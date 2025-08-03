@@ -12,6 +12,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 import argparse
 import asyncio
 import logging
+import json
 
 from config_manager import setup_environment
 from paper_qa_core import query_combined, query_local_papers, query_public_sources
@@ -130,57 +131,79 @@ async def run_picalm_demo():
 
 async def main():
     """Main CLI function."""
-    parser = argparse.ArgumentParser(description="Paper-QA CLI")
-    parser.add_argument("--question", "-q", help="Question to ask")
+    parser = argparse.ArgumentParser(description="Paper-QA CLI with enhanced features")
+    parser.add_argument(
+        "question",
+        help="Question to ask about papers",
+    )
     parser.add_argument(
         "--method",
         "-m",
-        choices=["local", "public", "combined", "semantic_scholar"],
+        choices=["local", "public", "combined", "semantic_scholar", "clinical_trials", "clinical_trials_only"],
         default="public",
         help="Query method (default: public for best results)",
     )
     parser.add_argument("--paper-dir", "-p", help="Paper directory for local queries")
     parser.add_argument(
-        "--config", "-c", default="default", help="Configuration to use"
+        "--config",
+        "-c",
+        default="default",
+        help="Configuration to use (default: default)",
     )
-    parser.add_argument("--demo", action="store_true", help="Run PICALM demo")
-    parser.add_argument("--status", action="store_true", help="Check system status")
-    parser.add_argument("--setup", action="store_true", help="Setup environment")
+    parser.add_argument(
+        "--output",
+        "-o",
+        help="Output file for results (optional)",
+    )
 
     args = parser.parse_args()
 
-    try:
-        # Setup environment
-        if args.setup:
-            print("Setting up environment...")
-            setup_environment()
-            print("✅ Environment setup complete")
+    from src.paper_qa_core import PaperQACore
+    core = PaperQACore(args.config)
+    
+    if args.method == "local":
+        if not args.paper_dir:
+            print("❌ Error: --paper-dir is required for local queries")
             return
+        result = await core.query_local_papers(args.question, args.paper_dir)
+    elif args.method == "public":
+        result = await core.query_public_sources(args.question)
+    elif args.method == "combined":
+        result = await core.query_combined(args.question, args.paper_dir)
+    elif args.method == "semantic_scholar":
+        result = await core.query_semantic_scholar_api(args.question)
+    elif args.method == "clinical_trials":
+        result = await core.query_clinical_trials(args.question)
+    elif args.method == "clinical_trials_only":
+        result = await core.query_clinical_trials_only(args.question)
+    else:
+        print(f"❌ Error: Unknown method {args.method}")
+        return
 
-        # Check status
-        if args.status:
-            print_system_status()
-            return
+    # Display results
+    if result.get("error"):
+        print(f"❌ Error: {result['error']}")
+        return
 
-        # Run demo
-        if args.demo:
-            await run_picalm_demo()
-            return
+    print(f"\n🎯 **Answer:**\n{result.get('answer', 'No answer generated')}")
+    
+    if result.get("agent_metadata"):
+        metadata = result["agent_metadata"]
+        print(f"\n📊 **Search Statistics**")
+        print(f"Total Papers Searched: {metadata.get('papers_searched', 0)}")
+        print(f"Evidence Pieces Retrieved: {metadata.get('evidence_count', 0)}")
+        print(f"Average Relevance Score: {metadata.get('avg_relevance_score', 'N/A')}")
+        
+        print(f"\n🤖 **Agent Performance**")
+        print(f"Agent Steps: {metadata.get('agent_steps', 0)}")
+        print(f"Tool Calls Made: {metadata.get('tool_calls', 0)}")
+        print(f"Processing Time: {metadata.get('processing_time', 'N/A')}")
 
-        # Run single query
-        if args.question:
-            await run_query(args.question, args.method, args.paper_dir, args.config)
-        else:
-            print(
-                "Please provide a question with --question or run --demo for PICALM demo"
-            )
-            parser.print_help()
-
-    except KeyboardInterrupt:
-        print("\n\nInterrupted by user")
-    except Exception as e:
-        print(f"\n❌ Error: {e}")
-        sys.exit(1)
+    # Save to file if requested
+    if args.output:
+        with open(args.output, "w") as f:
+            json.dump(result, f, indent=2, default=str)
+        print(f"\n💾 Results saved to {args.output}")
 
 
 if __name__ == "__main__":

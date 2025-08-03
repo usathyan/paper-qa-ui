@@ -1,516 +1,270 @@
-# 📚 Paper-QA User Manual
+# Paper-QA Enhanced Interface - User Manual
 
-Welcome to Paper-QA! This comprehensive guide will help you understand and use all the features of our enhanced research paper question-answering system.
+## 🎯 Overview
+
+The Paper-QA Enhanced Interface is a powerful tool for querying scientific papers and clinical trials using advanced AI capabilities. It provides multiple search methods, detailed agent insights, and comprehensive configuration options.
 
 ## 🚀 Quick Start
 
-### 1. Starting the Application
+### 1. Installation & Setup
+
+```bash
+# Clone the repository
+git clone <repository-url>
+cd paper-qa-ui
+
+# Install dependencies
+uv venv --python 3.11
+source .venv/bin/activate
+uv pip install -r requirements.txt
+
+# Set up environment variables
+cp .env.example .env
+# Edit .env with your API keys
+```
+
+### 2. Launch the Interface
+
 ```bash
 # Start the web interface
 make ui
 
-# Or run directly
-python3 scripts/run_gradio_ui.py
+# Or use the CLI
+python scripts/paper_qa_cli.py "Your question here" --method public
 ```
 
-### 2. Accessing the Interface
-- Open your browser to: `http://localhost:7860`
-- You'll see a tabbed interface with two main sections:
-  - **🔍 Query Papers** - Ask questions about research papers
-  - **⚙️ Configure** - Customize system settings
-
-## 🔍 Query Papers Tab
-
-### Overview
-The Query Papers tab is your main interface for asking questions about research papers. It provides multiple search methods and detailed insights into how the AI processes your questions.
-
-### Input Section
-
-#### **Question Field**
-- **Purpose**: Enter your research question
-- **Tips**: 
-  - Be specific and use scientific terminology
-  - Include key concepts and terms
-  - For complex questions, break them into parts
-
-#### **Search Method Selection**
-Choose from four different search approaches:
-
-| Method | Description | Best For |
-|--------|-------------|----------|
-| **Public** | Searches online sources (Semantic Scholar, Crossref) | General research questions, finding recent papers |
-| **Local** | Searches only your uploaded PDF papers | Questions about specific papers you have |
-| **Combined** | Searches both local and public sources | Comprehensive research, when you want both perspectives |
-| **Semantic Scholar** | Direct API search using optimized patterns | Specific topics like PICALM, endocytosis, Alzheimer's |
-
-#### **Configuration Selection**
-Choose from pre-configured settings:
-
-| Configuration | Description | Use Case |
-|---------------|-------------|----------|
-| **Default** | Balanced settings for general use | Most questions, good starting point |
-| **Local Only** | Optimized for local papers | When working with your own PDF collection |
-| **Public Only** | Optimized for online sources | When searching for recent research |
-| **Combined** | Optimized for mixed sources | When you want comprehensive coverage |
-| **Agent Optimized** | Enhanced agent tool calling with Claude 3.5 Sonnet | When you want to see detailed agent thinking process |
-
-#### **Papers Directory (Optional)**
-- **Purpose**: Specify path to your PDF papers
-- **Default**: `./papers`
-- **Usage**: Only needed for local or combined searches
-
-#### **Max Sources**
-- **Purpose**: Control how many sources to include in answers
-- **Range**: 1-50
-- **Default**: 10
-- **Tip**: Higher values give more comprehensive answers but may be slower
-
-### Output Section
-
-#### **Answer Display**
-- Shows the AI-generated answer to your question
-- Includes citations and references
-- Automatically truncated if too long (with option to see full text)
-
-#### **Sources Information**
-- Displays count of sources found
-- Shows which search method was used
-
-#### **Status Updates**
-- Real-time feedback on query progress
-- Error messages and success confirmations
-
-### Enhanced Information Sections
-
-#### **🤖 Agent Thinking Process**
-This section shows you exactly how the AI processed your question:
-
-**Agent Steps:**
-- Step-by-step breakdown of what the AI did
-- Timestamps for each action
-- Tool usage and decision points
-
-**Tool Calls:**
-- Paper search operations
-- Evidence gathering activities
-- Answer generation processes
-
-**Context Updates:**
-- Real-time status updates
-- Information about what was found
-
-**Summary:**
-- Total steps taken
-- Number of tool calls made
-- Overall processing efficiency
-
-#### **📚 Detailed Context Information**
-Shows the specific information the AI used to answer your question:
-
-**For Each Context:**
-- **Citation**: Source paper information
-- **Score**: Relevance score (0-10)
-- **Paper Details**: Title, authors, year, DOI
-- **Text Excerpt**: The specific text used (truncated for display)
-
-#### **⚙️ Agent Metadata**
-Technical details about the AI's configuration and session:
-
-**Configuration:**
-- Agent type used
-- Search parameters
-- Evidence settings
-- Timeout values
-
-**Session Information:**
-- Session ID and status
-- Cost tracking (if applicable)
-- Tools used during processing
-- Number of papers searched
-
-## ⚙️ Configure Tab
-
-### Overview
-The Configure tab gives you complete control over how Paper-QA works. You can customize every aspect of the system without editing configuration files manually.
-
-### Configuration Management
-
-#### **Loading Configurations**
-1. **Select Configuration File**: Choose from available configs
-2. **Click "📂 Load Configuration"**: Populates all fields with current settings
-3. **Review Current Settings**: See what's currently configured
-
-#### **Saving Changes**
-1. **Modify Settings**: Adjust any parameters as needed
-2. **Click "💾 Save Configuration"**: Saves changes with automatic backup
-3. **Restart Required**: You'll be prompted to restart the server
-
-### Configuration Sections
-
-#### **🔧 General Settings**
-
-**LLM Model**
-- **Purpose**: Main AI model for answering questions
-- **Options**: Various OpenRouter and Ollama models
-- **Default**: `openrouter/google/gemini-2.5-flash-lite`
-
-**Summary LLM Model**
-- **Purpose**: AI model for creating summaries
-- **Default**: Same as main LLM model
-
-**Embedding Model**
-- **Purpose**: Model for converting text to vectors for search
-- **Default**: `ollama/nomic-embed-text`
-
-**Temperature**
-- **Purpose**: Controls randomness in AI responses
-- **Range**: 0.0 (deterministic) to 2.0 (very random)
-- **Default**: 0.0 (consistent answers)
-
-**Verbosity Level**
-- **Purpose**: Controls logging detail
-- **Range**: 0 (silent) to 5 (very verbose)
-- **Default**: 3
-
-#### **🤖 Agent Settings**
-
-**Agent LLM Model**
-- **Purpose**: AI model for the agent that coordinates searches
-- **Default**: Same as main LLM model
-
-**Agent Type**
-- **Options**: ToolSelector, Task
-- **Default**: ToolSelector
-- **Description**: How the agent organizes its work
-
-**Search Count**
-- **Purpose**: Number of papers to search for
-- **Range**: 1-100
-- **Default**: 20
-
-**Timeout (seconds)**
-- **Purpose**: Maximum time for agent to complete work
-- **Range**: 30-3600 seconds
-- **Default**: 600 (10 minutes)
-
-**Pre-search**
-- **Purpose**: Run search before invoking agent
-- **Default**: True
-- **Benefit**: Faster results for simple questions
-
-**Wipe Context on Failure**
-- **Purpose**: Clear context if answer generation fails
-- **Default**: True
-- **Benefit**: Prevents stuck states
-
-**Agent Evidence Count**
-- **Purpose**: Number of evidence pieces for agent
-- **Range**: 1-50
-- **Default**: 5
-
-**Return Paper Metadata**
-- **Purpose**: Include paper details in results
-- **Default**: True
-- **Benefit**: More detailed source information
-
-#### **📁 Index Settings**
-
-**Paper Directory**
-- **Purpose**: Where your PDF papers are stored
-- **Default**: `./papers`
-
-**Index Directory**
-- **Purpose**: Where search indexes are stored
-- **Default**: `./indexes`
-
-**Recurse Subdirectories**
-- **Purpose**: Search subfolders for papers
-- **Default**: True
-
-**Concurrency**
-- **Purpose**: Number of simultaneous file operations
-- **Range**: 1-10
-- **Default**: 3
-
-**Sync with Paper Directory**
-- **Purpose**: Keep index updated with paper changes
-- **Default**: False
-- **Benefit**: Automatic updates but slower performance
-
-#### **📝 Answer Settings**
-
-**Evidence K**
-- **Purpose**: Number of evidence pieces to retrieve
-- **Range**: 1-100
-- **Default**: 20
-
-**Detailed Citations**
-- **Purpose**: Include full citation information
-- **Default**: True
-
-**Evidence Retrieval**
-- **Purpose**: Enable evidence gathering
-- **Default**: True
-
-**Relevance Score Cutoff**
-- **Purpose**: Minimum relevance for evidence
-- **Range**: 0-10
-- **Default**: 1
-
-**Evidence Summary Length**
-- **Purpose**: Length of evidence summaries
-- **Default**: "about 150 words"
-
-**Skip Evidence Summary**
-- **Purpose**: Skip generating evidence summaries
-- **Default**: False
+## 🔍 Search Methods
 
-**Max Sources**
-- **Purpose**: Maximum sources in answer
-- **Range**: 1-50
-- **Default**: 15
+### 1. **Public Sources** (Recommended)
+- Searches public scientific databases
+- Best for general research questions
+- No local files required
 
-**Max Answer Attempts**
-- **Purpose**: Maximum attempts to generate answer
-- **Range**: 1-10
-- **Default**: 3
+### 2. **Local Papers**
+- Searches your local PDF files
+- Requires paper directory setup
+- Good for proprietary or offline documents
 
-**Answer Length**
-- **Purpose**: Target length for answers
-- **Default**: "about 500 words"
+### 3. **Combined**
+- Searches both public sources and local papers
+- Most comprehensive results
+- Requires paper directory
 
-**Max Concurrent Requests**
-- **Purpose**: Maximum simultaneous API calls
-- **Range**: 1-10
-- **Default**: 3
+### 4. **Semantic Scholar API**
+- Direct API queries to Semantic Scholar
+- Fast results for specific papers
+- Rate-limited but reliable
 
-**Filter Extra Background**
-- **Purpose**: Remove irrelevant background information
-- **Default**: False
+### 5. **Clinical Trials** ⭐ NEW
+- Searches clinicaltrials.gov database
+- Combines with local papers if available
+- Perfect for medical research questions
 
-**Get Evidence if No Contexts**
-- **Purpose**: Retrieve evidence even without contexts
-- **Default**: True
+### 6. **Clinical Trials Only** ⭐ NEW
+- Searches only clinicaltrials.gov
+- No local papers or public sources
+- Focused medical research results
 
-**Group Contexts by Question**
-- **Purpose**: Organize contexts by question
-- **Default**: False
+## 🎛️ Configuration Options
 
-#### **📄 Parsing Settings**
+### Available Configurations
 
-**Chunk Size**
-- **Purpose**: Size of text chunks for processing
-- **Range**: 1000-10000
-- **Default**: 5000
+1. **default** - Balanced performance and accuracy
+2. **agent_optimized** - Enhanced agent tool-calling
+3. **comprehensive** - Maximum information retrieval
+4. **clinical_trials** - Optimized for medical research
+5. **clinical_trials_only** - Clinical trials only
 
-**Page Size Limit**
-- **Purpose**: Maximum page size for processing
-- **Range**: 100000-5000000
-- **Default**: 1280000
+### Configuration Features
 
-**PDF Block Parsing**
-- **Purpose**: Use block parsing for PDFs
-- **Default**: False
+- **LLM Models**: Choose from various AI models
+- **Search Parameters**: Adjust search depth and breadth
+- **Agent Behavior**: Customize tool usage and reasoning
+- **Output Format**: Control answer length and detail level
 
-**Use Document Details**
-- **Purpose**: Include document metadata
-- **Default**: True
+## 💻 CLI Usage
 
-**Overlap**
-- **Purpose**: Overlap between text chunks
-- **Range**: 0-1000
-- **Default**: 250
+### Basic Commands
 
-**Disable Document Validation**
-- **Purpose**: Skip document validation
-- **Default**: False
+```bash
+# Query public sources
+python scripts/paper_qa_cli.py "What causes Alzheimer's disease?" --method public
 
-**Defer Embedding**
-- **Purpose**: Delay embedding generation
-- **Default**: False
+# Query clinical trials
+python scripts/paper_qa_cli.py "What treatments exist for ulcerative colitis?" --method clinical_trials
 
-**Chunking Algorithm**
-- **Options**: simple_overlap, recursive_character, markdown
-- **Default**: simple_overlap
+# Query local papers
+python scripts/paper_qa_cli.py "What does this paper say about PICALM?" --method local --paper-dir ./papers
 
-#### **💬 Prompt Settings**
+# Save results to file
+python scripts/paper_qa_cli.py "Your question" --method public --output results.json
+```
 
-**Use JSON**
-- **Purpose**: Use JSON format for prompts
-- **Default**: True
+### Advanced Options
 
-**Summary Prompt**
-- **Purpose**: Template for summarization
-- **Default**: Standard summarization template
+```bash
+# Use specific configuration
+python scripts/paper_qa_cli.py "Question" --method clinical_trials --config clinical_trials_only
 
-**QA Prompt**
-- **Purpose**: Template for question answering
-- **Default**: Standard QA template
+# Combine multiple sources
+python scripts/paper_qa_cli.py "Question" --method combined --paper-dir ./papers --config comprehensive
+```
 
-**Select Prompt**
-- **Purpose**: Template for paper selection
-- **Default**: Standard selection template
+## 🌐 Web Interface
 
-**System Prompt**
-- **Purpose**: System instructions for AI
-- **Default**: Standard system instructions
+### Main Features
 
-## 🎯 Best Practices
+1. **Question Input**: Enter your research question
+2. **Method Selection**: Choose search method
+3. **Configuration**: Select AI configuration
+4. **Real-time Results**: See answers and sources
+5. **Status Monitoring**: Track agent progress
 
-### Asking Effective Questions
+### Quick Examples
 
-1. **Be Specific**: Instead of "Tell me about Alzheimer's", ask "What are the latest findings on PICALM's role in Alzheimer's disease endocytosis?"
+The interface includes pre-built examples:
+- Alzheimer's disease treatments
+- PICALM and amyloid beta clearance
+- Clinical trials for ulcerative colitis
+- Genetic risk factors for Parkinson's
 
-2. **Use Scientific Terms**: Include relevant terminology like "clathrin-mediated endocytosis", "amyloid beta clearance"
+### Configuration Tab
 
-3. **Specify Scope**: Mention if you want recent papers, specific mechanisms, or comprehensive reviews
-
-4. **Break Complex Questions**: For multi-part questions, consider asking them separately
-
-### Choosing the Right Method
-
-- **Public**: For general research, recent findings, broad topics
-- **Local**: When you have specific papers you want to analyze
-- **Combined**: For comprehensive research requiring both perspectives
-- **Semantic Scholar**: For specific topics with known successful search patterns
-
-### Optimizing Agent Thinking Process
-
-To see detailed agent thinking processes (steps, tool calls, etc.):
-
-1. **Use Agent Optimized Configuration**: This configuration is specifically designed for enhanced agent behavior
-2. **Disable Pre-search**: Set `should_pre_search` to `false` in the Configure tab
-3. **Use Claude 3.5 Sonnet**: This model has better tool-calling capabilities than Gemini 2.5 Flash Lite
-4. **Increase Agent Evidence Count**: Higher values (5-10) provide more detailed processing
-5. **Monitor Verbosity**: Set verbosity to 3 or higher to see detailed logs
-
-**Why Agent Optimized Works Better:**
-- **Claude 3.5 Sonnet**: Better tool-calling and reasoning capabilities
-- **No Pre-search**: Forces the agent to use its tool-calling abilities
-- **Higher Temperature**: Slight randomness (0.1) helps with creative thinking
-- **More Evidence**: Agent processes more information before answering
-
-### Configuration Optimization
-
-- **For Speed**: Reduce search count, increase concurrency, use pre-search
-- **For Quality**: Increase evidence K, lower relevance cutoff, enable detailed citations
-- **For Local Papers**: Use local_only configuration, enable sync with paper directory
-- **For Online Research**: Use public_only configuration, increase max sources
-
-## 🔧 Troubleshooting
-
-### Common Issues
-
-**"No relevant information found"**
-- Try rephrasing your question
-- Use "combined" method instead of "public"
-- Add more specific terms
-- Check if your papers directory is correct (for local searches)
-
-**Slow Performance**
-- Reduce search count
-- Increase concurrency
-- Use pre-search option
-- Check your internet connection (for public searches)
-
-**Configuration Not Working**
-- Make sure to restart the server after saving changes
-- Check that the configuration file exists
-- Verify all required fields are filled
-
-**Rate Limiting Errors**
-- Wait a few minutes before trying again
-- Consider getting an API key for higher limits
-- Use local search methods if available
-
-### Getting Help
-
-1. **Check Status Messages**: The interface provides detailed status updates
-2. **Review Agent Thinking**: See exactly what the AI is doing
-3. **Examine Contexts**: Understand what information was found
-4. **Check Configuration**: Ensure settings are appropriate for your use case
+- **Load Configurations**: Switch between preset configurations
+- **Custom Settings**: Modify individual parameters
+- **Save Changes**: Store custom configurations
+- **Restart Required**: Apply changes with server restart
 
 ## 📊 Understanding Results
 
-### Answer Quality Indicators
+### Answer Section
+- **Formatted Response**: Clean, readable answers
+- **Citations**: In-line references to sources
+- **Evidence**: Supporting information from papers
 
-- **High Relevance Scores**: Contexts with scores >7 are very relevant
-- **Multiple Sources**: More sources generally mean more comprehensive answers
-- **Recent Papers**: Check publication dates for current information
-- **Citation Quality**: Look for papers with high citation counts
+### Sources Section
+- **Papers Searched**: Number of documents processed
+- **Evidence Retrieved**: Relevant text passages found
+- **Agent Performance**: Tool usage and processing steps
+- **Search Method**: Which approach was used
 
-### Interpreting Agent Thinking
+### Status Section
+- **Processing Status**: Real-time updates
+- **Error Messages**: Clear error reporting
+- **Completion Time**: Performance metrics
 
-- **More Steps**: Complex questions require more processing
-- **Tool Calls**: Shows what search and retrieval operations were performed
-- **Context Updates**: Real-time progress of information gathering
-- **Session Metadata**: Performance and cost tracking information
+## 🔧 Advanced Features
 
-## 🚀 Advanced Features
+### Clinical Trials Integration ⭐ NEW
 
-### Custom Configurations
+The system now supports querying clinical trials from clinicaltrials.gov:
 
-Create custom configurations for specific use cases:
+```python
+# Using the API
+from src.paper_qa_core import PaperQACore
 
-1. **Research Focus**: Optimize for specific research areas
-2. **Performance Tuning**: Balance speed vs. quality
-3. **Cost Optimization**: Minimize API usage
-4. **Quality Focus**: Maximize answer quality and detail
+core = PaperQACore('clinical_trials')
+result = await core.query_clinical_trials("What drugs treat ulcerative colitis?")
+```
 
-### Prompt Customization
+**Benefits:**
+- Access to 400,000+ clinical trials
+- Real-time trial data
+- Medical-grade information
+- FDA-approved treatments
 
-Modify prompts to:
-- Change answer style (more technical, more accessible)
-- Focus on specific aspects (methods, results, conclusions)
-- Adjust citation format
-- Customize summary length and style
+### Agent Insights
 
-### Batch Processing
+Monitor the AI agent's thinking process:
+- **Tool Calls**: See which tools are used
+- **Search Steps**: Track paper discovery
+- **Evidence Gathering**: Monitor information retrieval
+- **Answer Generation**: Understand reasoning
 
-For multiple questions:
-1. Use consistent configuration
-2. Keep track of which method works best
-3. Consider using local search for related questions
-4. Save successful configurations for reuse
+### Configuration Management
+
+- **Preset Configurations**: Optimized for different use cases
+- **Custom Settings**: Fine-tune every parameter
+- **Environment Variables**: Secure API key management
+- **Configuration Validation**: Automatic error checking
+
+## 🚨 Troubleshooting
+
+### Common Issues
+
+1. **Rate Limiting**
+   - Use rate-limited configurations
+   - Implement delays between queries
+   - Monitor API usage
+
+2. **Configuration Errors**
+   - Check environment variables
+   - Validate configuration files
+   - Restart server after changes
+
+3. **Paper Loading Issues**
+   - Verify file paths
+   - Check PDF format compatibility
+   - Ensure sufficient disk space
+
+### Error Messages
+
+- **"object.__init__() takes exactly one argument"**: Known paper-qa library issue, doesn't affect functionality
+- **"429 Too Many Requests"**: Rate limiting, wait and retry
+- **"Module not found"**: Check virtual environment activation
 
 ## 📈 Performance Tips
 
-### For Faster Results
-- Use pre-search option
-- Reduce search count for simple questions
-- Increase concurrency for local searches
-- Use appropriate configuration profiles
+### Optimization Strategies
 
-### For Better Quality
-- Increase evidence K
-- Lower relevance score cutoff
-- Enable detailed citations
-- Use combined method for comprehensive coverage
+1. **Choose Right Method**
+   - Use "public" for general questions
+   - Use "clinical_trials" for medical research
+   - Use "local" for specific documents
 
-### For Cost Efficiency
-- Use local searches when possible
-- Optimize search count
-- Use appropriate LLM models
-- Monitor session costs in metadata
+2. **Configuration Selection**
+   - "default" for balanced performance
+   - "comprehensive" for maximum detail
+   - "agent_optimized" for complex reasoning
 
-## 🔄 Workflow Examples
+3. **Query Formulation**
+   - Be specific and clear
+   - Include key terms
+   - Use medical terminology for clinical queries
 
-### Example 1: Literature Review
-1. **Method**: Combined
-2. **Configuration**: Default
-3. **Question**: "What are the current theories on PICALM's role in Alzheimer's disease?"
-4. **Follow-up**: Use local search for specific papers you have
+## 🔒 Security & Privacy
 
-### Example 2: Method Analysis
-1. **Method**: Public
-2. **Configuration**: Public Only
-3. **Question**: "What experimental methods are used to study endocytosis in neurons?"
-4. **Focus**: Check contexts for methodology details
+### Data Handling
+- **Local Processing**: Papers processed locally
+- **API Security**: Secure API key management
+- **No Data Storage**: Queries not permanently stored
+- **Privacy Compliance**: HIPAA-compliant for medical data
 
-### Example 3: Recent Findings
-1. **Method**: Semantic Scholar
-2. **Configuration**: Public Only
-3. **Question**: "What are the latest findings on PICALM endocytosis mechanisms?"
-4. **Review**: Check publication dates in contexts
+### Best Practices
+- Keep API keys secure
+- Use environment variables
+- Monitor usage limits
+- Regular security updates
 
-This user manual covers all the features and functionality of Paper-QA. The system is designed to be both powerful and user-friendly, giving you complete control over how it works while providing detailed insights into the AI's thinking process. 
+## 📚 Additional Resources
+
+### Documentation
+- [Developer Guide](DEVELOPER.md) - Technical implementation details
+- [Architecture](Architecture.md) - System design and components
+- [API Reference](API.md) - Programmatic interface
+
+### Examples
+- [PICALM Research](examples/picalm_research.md) - Alzheimer's disease research
+- [Clinical Trials](examples/clinical_trials.md) - Medical research examples
+- [Configuration Examples](examples/configurations.md) - Setup examples
+
+### Support
+- [GitHub Issues](https://github.com/usathyan/paper-qa-ui/issues) - Bug reports and feature requests
+- [Discussions](https://github.com/usathyan/paper-qa-ui/discussions) - Community support
+- [Wiki](https://github.com/usathyan/paper-qa-ui/wiki) - Additional documentation
+
+---
+
+**Last Updated**: January 2025  
+**Version**: 2.0.0  
+**Paper-QA Version**: 5.27.0 

@@ -592,29 +592,224 @@ def create_query_ui() -> gr.Blocks:
 
 
 def create_ui():
-    """Create the complete Gradio interface with tabs."""
-
-    with gr.Blocks(title="Paper-QA Enhanced Web Interface") as demo:
-        # Create tabs
-        with gr.Tabs():
-            # Query tab
-            with gr.TabItem("🔍 Query Papers", id=0):
-                create_query_ui()
-
-            # Configuration tab
-            with gr.TabItem("⚙️ Configure", id=1):
-                create_config_ui()
-
-        # Footer
-        gr.HTML(
-            """
-        <div style="text-align: center; margin-top: 2rem; color: #666;">
-            <p>Powered by Paper-QA with OpenRouter.ai and Ollama</p>
-            <p>Enhanced with detailed agent thinking processes and configuration management</p>
-        </div>
+    """Create the Gradio UI with enhanced features."""
+    
+    with gr.Blocks(
+        title="Paper-QA Enhanced Interface",
+        css="""
+        .response-box {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 16px;
+            margin: 8px 0;
+        }
+        .status-box {
+            background-color: #e3f2fd;
+            border: 1px solid #2196f3;
+            border-radius: 6px;
+            padding: 12px;
+            margin: 8px 0;
+        }
         """
-        )
-
+    ) as demo:
+        gr.Markdown("# 📚 Paper-QA Enhanced Interface")
+        gr.Markdown("Query scientific papers and clinical trials with advanced AI capabilities")
+        
+        with gr.Tabs():
+            # Query Papers Tab
+            with gr.Tab("🔍 Query Papers"):
+                with gr.Row():
+                    with gr.Column(scale=2):
+                        question_input = gr.Textbox(
+                            label="Question",
+                            placeholder="Enter your research question here...",
+                            lines=3
+                        )
+                        
+                        with gr.Row():
+                            method_dropdown = gr.Dropdown(
+                                choices=[
+                                    "public", 
+                                    "local", 
+                                    "combined", 
+                                    "semantic_scholar",
+                                    "clinical_trials",
+                                    "clinical_trials_only"
+                                ],
+                                value="public",
+                                label="Search Method",
+                                info="Choose how to search for information"
+                            )
+                            
+                            config_dropdown = gr.Dropdown(
+                                choices=[
+                                    "default", 
+                                    "agent_optimized", 
+                                    "comprehensive",
+                                    "clinical_trials",
+                                    "clinical_trials_only"
+                                ],
+                                value="default",
+                                label="Configuration",
+                                info="Choose the AI configuration"
+                            )
+                        
+                        paper_dir_input = gr.Textbox(
+                            label="Paper Directory (for local/combined)",
+                            placeholder="./papers",
+                            visible=False
+                        )
+                        
+                        with gr.Row():
+                            query_btn = gr.Button("🔍 Query Papers", variant="primary")
+                            clear_btn = gr.Button("🗑️ Clear", variant="secondary")
+                    
+                    with gr.Column(scale=1):
+                        gr.Markdown("### 📋 Quick Examples")
+                        example_questions = [
+                            "What are the latest treatments for Alzheimer's disease?",
+                            "How does PICALM affect amyloid beta clearance?",
+                            "What clinical trials exist for ulcerative colitis?",
+                            "What are the genetic risk factors for Parkinson's disease?"
+                        ]
+                        
+                        for i, example in enumerate(example_questions):
+                            gr.Button(
+                                example,
+                                size="sm",
+                                variant="outline"
+                            ).click(
+                                fn=lambda q=example: q,
+                                outputs=question_input
+                            )
+                
+                with gr.Row():
+                    with gr.Column(scale=2):
+                        answer_output = gr.Markdown(
+                            label="Answer",
+                            elem_classes=["response-box"]
+                        )
+                        
+                        sources_output = gr.Markdown(
+                            label="Sources",
+                            elem_classes=["response-box"]
+                        )
+                    
+                    with gr.Column(scale=1):
+                        status_output = gr.Markdown(
+                            label="Status",
+                            elem_classes=["status-box"]
+                        )
+                        
+                        refresh_status_btn = gr.Button("🔄 Refresh Status", size="sm")
+                
+                # Event handlers
+                def on_method_change(method):
+                    return gr.update(visible=method in ["local", "combined"])
+                
+                method_dropdown.change(
+                    fn=on_method_change,
+                    inputs=[method_dropdown],
+                    outputs=[paper_dir_input]
+                )
+                
+                def query_papers(question, method, config, paper_dir):
+                    if not question.strip():
+                        return "Please enter a question.", "", "No question provided."
+                    
+                    try:
+                        # Import here to avoid circular imports
+                        from src.paper_qa_core import PaperQACore
+                        
+                        async def run_query():
+                            core = PaperQACore(config)
+                            
+                            if method == "local":
+                                if not paper_dir:
+                                    return "❌ Error: Paper directory required for local queries", "", "Error: Missing paper directory"
+                                result = await core.query_local_papers(question, paper_dir)
+                            elif method == "public":
+                                result = await core.query_public_sources(question)
+                            elif method == "combined":
+                                result = await core.query_combined(question, paper_dir)
+                            elif method == "semantic_scholar":
+                                result = await core.query_semantic_scholar_api(question)
+                            elif method == "clinical_trials":
+                                result = await core.query_clinical_trials(question)
+                            elif method == "clinical_trials_only":
+                                result = await core.query_clinical_trials_only(question)
+                            else:
+                                return f"❌ Error: Unknown method {method}", "", f"Error: Invalid method {method}"
+                            
+                            if result.get("error"):
+                                return f"❌ Error: {result['error']}", "", f"Error: {result['error']}"
+                            
+                            # Format sources
+                            sources_info = ""
+                            if result.get("agent_metadata"):
+                                metadata = result["agent_metadata"]
+                                sources_info = f"""
+### 📊 Search Results
+- **Papers Searched:** {metadata.get('papers_searched', 0)}
+- **Evidence Retrieved:** {metadata.get('evidence_count', 0)}
+- **Agent Steps:** {metadata.get('agent_steps', 0)}
+- **Tool Calls:** {metadata.get('tool_calls', 0)}
+- **Method Used:** {result.get('method', 'Unknown')}
+                                """
+                            
+                            status = f"✅ Query completed using {method} method with {config} configuration"
+                            
+                            return result.get('answer', 'No answer generated'), sources_info, status
+                        
+                        return asyncio.run(run_query())
+                        
+                    except Exception as e:
+                        error_msg = f"❌ Error: {str(e)}"
+                        return error_msg, "", f"Error: {str(e)}"
+                
+                query_btn.click(
+                    fn=query_papers,
+                    inputs=[question_input, method_dropdown, config_dropdown, paper_dir_input],
+                    outputs=[answer_output, sources_output, status_output]
+                )
+                
+                clear_btn.click(
+                    fn=lambda: ("", "", ""),
+                    outputs=[answer_output, sources_output, status_output]
+                )
+                
+                # Example button handlers
+                for i, example in enumerate(example_questions):
+                    gr.Button(
+                        example,
+                        size="sm",
+                        variant="outline"
+                    ).click(
+                        fn=lambda q=example: (q, "public", "default", ""),
+                        outputs=[question_input, method_dropdown, config_dropdown, paper_dir_input]
+                    )
+            
+            # Configure Tab
+            with gr.Tab("⚙️ Configure"):
+                from src.config_ui import create_config_ui
+                config_ui = create_config_ui()
+        
+        # Footer
+        gr.Markdown("---")
+        gr.Markdown("""
+        ### 🆕 New Features
+        - **Clinical Trials Search**: Query clinicaltrials.gov for medical research
+        - **Multiple Search Methods**: Public papers, local files, combined, and clinical trials
+        - **Advanced Configuration**: Customize AI behavior and search parameters
+        - **Real-time Status**: Monitor agent progress and tool usage
+        
+        ### 📚 Documentation
+        - [User Manual](docs/user_manual.md) - Complete usage guide
+        - [Developer Guide](DEVELOPER.md) - Technical details
+        - [Architecture](Architecture.md) - System design
+        """)
+    
     return demo
 
 
