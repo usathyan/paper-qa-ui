@@ -46,6 +46,20 @@ Paper-QA lets you ask research questions and get answers with citations from you
 
 4. **Add your PDF papers:**
    - Place PDFs in the `papers/` directory
+   
+   **Download initial papers (optional):**
+   ```sh
+   # Create papers directory if it doesn't exist
+   mkdir -p papers
+   
+   # Download the 4 included research papers
+   curl -L -o papers/Alzheimer_Pathogenesis_2021.pdf "https://github.com/usathyan/paper-qa-ui/raw/main/papers/Alzheimer_Pathogenesis_2021.pdf"
+   curl -L -o papers/PICALM_Mechanisms_2020.pdf "https://github.com/usathyan/paper-qa-ui/raw/main/papers/PICALM_Mechanisms_2020.pdf"
+   curl -L -o papers/Alzheimer_GWAS_2019.pdf "https://github.com/usathyan/paper-qa-ui/raw/main/papers/Alzheimer_GWAS_2019.pdf"
+   curl -L -o papers/PICALM_Alzheimer_Review_2021.pdf "https://github.com/usathyan/paper-qa-ui/raw/main/papers/PICALM_Alzheimer_Review_2021.pdf"
+   ```
+   
+   These papers focus on Alzheimer's disease research and PICALM mechanisms, providing a good starting point for testing the system.
 
 5. **Run a demo:**
    ```sh
