@@ -152,13 +152,23 @@ class PaperQACore:
         detailed_contexts = []
 
         for i, context in enumerate(contexts):
+            # Safely extract text content
+            text_content = getattr(context, "text", str(context))
+            if hasattr(text_content, "text"):
+                # If it's a Text object, get the actual text
+                text_content = text_content.text
+            elif not isinstance(text_content, str):
+                # If it's not a string, convert it
+                text_content = str(text_content)
+
+            # Truncate text for display
+            display_text = (
+                text_content[:200] + "..." if len(text_content) > 200 else text_content
+            )
+
             context_info = {
                 "index": i + 1,
-                "text": (
-                    getattr(context, "text", str(context))[:200] + "..."
-                    if len(str(context)) > 200
-                    else str(context)
-                ),
+                "text": display_text,
                 "citation": getattr(context, "citation", "Unknown"),
                 "score": getattr(context, "score", 0.0),
                 "question": getattr(context, "question", None),
