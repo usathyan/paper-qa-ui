@@ -139,15 +139,15 @@ async def query_papers(
     config_name: str,
     paper_directory: str,
     max_sources: int = 10,
-) -> tuple[str, str, str, str, str, str]:
+) -> tuple[str, str, str]:
     """
     Query papers using the specified method.
 
     Returns:
-        tuple: (answer, sources_info, status, thinking_process, detailed_contexts, agent_metadata)
+        tuple: (answer, sources_info, status)
     """
     if not question.strip():
-        return "", "", "❌ Please enter a question.", "Ready to query...", "", ""
+        return "", "", "❌ Please enter a question."
 
     try:
         # Initialize core
@@ -181,43 +181,31 @@ async def query_papers(
             if answer.strip() == "I cannot answer." or answer.strip() == "":
                 status = "⚠️ Query completed but no relevant information found. Try rephrasing your question or using a different method."
                 return (
-                    "No relevant information found. Try:\n• Rephrasing your question\n• Using 'combined' method instead of 'public'\n• Adding more specific terms",
+                    "**No relevant information found.**\n\nTry:\n• Rephrasing your question\n• Using 'combined' method instead of 'public'\n• Adding more specific terms",
                     sources_info,
                     status,
-                    "No thinking process data available.",
-                    "No context information available.",
-                    "No agent metadata available.",
                 )
 
             # Truncate answer if too long
             if len(answer) > 5000:
                 answer = answer[:5000] + "\n\n... (truncated for display)"
 
-            # Format detailed information
-            thinking_process = format_thinking_process(
-                result.get("thinking_process", {})
-            )
-            detailed_contexts = format_detailed_contexts(
-                result.get("detailed_contexts", [])
-            )
-            agent_metadata = format_agent_metadata(result.get("agent_metadata", {}))
+            # Format answer for markdown display
+            formatted_answer = answer
+            if len(formatted_answer) > 10000:
+                formatted_answer = (
+                    formatted_answer[:10000] + "\n\n... *(truncated for display)*"
+                )
 
             status = f"✅ Query completed successfully using {method} method"
-            return (
-                answer,
-                sources_info,
-                status,
-                thinking_process,
-                detailed_contexts,
-                agent_metadata,
-            )
+            return formatted_answer, sources_info, status
         else:
             error_msg = result.get("error", "Unknown error")
-            return "", "", f"❌ Query failed: {error_msg}", "", "", ""
+            return "", "", f"❌ Query failed: {error_msg}"
 
     except Exception as e:
         logger.error(f"Error in query_papers: {e}")
-        return "", "", f"❌ Error: {str(e)}", "", "", ""
+        return "", "", f"❌ Error: {str(e)}"
 
 
 def query_papers_sync(
@@ -226,7 +214,7 @@ def query_papers_sync(
     config_name: str,
     paper_directory: str,
     max_sources: int = 10,
-) -> tuple[str, str, str, str, str, str]:
+) -> tuple[str, str, str]:
     """
     Synchronous wrapper for query_papers to work with Gradio.
     """
@@ -254,7 +242,7 @@ def query_papers_sync(
             )
     except Exception as e:
         logger.error(f"Error in query_papers_sync: {e}")
-        return "", "", f"❌ Error: {str(e)}", "", "", ""
+        return "", "", f"❌ Error: {str(e)}"
 
 
 def create_query_ui() -> gr.Blocks:
@@ -270,33 +258,44 @@ def create_query_ui() -> gr.Blocks:
         text-align: center;
         margin-bottom: 2rem;
     }
+    .response-box {
+        background-color: #f8f9fa;
+        padding: 1.5rem;
+        border-radius: 12px;
+        border: 2px solid #e9ecef;
+        margin: 1rem 0;
+        font-size: 16px;
+        line-height: 1.6;
+    }
+    .response-box h1, .response-box h2, .response-box h3 {
+        color: #2c3e50;
+        margin-top: 1.5rem;
+        margin-bottom: 0.5rem;
+    }
+    .response-box p {
+        margin-bottom: 1rem;
+    }
+    .response-box ul, .response-box ol {
+        margin-bottom: 1rem;
+        padding-left: 2rem;
+    }
+    .response-box li {
+        margin-bottom: 0.5rem;
+    }
+    .response-box strong {
+        color: #2c3e50;
+        font-weight: 600;
+    }
+    .response-box em {
+        color: #6c757d;
+        font-style: italic;
+    }
     .info-box {
         background-color: #f8f9fa;
         padding: 1rem;
         border-radius: 8px;
         margin-bottom: 1rem;
         border-left: 4px solid #007bff;
-    }
-    .thinking-box {
-        background-color: #fff3cd;
-        padding: 1rem;
-        border-radius: 8px;
-        margin-bottom: 1rem;
-        border-left: 4px solid #ffc107;
-    }
-    .context-box {
-        background-color: #d1ecf1;
-        padding: 1rem;
-        border-radius: 8px;
-        margin-bottom: 1rem;
-        border-left: 4px solid #17a2b8;
-    }
-    .metadata-box {
-        background-color: #d4edda;
-        padding: 1rem;
-        border-radius: 8px;
-        margin-bottom: 1rem;
-        border-left: 4px solid #28a745;
     }
     """
 
@@ -399,46 +398,18 @@ def create_query_ui() -> gr.Blocks:
 
         # Output section
         with gr.Group():
-            gr.Markdown("### 📝 Answer")
-            answer_output = gr.Textbox(
-                label="Answer", lines=8, max_lines=15, interactive=False
+            gr.Markdown("### 📝 Response")
+            answer_output = gr.Markdown(
+                label="Answer",
+                value="Ask a question to get started...",
+                elem_classes=["response-box"],
             )
 
             with gr.Row():
-                sources_output = gr.Textbox(label="Sources", interactive=False)
-                status_output = gr.Textbox(label="Status", interactive=False)
-
-        # Enhanced information sections
-        with gr.Row():
-            with gr.Column():
-                gr.Markdown("### 🤖 Agent Thinking Process")
-                thinking_output = gr.Textbox(
-                    label="Agent Steps & Tool Calls",
-                    lines=12,
-                    max_lines=20,
-                    interactive=False,
-                    value="Ready to display agent thinking process...",
+                sources_output = gr.Textbox(
+                    label="Sources Found", interactive=False, scale=1
                 )
-
-            with gr.Column():
-                gr.Markdown("### 📚 Detailed Contexts")
-                contexts_output = gr.Textbox(
-                    label="Context Information",
-                    lines=12,
-                    max_lines=20,
-                    interactive=False,
-                    value="Ready to display detailed context information...",
-                )
-
-        with gr.Row():
-            gr.Markdown("### ⚙️ Agent Metadata")
-            metadata_output = gr.Textbox(
-                label="Agent Configuration & Session Info",
-                lines=8,
-                max_lines=15,
-                interactive=False,
-                value="Ready to display agent metadata...",
-            )
+                status_output = gr.Textbox(label="Status", interactive=False, scale=1)
 
         # Event handlers
         query_btn.click(
@@ -454,9 +425,6 @@ def create_query_ui() -> gr.Blocks:
                 answer_output,
                 sources_output,
                 status_output,
-                thinking_output,
-                contexts_output,
-                metadata_output,
             ],
         )
 
@@ -474,9 +442,6 @@ def create_query_ui() -> gr.Blocks:
                 answer_output,
                 sources_output,
                 status_output,
-                thinking_output,
-                contexts_output,
-                metadata_output,
             ],
         )
 
