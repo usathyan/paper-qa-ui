@@ -1,264 +1,147 @@
 # Paper-QA: Scientific Paper Question Answering
 
 ## What is Paper-QA?
-Paper-QA lets you ask research questions and get answers with citations from your own PDF papers and public sources (like Semantic Scholar, Crossref, OpenAlex). It uses state-of-the-art AI models for both language and embeddings, and is designed for scientists, students, and anyone who needs reliable, cited answers from the literature.
+[Paper-QA](https://github.com/Future-House/paper-qa) is an AI research assistant that helps you find answers to scientific questions with proper citations. It searches both your own PDF papers and millions of published papers from databases like Semantic Scholar, Crossref, and OpenAlex.
+
+**Perfect for:** Literature reviews, grant writing, staying current with research, and exploring new fields.
+
+This is a Web based Front end for the already great paper-qa. I built this UI for self education.
 
 ---
 
-## User Journey & Features
+## A Visual Guide for how this works
 
 ```mermaid
-graph TD
-    A[👤 Researcher has a question] --> B{📚 What sources?}
+graph LR
+    A[📝 Research Query] --> B[⚙️ Choose Configuration]
     
-    B -->|My PDFs| C[📁 Upload papers to /papers]
-    B -->|Public literature| D[🌐 Use public databases]
-    B -->|Both| E[🔄 Combined search]
+    B --> C[🔍 Search Sources]
+    C --> D[🤖 AI Processing]
+    D --> E[📊 Cited Answer]
     
-    C --> F[🚀 Start Paper-QA UI]
-    D --> F
-    E --> F
+    subgraph "Configuration Options"
+        F[public_only<br/>📚 Literature Review]
+        G[local_only<br/>📁 Your PDFs]
+        H[combined<br/>🔄 Both Sources]
+        I[clinical_trials<br/>🏥 Medical Research]
+    end
     
-    F --> G[❓ Ask research question]
-    G --> H{🔍 Choose search method}
+    subgraph "Key Parameters"
+        J[Search Count: 15-50]
+        K[Evidence K: 10-30]
+        L[Temperature: 0.0-0.5]
+    end
     
-    H -->|Local Only| I[📖 Search uploaded PDFs]
-    H -->|Public Only| J[🔍 Search Semantic Scholar<br/>Crossref, OpenAlex]
-    H -->|Combined| K[🔄 Search both sources]
-    H -->|Clinical Trials| L[🏥 Search clinical databases]
+    B -.-> F
+    B -.-> G
+    B -.-> H
+    B -.-> I
     
-    I --> M[🤖 AI Agent processes]
-    J --> M
-    K --> M
-    L --> M
-    
-    M --> N[📊 Real-time status updates]
-    M --> O[🧠 Agent thinking process]
-    M --> P[📚 Evidence gathering]
-    
-    P --> Q[✍️ Generate answer with citations]
-    Q --> R[📝 Formatted response]
-    
-    R --> S{😊 Satisfied?}
-    S -->|No| T[🔧 Adjust configuration]
-    S -->|Yes| U[✅ Research complete]
-    
-    T --> G
-    
-    style A fill:#e1f5fe
-    style F fill:#f3e5f5
-    style M fill:#fff3e0
-    style R fill:#e8f5e8
-    style U fill:#e8f5e8
+    style A fill:#e3f2fd
+    style B fill:#1976d2,color:#fff
+    style C fill:#ff9800,color:#fff
+    style D fill:#ff9800,color:#fff
+    style E fill:#4caf50,color:#fff
 ```
 
-**Key Capabilities:**
-- 🌐 **Zero setup web interface** - Just run `make ui` and go!
-- 🤖 **AI-powered research assistant** with real-time thinking process
-- 📚 **Multi-source search**: Your PDFs + public literature + clinical trials
-- 📝 **Automatic citations** for every piece of evidence
-- ⚡ **Streaming responses** with live status updates
-- 🔧 **Visual configuration** - no config file editing needed
-- 🚀 **Enterprise-grade**: Rate limiting, error handling, retry logic
-
 ---
 
-## Requirements
-- Python 3.11+
-- [Ollama](https://ollama.com/) running locally (for embeddings)
-- [OpenRouter.ai](https://openrouter.ai/) API key (for LLM)
-- PDF papers (optional, for local research)
+## 🚀 Getting Started
 
----
+**New to Paper-QA?** Just want to start asking research questions? Here's all you need:
 
-## Quick Start
+### ⚡ Quick Start (3 Steps)
+1. **Get the system running** see Developer notes below for how to run it.
+2. **Open your browser** to http://localhost:7860 
+3. **Start asking questions!** 
 
-1. **Clone the repo and enter the directory:**
-   ```sh
-   git clone <your-repo-url>
-   cd paper-qa-ui
-   ```
+That's it! No folders to create, no PDFs to upload unless you want to search your own papers.
 
-2. **Run the setup script:**
-   ```sh
-   make setup
-   ```
-   This will:
-   - Create a virtual environment
-   - Install all dependencies
-   - Pull the required Ollama model
-   - Set up directories and a `.env` file
+### 🔍 What You Can Do Right Away
+- **Ask any research question** and get cited answers from millions of published papers
+- **Search public literature** - no setup needed, works immediately  
+- **Upload your own PDFs** later if you want to search your personal collection
+- **Try different search methods** to get the best answers for your questions
 
-3. **Configure environment:**
-   ```sh
-   # Copy the template and edit with your API keys
-   cp env.template .env
-   # Edit .env and add your OpenRouter API key
-   ```
-   
-   - Get your OpenRouter key from [OpenRouter.ai](https://openrouter.ai/keys)
-   - The `.env` file is ignored by git for security
+### 📚 Example Questions to Try
+- "What are the latest treatments for Alzheimer's disease?"
+- "How does CRISPR gene editing work?"
+- "What are the side effects of statins?"
+- "What is the current understanding of long COVID?"
 
-4. **Configure rate limiting (recommended):**
-   ```sh
-   # Run the rate limiting configuration script
-   python3 scripts/configure_rate_limits.py
-   
-   # Edit .env and update email addresses for better API limits
-   nano .env
-   ```
-   
-   This will:
-   - Add rate limiting environment variables to `.env`
-   - Optimize configuration files for better API reliability
-   - Set up proper timeouts and concurrency settings
-
-5. **Add your PDF papers:**
-   - Place PDFs in the `papers/` directory
-   
-   **Download initial papers (optional):**
-   
-   The papers directory contains sample research papers for testing. Since these are large files, they're not included in the git repository. You can:
-   
-   **Option 1: Use your own PDFs**
-   - Place any PDF research papers in the `papers/` directory
-   
-   **Option 2: Download sample papers from public sources**
-   ```sh
-   # Create papers directory if it doesn't exist
-   mkdir -p papers
-   
-   # Download sample papers from public repositories
-   # (Replace these URLs with actual public paper URLs)
-   curl -L -o papers/sample_paper_1.pdf "https://example.com/sample_paper_1.pdf"
-   curl -L -o papers/sample_paper_2.pdf "https://example.com/sample_paper_2.pdf"
-   ```
-   
-   **Option 3: Get papers from Semantic Scholar/PubMed**
-   - Use the public sources feature to search for papers on your topic of interest
-   - The system can access papers from Semantic Scholar, Crossref, and OpenAlex
-   
-   For testing, you can start with any PDF research papers you have locally.
-   
-   > **Note:** PDF files are excluded from the git repository (see `.gitignore`) to keep the repository size manageable. This is why the papers directory appears empty when cloned.
-
-6. **Start the web interface:**
-   ```sh
-   make ui
-   ```
-   This will start the Paper-QA web interface at http://localhost:7860
-   
-   🎉 **That's it!** Open your browser and start asking questions about your research papers!
+> **🔧 Need to set this up yourself?** See the [Developer Guide](DEVELOPER.md) for full installation instructions.
 
 ---
 
 ## 📖 Documentation
 
-- **[📚 User Manual](docs/user_manual.md)** - Comprehensive guide to all features and functionality
-- **[🔧 Developer Guide](DEVELOPER.md)** - Technical details for developers
-- **[🏗️ Architecture](Architecture.md)** - System architecture and design
+- **[🔧 Developer Guide](DEVELOPER.md)** - Installation, technical details, and system architecture
 
-## Usage
+## 🌐 Using Paper-QA
 
-### 🌐 Web Interface (Recommended)
-Start the web interface with:
-```sh
-make ui
-```
-Then open http://localhost:7860 in your browser.
+### 🎯 Main Interface Features
+- **🔍 Ask Questions**: Type any research question in plain English
+- **⚙️ Choose Search Type**: Public literature, your PDFs, or both
+- **🤖 Watch AI Think**: See how the AI finds and analyzes papers
+- **📚 Get Cited Answers**: Receive detailed answers with proper citations
+- **🔧 Adjust Settings**: Fine-tune search depth and answer style
 
-**🎯 Key Features:**
-- **🔍 Query Papers Tab**: Ask questions with multiple search methods
-- **⚙️ Configure Tab**: Complete configuration management through the UI
-- **🤖 Agent Thinking Process**: See exactly how the AI processes your questions
-- **📚 Detailed Context Information**: View the specific information used
-- **📊 Real-time Status Updates**: Live feedback on query progress
-- **💡 Example Questions**: Pre-built questions to get you started
+### 🔍 Search Options
 
-**🔍 Search Methods:**
-- **Public Only**: Search online sources (Semantic Scholar, Crossref, OpenAlex)
-- **Local Only**: Search your uploaded PDF papers
-- **Combined**: Search both local and public sources  
-- **Clinical Trials**: Search clinical trials databases
-- **Comprehensive**: Advanced search with multiple strategies
+#### 🌐 Public Literature
+**Best for**: Staying current with published research, exploring new fields
+- Search millions of papers from Semantic Scholar, Crossref, OpenAlex
+- No setup needed - works immediately
+- Great for literature reviews and background research
 
-**💡 Example Questions to Try:**
-- "What are the main findings of this research?"
-- "What are recent developments in machine learning?"
-- "How does this research compare to current literature?"
-- "What are the limitations of this study?"
-- "What future research directions are suggested?"
+#### 📁 Your PDFs  
+**Best for**: Analyzing your own research collection
+- Upload PDFs to search your personal paper library
+- Perfect for manuscript writing and data analysis
+- Ask your IT team to add papers to the system
 
-### 💻 Advanced Usage
-For automation, scripting, and programmatic access, see the [Developer Guide](DEVELOPER.md) which covers:
-- **Command Line Interface** for automation
-- **Python API** for programmatic integration
-- **Configuration management** for advanced setups
+#### 🔄 Combined Search
+**Best for**: Comprehensive research, comparing your work to published literature  
+- Searches both public databases AND your uploaded papers
+- Most thorough results for grant writing and manuscript preparation
 
-### 💡 Example Questions for Any Research Papers
-- "What is the main research question being addressed?"
-- "What methodology was used in this study?"
-- "What are the key findings and conclusions?"
-- "What are the limitations of this research?"
-- "How does this work contribute to the field?"
-- "What future research directions are suggested?"
+#### 🏥 Clinical Trials
+**Best for**: Treatment options, drug development status, patient recruitment
+- Searches clinicaltrials.gov database
+- Find active trials, completed studies, and trial results
 
----
+### ⚙️ Professional Configuration
 
-## Rate Limiting & API Reliability
+#### Configuration Presets
+| Config | Use Case | Search Sources | Agent Tools | Performance |
+|--------|----------|----------------|-------------|-------------|
+| `public_only` | Literature review, staying current | Semantic Scholar, Crossref, OpenAlex | Basic search + answer | Fast |
+| `local_only` | Private research, manuscript writing | Your PDF collection | PDF indexing + search | Medium |
+| `combined` | Comprehensive research | Public APIs + Local PDFs | Multi-source synthesis | Medium |
+| `clinical_trials` | Medical research, drug development | ClinicalTrials.gov + Public APIs | Clinical data focus | Medium |
+| `comprehensive` | Deep research, grant writing | All sources + advanced strategies | Full agent toolkit | Slow |
+| `agent_optimized` | Complex queries, multi-step reasoning | All sources | Advanced reasoning tools | Slowest |
 
-Paper-QA includes built-in rate limiting mechanisms to ensure reliable access to public APIs:
+#### Key Parameters for Optimization
+- **Search Count** (1-100): Papers to retrieve per query
+  - 15-20: Quick answers, current literature
+  - 25-40: Comprehensive reviews  
+  - 50+: Exhaustive research
+- **Evidence K** (1-100): Evidence pieces for answer generation
+  - 10-15: Focused, concise answers
+  - 20-30: Detailed analysis
+  - 40+: Comprehensive synthesis
+- **Temperature** (0.0-2.0): LLM creativity/consistency
+  - 0.0-0.1: Factual, reproducible answers
+  - 0.2-0.5: Balanced responses
+  - 0.6+: Creative interpretations
+- **Max Sources** (1-50): Citations in final answer
+- **Timeout** (30-3600s): Query processing time limit
 
-### Automatic Features
-- **Exponential backoff**: Automatic retry with 4-10 second delays
-- **HTTP status handling**: Handles 403, 429, 500, 502, 503, 504 errors
-- **Async retrying**: Non-blocking retry behavior with maximum 3 attempts
-- **Configurable timeouts**: 30-second API timeouts, 600-second overall timeouts
-
-### Configuration
-The system is pre-configured for optimal rate limit handling:
-- **Reduced concurrency**: 2-3 concurrent requests (vs 5 default)
-- **Optimized search count**: 15-20 papers for better quality
-- **Email addresses**: Improves API limits for Semantic Scholar, Crossref, etc.
-
-### API-Specific Limits
-- **Semantic Scholar**: 100 requests per 5 minutes (without API key), improved with email
-- **Crossref**: 500 requests per day (without email), 1000 with email
-- **OpenAlex**: 100,000 requests per day, email required for better limits
-- **Unpaywall**: 100,000 requests per day, email required for better limits
-
-### Setup
-Run the configuration script to set up rate limiting:
-```sh
-python3 scripts/configure_rate_limits.py
-```
-
-Then update email addresses in `.env` for better API limits.
+### 💻 For Developers & Automation
+Need to integrate Paper-QA into scripts or applications? See the [Developer Guide](DEVELOPER.md) for:
+- Command line interface
+- Python API
+- Advanced configuration
 
 ---
-
-## Troubleshooting
-
-### Common Issues
-- **🔧 Ollama not running?** Start it with `ollama serve`.
-- **🔑 Missing API key?** Set `OPENROUTER_API_KEY` in `.env`.
-- **🤖 Model errors?** Ensure you have the correct model names in your config files.
-- **❓ "I cannot answer" responses?** Try:
-  - Rephrasing your question to be more specific
-  - Using a different search method (try "Combined" instead of "Public Only")
-  - Adding scientific terminology to your question
-  - Using the example questions as templates
-- **⚙️ Configuration errors?** Use the web UI's Configure tab to visually manage settings
-- **⏱️ Rate limiting errors?** Run `python3 scripts/configure_rate_limits.py` and update email addresses in `.env`
-- **🌐 Web UI not loading?** Check that port 7860 is available and restart with `make ui`
-
-### Getting Help
-- 📚 **Detailed guides:** See [User Manual](docs/user_manual.md)
-- 🔧 **Technical details:** See [Developer Guide](DEVELOPER.md)
-- 🏗️ **Architecture info:** See [Architecture](Architecture.md)
-- 🐛 **Still stuck?** Open an issue on GitHub
-
----
-
-## License
-MIT
