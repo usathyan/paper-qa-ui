@@ -1,12 +1,11 @@
 """
 Gradio UI for Paper-QA
 Provides a web interface for querying papers and public sources.
+Enhanced to display detailed agent thinking processes and context information.
 """
 
 import asyncio
 import logging
-import queue
-import time
 from typing import Optional
 
 import gradio as gr
@@ -20,9 +19,6 @@ logger = logging.getLogger(__name__)
 # Global core instance
 paper_qa_core: Optional[PaperQACore] = None
 
-# Status update queue
-status_queue = queue.Queue()
-
 
 def initialize_core(config_name: str = "default") -> PaperQACore:
     """Initialize the Paper-QA core with the specified configuration."""
@@ -32,69 +28,149 @@ def initialize_core(config_name: str = "default") -> PaperQACore:
     return paper_qa_core
 
 
+def format_thinking_process(thinking_data: dict) -> str:
+    """Format thinking process data for display."""
+    if not thinking_data:
+        return "No thinking process data available."
+
+    formatted = []
+
+    # Agent steps
+    if thinking_data.get("agent_steps"):
+        formatted.append("🤖 **Agent Steps:**")
+        for step in thinking_data["agent_steps"]:
+            formatted.append(
+                f"  {step['step']}. [{step['timestamp']}] {step['action']}"
+            )
+        formatted.append("")
+
+    # Tool calls
+    if thinking_data.get("tool_calls"):
+        formatted.append("🔧 **Tool Calls:**")
+        for tool in thinking_data["tool_calls"]:
+            formatted.append(
+                f"  • {tool['type']} [{tool['timestamp']}]: {tool['details']}"
+            )
+        formatted.append("")
+
+    # Context details
+    if thinking_data.get("context_details"):
+        formatted.append("📊 **Context Updates:**")
+        for detail in thinking_data["context_details"]:
+            formatted.append(f"  • [{detail['timestamp']}] {detail['details']}")
+        formatted.append("")
+
+    # Summary
+    total_steps = thinking_data.get("total_steps", 0)
+    total_tools = thinking_data.get("total_tool_calls", 0)
+    formatted.append(f"📈 **Summary:** {total_steps} steps, {total_tools} tool calls")
+
+    return "\n".join(formatted)
+
+
+def format_detailed_contexts(contexts: list) -> str:
+    """Format detailed context information for display."""
+    if not contexts:
+        return "No context information available."
+
+    formatted = []
+    formatted.append("📚 **Detailed Context Information:**")
+
+    for i, context in enumerate(contexts, 1):
+        formatted.append(f"\n**Context {i}:**")
+        formatted.append(f"  • **Citation:** {context.get('citation', 'Unknown')}")
+        formatted.append(f"  • **Score:** {context.get('score', 0.0):.2f}")
+
+        if context.get("paper_info"):
+            paper = context["paper_info"]
+            formatted.append(f"  • **Paper:** {paper.get('title', 'Unknown')}")
+            formatted.append(f"  • **Authors:** {', '.join(paper.get('authors', []))}")
+            formatted.append(f"  • **Year:** {paper.get('year', 'Unknown')}")
+            if paper.get("doi"):
+                formatted.append(f"  • **DOI:** {paper['doi']}")
+
+        # Truncate text for display
+        text = context.get("text", "")
+        if len(text) > 300:
+            text = text[:300] + "..."
+        formatted.append(f"  • **Text:** {text}")
+
+    return "\n".join(formatted)
+
+
+def format_agent_metadata(metadata: dict) -> str:
+    """Format agent metadata for display."""
+    if not metadata:
+        return "No agent metadata available."
+
+    formatted = []
+    formatted.append("⚙️ **Agent Configuration:**")
+
+    # Basic agent info
+    formatted.append(f"  • **Agent Type:** {metadata.get('agent_type', 'Unknown')}")
+    formatted.append(f"  • **Search Count:** {metadata.get('search_count', 0)}")
+    formatted.append(f"  • **Evidence Count:** {metadata.get('agent_evidence_n', 0)}")
+    formatted.append(f"  • **Timeout:** {metadata.get('timeout', 0)}s")
+
+    # Session info if available
+    if metadata.get("session_id"):
+        formatted.append(f"  • **Session ID:** {metadata['session_id']}")
+        formatted.append(
+            f"  • **Session Status:** {metadata.get('session_status', 'Unknown')}"
+        )
+        formatted.append(
+            f"  • **Session Cost:** ${metadata.get('session_cost', 0.0):.4f}"
+        )
+        formatted.append(f"  • **Session Steps:** {metadata.get('session_steps', 0)}")
+        formatted.append(
+            f"  • **Tools Used:** {', '.join(metadata.get('session_tools_used', []))}"
+        )
+        formatted.append(
+            f"  • **Papers Searched:** {metadata.get('session_papers_searched', 0)}"
+        )
+
+    return "\n".join(formatted)
+
+
 async def query_papers(
     question: str,
     method: str,
     config_name: str,
     paper_directory: str,
     max_sources: int = 10,
-) -> tuple[str, str, str, str]:
+) -> tuple[str, str, str, str, str, str]:
     """
     Query papers using the specified method.
 
     Returns:
-        tuple: (answer, sources_info, status)
+        tuple: (answer, sources_info, status, thinking_process, detailed_contexts, agent_metadata)
     """
     if not question.strip():
-        return "", "", "❌ Please enter a question.", "Ready to query..."
+        return "", "", "❌ Please enter a question.", "Ready to query...", "", ""
 
     try:
-        # Add initial status update
-        add_status_update(f"🔍 Starting {method} query...")
-
         # Initialize core
-        add_status_update("⚙️ Initializing Paper-QA core...")
         core = initialize_core(config_name)
-
-        # Set up callbacks for streaming
-        answer_parts = []
-
-        def stream_callback(text: str):
-            answer_parts.append(text)
-
-        callbacks = [stream_callback] if method in ["local", "combined"] else None
 
         # Execute query based on method
         if method == "local":
-            add_status_update("📚 Loading local papers...")
             result = await core.query_local_papers(
                 question,
                 paper_directory=paper_directory if paper_directory else None,
-                callbacks=callbacks,
             )
         elif method == "public":
-            add_status_update(
-                "🌐 Searching public sources (Semantic Scholar, Crossref, etc.)..."
-            )
-            add_status_update("🔍 Querying Semantic Scholar database...")
-            add_status_update("📄 Searching for relevant papers...")
             result = await core.query_public_sources(question)
         elif method == "combined":
-            add_status_update("🔄 Searching both local and public sources...")
             result = await core.query_combined(
                 question,
                 paper_directory=paper_directory if paper_directory else None,
-                callbacks=callbacks,
             )
         elif method == "semantic_scholar":
-            add_status_update("🔍 Direct Semantic Scholar API search...")
             result = await core.query_semantic_scholar_api(question)
         else:
-            return "", "", f"❌ Unknown method: {method}"
+            return "", "", f"❌ Unknown method: {method}", "", "", ""
 
         # Process results
-        add_status_update("📝 Processing results and generating answer...")
-        add_status_update("🤖 Generating AI response...")
         if result["success"]:
             answer = result["answer"]
             sources_count = result["sources"]
@@ -103,36 +179,44 @@ async def query_papers(
             # Check if answer is meaningful
             if answer.strip() == "I cannot answer." or answer.strip() == "":
                 status = "⚠️ Query completed but no relevant information found. Try rephrasing your question or using a different method."
-                add_status_update("⚠️ No relevant information found")
                 return (
                     "No relevant information found. Try:\n• Rephrasing your question\n• Using 'combined' method instead of 'public'\n• Adding more specific terms",
                     sources_info,
                     status,
-                    get_status_updates(),
+                    "No thinking process data available.",
+                    "No context information available.",
+                    "No agent metadata available.",
                 )
 
-                # Truncate answer if too long
+            # Truncate answer if too long
             if len(answer) > 5000:
                 answer = answer[:5000] + "\n\n... (truncated for display)"
 
-            add_status_update(f"✅ Success! Found {sources_count} sources")
-            add_status_update(f"📄 Generated {len(answer)} character answer")
-            add_status_update("🎉 Query completed successfully!")
+            # Format detailed information
+            thinking_process = format_thinking_process(
+                result.get("thinking_process", {})
+            )
+            detailed_contexts = format_detailed_contexts(
+                result.get("detailed_contexts", [])
+            )
+            agent_metadata = format_agent_metadata(result.get("agent_metadata", {}))
+
             status = f"✅ Query completed successfully using {method} method"
-            return answer, sources_info, status, get_status_updates()
+            return (
+                answer,
+                sources_info,
+                status,
+                thinking_process,
+                detailed_contexts,
+                agent_metadata,
+            )
         else:
             error_msg = result.get("error", "Unknown error")
-            add_status_update(f"❌ Query failed: {error_msg}")
-            if "rate limit" in error_msg.lower():
-                add_status_update(
-                    "💡 Tip: Consider getting a Semantic Scholar API key for higher rate limits"
-                )
-            return "", "", f"❌ Query failed: {error_msg}", get_status_updates()
+            return "", "", f"❌ Query failed: {error_msg}", "", "", ""
 
     except Exception as e:
         logger.error(f"Error in query_papers: {e}")
-        add_status_update(f"❌ Error: {str(e)}")
-        return "", "", f"❌ Error: {str(e)}", get_status_updates()
+        return "", "", f"❌ Error: {str(e)}", "", "", ""
 
 
 def query_papers_sync(
@@ -141,7 +225,7 @@ def query_papers_sync(
     config_name: str,
     paper_directory: str,
     max_sources: int = 10,
-) -> tuple[str, str, str, str]:
+) -> tuple[str, str, str, str, str, str]:
     """
     Synchronous wrapper for query_papers to work with Gradio.
     """
@@ -169,47 +253,7 @@ def query_papers_sync(
             )
     except Exception as e:
         logger.error(f"Error in query_papers_sync: {e}")
-        return "", "", f"❌ Error: {str(e)}"
-
-
-def get_status_updates() -> str:
-    """
-    Get current status updates for display in the UI.
-    """
-    try:
-        # Get all available status updates
-        updates = []
-        while not status_queue.empty():
-            try:
-                update = status_queue.get_nowait()
-                updates.append(update)
-            except queue.Empty:
-                break
-
-        if updates:
-            # Show last 8 updates for better visibility
-            recent_updates = updates[-8:] if len(updates) > 8 else updates
-            return "\n".join(recent_updates)
-        else:
-            return "Ready to query...\n\n💡 Tip: Enter a question and click 'Ask Question' to start"
-    except Exception as e:
-        return f"Status error: {str(e)}"
-
-
-def add_status_update(message: str):
-    """
-    Add a status update to the queue.
-    """
-    try:
-        timestamp = time.strftime("%H:%M:%S")
-        # Add emoji and better formatting
-        formatted_message = f"[{timestamp}] {message}"
-        status_queue.put(formatted_message)
-
-        # Also log to console for debugging
-        print(f"📊 Status: {formatted_message}")
-    except Exception as e:
-        logger.error(f"Error adding status update: {e}")
+        return "", "", f"❌ Error: {str(e)}", "", "", ""
 
 
 def create_ui():
@@ -218,28 +262,50 @@ def create_ui():
     # Custom CSS for better styling
     css = """
     .gradio-container {
-        max-width: 1200px !important;
+        max-width: 1400px !important;
         margin: auto !important;
     }
     .main-header {
         text-align: center;
         margin-bottom: 2rem;
     }
-    .status-box {
-        background-color: #f0f0f0;
+    .info-box {
+        background-color: #f8f9fa;
         padding: 1rem;
         border-radius: 8px;
         margin-bottom: 1rem;
+        border-left: 4px solid #007bff;
+    }
+    .thinking-box {
+        background-color: #fff3cd;
+        padding: 1rem;
+        border-radius: 8px;
+        margin-bottom: 1rem;
+        border-left: 4px solid #ffc107;
+    }
+    .context-box {
+        background-color: #d1ecf1;
+        padding: 1rem;
+        border-radius: 8px;
+        margin-bottom: 1rem;
+        border-left: 4px solid #17a2b8;
+    }
+    .metadata-box {
+        background-color: #d4edda;
+        padding: 1rem;
+        border-radius: 8px;
+        margin-bottom: 1rem;
+        border-left: 4px solid #28a745;
     }
     """
 
-    with gr.Blocks(css=css, title="Paper-QA Web Interface") as demo:
+    with gr.Blocks(css=css, title="Paper-QA Enhanced Web Interface") as demo:
         # Header
         gr.HTML(
             """
         <div class="main-header">
-            <h1>📚 Paper-QA Web Interface</h1>
-            <p>Ask questions about your research papers and get AI-powered answers with citations</p>
+            <h1>📚 Paper-QA Enhanced Web Interface</h1>
+            <p>Ask questions about your research papers and get AI-powered answers with detailed agent thinking processes</p>
         </div>
         """
         )
@@ -298,7 +364,7 @@ def create_ui():
                 query_btn = gr.Button("🔍 Ask Question", variant="primary", size="lg")
 
             with gr.Column(scale=1):
-                # Status and info
+                # Information section
                 with gr.Group():
                     gr.Markdown("### ℹ️ Information")
                     gr.Markdown(
@@ -319,6 +385,12 @@ def create_ui():
                     - Use scientific terminology
                     - Try different query methods if one doesn't work
                     - For broad topics, use "combined" method
+                    
+                    **🔍 Enhanced Features:**
+                    - View agent thinking processes
+                    - See detailed context information
+                    - Monitor tool calls and steps
+                    - Track agent metadata
                     """
                     )
 
@@ -326,40 +398,58 @@ def create_ui():
         with gr.Group():
             gr.Markdown("### 📝 Answer")
             answer_output = gr.Textbox(
-                label="Answer", lines=10, max_lines=20, interactive=False
+                label="Answer", lines=8, max_lines=15, interactive=False
             )
 
             with gr.Row():
                 sources_output = gr.Textbox(label="Sources", interactive=False)
-
                 status_output = gr.Textbox(label="Status", interactive=False)
 
-            # Real-time status updates
-            with gr.Group():
-                gr.Markdown("### 🔄 Real-time Status")
-                with gr.Row():
-                    status_updates_output = gr.Textbox(
-                        label="Query Progress",
-                        lines=5,
-                        max_lines=10,
-                        interactive=False,
-                        value="Ready to query...\n\n💡 Tip: Enter a question and click 'Ask Question' to start",
-                    )
-                    refresh_status_btn = gr.Button("🔄 Refresh Status", size="sm")
+        # Enhanced information sections
+        with gr.Row():
+            with gr.Column():
+                gr.Markdown("### 🤖 Agent Thinking Process")
+                thinking_output = gr.Textbox(
+                    label="Agent Steps & Tool Calls",
+                    lines=12,
+                    max_lines=20,
+                    interactive=False,
+                    value="Ready to display agent thinking process...",
+                )
+
+            with gr.Column():
+                gr.Markdown("### 📚 Detailed Contexts")
+                contexts_output = gr.Textbox(
+                    label="Context Information",
+                    lines=12,
+                    max_lines=20,
+                    interactive=False,
+                    value="Ready to display detailed context information...",
+                )
+
+        with gr.Row():
+            gr.Markdown("### ⚙️ Agent Metadata")
+            metadata_output = gr.Textbox(
+                label="Agent Configuration & Session Info",
+                lines=8,
+                max_lines=15,
+                interactive=False,
+                value="Ready to display agent metadata...",
+            )
 
         # Footer
         gr.HTML(
             """
         <div style="text-align: center; margin-top: 2rem; color: #666;">
             <p>Powered by Paper-QA with OpenRouter.ai and Ollama</p>
-            <p>Built with Gradio</p>
+            <p>Enhanced with detailed agent thinking processes and context information</p>
         </div>
         """
         )
 
         # Event handlers
         query_btn.click(
-            fn=query_papers,
+            fn=query_papers_sync,
             inputs=[
                 question_input,
                 method_dropdown,
@@ -371,13 +461,15 @@ def create_ui():
                 answer_output,
                 sources_output,
                 status_output,
-                status_updates_output,
+                thinking_output,
+                contexts_output,
+                metadata_output,
             ],
         )
 
         # Enter key support
         question_input.submit(
-            fn=query_papers,
+            fn=query_papers_sync,
             inputs=[
                 question_input,
                 method_dropdown,
@@ -389,18 +481,10 @@ def create_ui():
                 answer_output,
                 sources_output,
                 status_output,
-                status_updates_output,
+                thinking_output,
+                contexts_output,
+                metadata_output,
             ],
-        )
-
-        # Manual refresh button for status updates
-        def update_status():
-            return get_status_updates()
-
-        refresh_status_btn.click(
-            fn=update_status,
-            inputs=[],
-            outputs=status_updates_output,
         )
 
     return demo
@@ -408,7 +492,7 @@ def create_ui():
 
 def main():
     """Main function to launch the Gradio interface."""
-    print("🚀 Starting Paper-QA Gradio Interface...")
+    print("🚀 Starting Paper-QA Enhanced Gradio Interface...")
 
     # Create and launch the interface
     demo = create_ui()
