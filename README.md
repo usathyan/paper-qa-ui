@@ -5,14 +5,61 @@ Paper-QA lets you ask research questions and get answers with citations from you
 
 ---
 
-## Features
-- **Ask questions about your own PDFs**
-- **Include public sources for broader answers**
-- **Citations for every answer**
-- **Fast, streaming responses**
-- **No vendor lock-in: uses OpenRouter.ai (Google Gemini 2.5 Flash Lite) and Ollama (nomic-embed-text)**
-- **CLI and programmatic API**
-- **Built-in rate limiting for reliable API access**
+## User Journey & Features
+
+```mermaid
+graph TD
+    A[👤 Researcher has a question] --> B{📚 What sources?}
+    
+    B -->|My PDFs| C[📁 Upload papers to /papers]
+    B -->|Public literature| D[🌐 Use public databases]
+    B -->|Both| E[🔄 Combined search]
+    
+    C --> F[🚀 Start Paper-QA UI]
+    D --> F
+    E --> F
+    
+    F --> G[❓ Ask research question]
+    G --> H{🔍 Choose search method}
+    
+    H -->|Local Only| I[📖 Search uploaded PDFs]
+    H -->|Public Only| J[🔍 Search Semantic Scholar<br/>Crossref, OpenAlex]
+    H -->|Combined| K[🔄 Search both sources]
+    H -->|Clinical Trials| L[🏥 Search clinical databases]
+    
+    I --> M[🤖 AI Agent processes]
+    J --> M
+    K --> M
+    L --> M
+    
+    M --> N[📊 Real-time status updates]
+    M --> O[🧠 Agent thinking process]
+    M --> P[📚 Evidence gathering]
+    
+    P --> Q[✍️ Generate answer with citations]
+    Q --> R[📝 Formatted response]
+    
+    R --> S{😊 Satisfied?}
+    S -->|No| T[🔧 Adjust configuration]
+    S -->|Yes| U[✅ Research complete]
+    
+    T --> G
+    
+    style A fill:#e1f5fe
+    style F fill:#f3e5f5
+    style M fill:#fff3e0
+    style R fill:#e8f5e8
+    style U fill:#e8f5e8
+```
+
+**Key Capabilities:**
+- 🌐 **Zero setup web interface** - Just run `make ui` and go!
+- 🤖 **AI-powered research assistant** with real-time thinking process
+- 📚 **Multi-source search**: Your PDFs + public literature + clinical trials
+- 📝 **Automatic citations** for every piece of evidence
+- ⚡ **Streaming responses** with live status updates
+- 🔧 **Visual configuration** - no config file editing needed
+- 🚀 **Enterprise-grade**: Rate limiting, error handling, retry logic
 
 ---
 
@@ -95,16 +142,13 @@ Paper-QA lets you ask research questions and get answers with citations from you
    
    > **Note:** PDF files are excluded from the git repository (see `.gitignore`) to keep the repository size manageable. This is why the papers directory appears empty when cloned.
 
-6. **Run a demo:**
-   ```sh
-   make run
-   ```
-
-7. **Or run the web interface:**
+6. **Start the web interface:**
    ```sh
    make ui
    ```
-   This will start a Gradio web interface at http://localhost:7860
+   This will start the Paper-QA web interface at http://localhost:7860
+   
+   🎉 **That's it!** Open your browser and start asking questions about your research papers!
 
 ---
 
@@ -115,71 +159,43 @@ Paper-QA lets you ask research questions and get answers with citations from you
 - **[🏗️ Architecture](Architecture.md)** - System architecture and design
 
 ## Usage
-```sh
-# Ask about your local papers
-make run-query QUESTION="What are the main findings of this research?" METHOD=local
 
-# Ask about public sources
-make run-query QUESTION="What are recent developments in machine learning?" METHOD=public
-
-# Ask about both local and public sources
-make run-query QUESTION="How does this research compare to current literature?" METHOD=combined
-
-# With specific configuration
-make run-query QUESTION="What is PICALM?" METHOD=public CONFIG=public_only
-```
-
-**Parameters:**
-- `QUESTION` - Your research question (required)
-- `METHOD` - `local`, `public`, or `combined` (required)
-- `CONFIG` - `default`, `local_only`, `public_only`, or `combined` (optional, defaults to appropriate config for method)
-
-### Web Interface (Gradio)
+### 🌐 Web Interface (Recommended)
+Start the web interface with:
 ```sh
 make ui
 ```
-Then open http://localhost:7860 in your browser for a user-friendly web interface.
+Then open http://localhost:7860 in your browser.
 
-**Enhanced Features:**
+**🎯 Key Features:**
 - **🔍 Query Papers Tab**: Ask questions with multiple search methods
 - **⚙️ Configure Tab**: Complete configuration management through the UI
 - **🤖 Agent Thinking Process**: See exactly how the AI processes your questions
 - **📚 Detailed Context Information**: View the specific information used
-- **⚙️ Agent Metadata**: Technical details about processing and performance
 - **📊 Real-time Status Updates**: Live feedback on query progress
+- **💡 Example Questions**: Pre-built questions to get you started
 
-**Search Methods:**
-- **Public**: Search online sources (Semantic Scholar, Crossref)
-- **Local**: Search your uploaded PDF papers
-- **Combined**: Search both local and public sources
-- **Semantic Scholar**: Direct API search with optimized patterns
+**🔍 Search Methods:**
+- **Public Only**: Search online sources (Semantic Scholar, Crossref, OpenAlex)
+- **Local Only**: Search your uploaded PDF papers
+- **Combined**: Search both local and public sources  
+- **Clinical Trials**: Search clinical trials databases
+- **Comprehensive**: Advanced search with multiple strategies
 
-### Programmatic Use (Python)
-```python
-from paper_qa_core import PaperQACore
+**💡 Example Questions to Try:**
+- "What are the main findings of this research?"
+- "What are recent developments in machine learning?"
+- "How does this research compare to current literature?"
+- "What are the limitations of this study?"
+- "What future research directions are suggested?"
 
-# Initialize with default configuration
-core = PaperQACore(config_name="default")
+### 💻 Advanced Usage
+For automation, scripting, and programmatic access, see the [Developer Guide](DEVELOPER.md) which covers:
+- **Command Line Interface** for automation
+- **Python API** for programmatic integration
+- **Configuration management** for advanced setups
 
-# Query your local papers
-result = await core.query_local_papers(
-    "What are the key conclusions of this research?", 
-    paper_directory="papers/"
-)
-
-# Query public sources
-result = await core.query_public_sources(
-    "What are the latest trends in this field?"
-)
-
-# Query both sources
-result = await core.query_combined(
-    "How does this research fit into the broader context?",
-    paper_directory="papers/"
-)
-```
-
-### Example Questions for Any Research Papers
+### 💡 Example Questions for Any Research Papers
 - "What is the main research question being addressed?"
 - "What methodology was used in this study?"
 - "What are the key findings and conclusions?"
@@ -222,16 +238,25 @@ Then update email addresses in `.env` for better API limits.
 ---
 
 ## Troubleshooting
-- **Ollama not running?** Start it with `ollama serve`.
-- **Missing API key?** Set `OPENROUTER_API_KEY` in `.env`.
-- **Model errors?** Ensure you have the correct model names in your config files.
-- **"I cannot answer" responses?** Try:
+
+### Common Issues
+- **🔧 Ollama not running?** Start it with `ollama serve`.
+- **🔑 Missing API key?** Set `OPENROUTER_API_KEY` in `.env`.
+- **🤖 Model errors?** Ensure you have the correct model names in your config files.
+- **❓ "I cannot answer" responses?** Try:
   - Rephrasing your question to be more specific
-  - Using `METHOD=combined` instead of `METHOD=public`
+  - Using a different search method (try "Combined" instead of "Public Only")
   - Adding scientific terminology to your question
-- **Configuration errors?** Use `CONFIG=public_only` for public queries, `CONFIG=local_only` for local papers
-- **Rate limiting errors?** Run `python3 scripts/configure_rate_limits.py` and update email addresses in `.env`
-- **Still stuck?** See `DEVELOPER.md` or open an issue.
+  - Using the example questions as templates
+- **⚙️ Configuration errors?** Use the web UI's Configure tab to visually manage settings
+- **⏱️ Rate limiting errors?** Run `python3 scripts/configure_rate_limits.py` and update email addresses in `.env`
+- **🌐 Web UI not loading?** Check that port 7860 is available and restart with `make ui`
+
+### Getting Help
+- 📚 **Detailed guides:** See [User Manual](docs/user_manual.md)
+- 🔧 **Technical details:** See [Developer Guide](DEVELOPER.md)
+- 🏗️ **Architecture info:** See [Architecture](Architecture.md)
+- 🐛 **Still stuck?** Open an issue on GitHub
 
 ---
 

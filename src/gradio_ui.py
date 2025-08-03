@@ -10,7 +10,6 @@ from typing import Optional
 
 import gradio as gr
 
-from config_ui import create_config_ui
 from paper_qa_core import PaperQACore
 
 # Configure logging
@@ -21,7 +20,7 @@ logger = logging.getLogger(__name__)
 paper_qa_core: Optional[PaperQACore] = None
 
 
-def initialize_core(config_name: str = "default") -> PaperQACore:
+def initialize_core(config_name: str = "public_only") -> PaperQACore:
     """Initialize the Paper-QA core with the specified configuration."""
     global paper_qa_core
     print(f"🔍 DEBUG: initialize_core called with config_name: {config_name}")
@@ -194,7 +193,6 @@ def extract_detailed_info(
 
 async def query_papers(
     question: str,
-    method: str,
     config_name: str,
     paper_directory: str,
     max_sources: int = 10,
@@ -213,23 +211,26 @@ async def query_papers(
         # Initialize core
         core = initialize_core(config_name)
 
-        # Execute query based on method
-        if method == "local":
+        # Execute query based on configuration
+        if config_name in ["local_only"]:
             result = await core.query_local_papers(
                 question,
                 paper_directory=paper_directory if paper_directory else None,
             )
-        elif method == "public":
+        elif config_name in ["public_only", "comprehensive", "agent_optimized"]:
             result = await core.query_public_sources(question)
-        elif method == "combined":
+        elif config_name in ["combined"]:
             result = await core.query_combined(
                 question,
                 paper_directory=paper_directory if paper_directory else None,
             )
-        elif method == "semantic_scholar":
-            result = await core.query_semantic_scholar_api(question)
+        elif config_name in ["clinical_trials"]:
+            result = await core.query_clinical_trials(question)
+        elif config_name in ["clinical_trials_only"]:
+            result = await core.query_clinical_trials_only(question)
         else:
-            return "", "", f"❌ Unknown method: {method}", "", "", ""
+            # Default to public sources
+            result = await core.query_public_sources(question)
 
         # Process results
         if result["success"]:
@@ -261,7 +262,9 @@ async def query_papers(
                     formatted_answer[:10000] + "\n\n... *(truncated for display)*"
                 )
 
-            status = f"✅ Query completed successfully using {method} method"
+            status = (
+                f"✅ Query completed successfully using {config_name} configuration"
+            )
             detailed_info = extract_detailed_info(
                 result, result.get("thinking_process", {}), config_name
             )
@@ -289,7 +292,6 @@ async def query_papers(
 
 def query_papers_sync(
     question: str,
-    method: str,
     config_name: str,
     paper_directory: str,
     max_sources: int = 10,
@@ -307,17 +309,13 @@ def query_papers_sync(
             with concurrent.futures.ThreadPoolExecutor() as executor:
                 future = executor.submit(
                     asyncio.run,
-                    query_papers(
-                        question, method, config_name, paper_directory, max_sources
-                    ),
+                    query_papers(question, config_name, paper_directory, max_sources),
                 )
                 return future.result()
         except RuntimeError:
             # No event loop running, we can use asyncio.run
             return asyncio.run(
-                query_papers(
-                    question, method, config_name, paper_directory, max_sources
-                )
+                query_papers(question, config_name, paper_directory, max_sources)
             )
     except Exception as e:
         logger.error(f"Error in query_papers_sync: {e}")
@@ -403,26 +401,19 @@ def create_query_ui() -> gr.Blocks:
 
                 with gr.Row():
                     with gr.Column():
-                        method_dropdown = gr.Dropdown(
-                            choices=["local", "public", "combined", "semantic_scholar"],
-                            value="public",
-                            label="Search Method",
-                            info="public: Semantic Scholar & Crossref | local: Your PDFs | combined: Both | semantic_scholar: Direct API search",
-                        )
-
-                    with gr.Column():
                         config_dropdown = gr.Dropdown(
                             choices=[
-                                "default",
-                                "local_only",
                                 "public_only",
+                                "local_only",
                                 "combined",
-                                "agent_optimized",
                                 "comprehensive",
+                                "agent_optimized",
+                                "clinical_trials",
+                                "clinical_trials_only",
                             ],
-                            value="default",
-                            label="Configuration",
-                            info="Different settings for different use cases",
+                            value="public_only",
+                            label="Search Configuration",
+                            info="Choose your search strategy and settings",
                         )
 
                 with gr.Row():
@@ -450,24 +441,20 @@ def create_query_ui() -> gr.Blocks:
                     gr.Markdown("### ℹ️ Information")
                     gr.Markdown(
                         """
-                    **Query Methods:**
-                    - **Local**: Search only your uploaded PDF papers
-                    - **Public**: Search online sources (Semantic Scholar, Crossref, etc.)
-                    - **Combined**: Search both local and public sources
-                    
-                    **Configurations:**
-                    - **Default**: Balanced settings for general use
-                    - **Local Only**: Optimized for local papers
-                    - **Public Only**: Optimized for online sources
-                    - **Combined**: Optimized for mixed sources
-                    - **Agent Optimized**: Enhanced agent tool calling with Claude 3.5 Sonnet
-                    - **Comprehensive**: Maximum information retrieval with all features enabled
+                    **Search Configurations:**
+                    - **Public Only**: Search online sources (Semantic Scholar, Crossref, etc.) - Best for general research
+                    - **Local Only**: Search only your uploaded PDF papers - Best for private documents
+                    - **Combined**: Search both local and public sources - Best for comprehensive research
+                    - **Comprehensive**: Maximum information retrieval with Claude 3.5 Sonnet - Best for detailed analysis
+                    - **Agent Optimized**: Enhanced agent tool calling - Best for complex queries
+                    - **Clinical Trials**: Search clinicaltrials.gov - Best for medical research
+                    - **Clinical Trials Only**: Focus only on clinical trials data
                     
                     **💡 Tips for Better Results:**
                     - Be specific in your questions
                     - Use scientific terminology
-                    - Try different query methods if one doesn't work
-                    - For broad topics, use "combined" method
+                    - For medical research, try "Clinical Trials" configurations
+                    - For broad topics, use "Combined" or "Comprehensive"
                     
                     **🔍 Enhanced Features:**
                     - View agent thinking processes
@@ -543,7 +530,6 @@ def create_query_ui() -> gr.Blocks:
             fn=query_papers_sync,
             inputs=[
                 question_input,
-                method_dropdown,
                 config_dropdown,
                 paper_dir_input,
                 max_sources_input,
@@ -568,7 +554,6 @@ def create_query_ui() -> gr.Blocks:
             fn=query_papers_sync,
             inputs=[
                 question_input,
-                method_dropdown,
                 config_dropdown,
                 paper_dir_input,
                 max_sources_input,
@@ -593,7 +578,7 @@ def create_query_ui() -> gr.Blocks:
 
 def create_ui():
     """Create the Gradio UI with enhanced features."""
-    
+
     with gr.Blocks(
         title="Paper-QA Enhanced Interface",
         css="""
@@ -611,11 +596,13 @@ def create_ui():
             padding: 12px;
             margin: 8px 0;
         }
-        """
+        """,
     ) as demo:
         gr.Markdown("# 📚 Paper-QA Enhanced Interface")
-        gr.Markdown("Query scientific papers and clinical trials with advanced AI capabilities")
-        
+        gr.Markdown(
+            "Query scientific papers and clinical trials with advanced AI capabilities"
+        )
+
         with gr.Tabs():
             # Query Papers Tab
             with gr.Tab("🔍 Query Papers"):
@@ -624,127 +611,119 @@ def create_ui():
                         question_input = gr.Textbox(
                             label="Question",
                             placeholder="Enter your research question here...",
-                            lines=3
+                            lines=3,
                         )
-                        
+
                         with gr.Row():
-                            method_dropdown = gr.Dropdown(
-                                choices=[
-                                    "public", 
-                                    "local", 
-                                    "combined", 
-                                    "semantic_scholar",
-                                    "clinical_trials",
-                                    "clinical_trials_only"
-                                ],
-                                value="public",
-                                label="Search Method",
-                                info="Choose how to search for information"
-                            )
-                            
                             config_dropdown = gr.Dropdown(
                                 choices=[
-                                    "default", 
-                                    "agent_optimized", 
+                                    "public_only",
+                                    "local_only",
+                                    "combined",
                                     "comprehensive",
+                                    "agent_optimized",
                                     "clinical_trials",
-                                    "clinical_trials_only"
+                                    "clinical_trials_only",
                                 ],
-                                value="default",
-                                label="Configuration",
-                                info="Choose the AI configuration"
+                                value="public_only",
+                                label="Search Configuration",
+                                info="Choose your search strategy and settings",
                             )
-                        
+
                         paper_dir_input = gr.Textbox(
                             label="Paper Directory (for local/combined)",
                             placeholder="./papers",
-                            visible=False
+                            visible=False,
                         )
-                        
+
                         with gr.Row():
                             query_btn = gr.Button("🔍 Query Papers", variant="primary")
                             clear_btn = gr.Button("🗑️ Clear", variant="secondary")
-                    
+
                     with gr.Column(scale=1):
                         gr.Markdown("### 📋 Quick Examples")
                         example_questions = [
                             "What are the latest treatments for Alzheimer's disease?",
                             "How does PICALM affect amyloid beta clearance?",
                             "What clinical trials exist for ulcerative colitis?",
-                            "What are the genetic risk factors for Parkinson's disease?"
+                            "What are the genetic risk factors for Parkinson's disease?",
                         ]
-                        
+
                         for i, example in enumerate(example_questions):
-                            gr.Button(
-                                example,
-                                size="sm",
-                                variant="outline"
-                            ).click(
-                                fn=lambda q=example: q,
-                                outputs=question_input
+                            gr.Button(example, size="sm", variant="outline").click(
+                                fn=lambda q=example: q, outputs=question_input
                             )
-                
+
                 with gr.Row():
                     with gr.Column(scale=2):
                         answer_output = gr.Markdown(
-                            label="Answer",
-                            elem_classes=["response-box"]
+                            label="Answer", elem_classes=["response-box"]
                         )
-                        
+
                         sources_output = gr.Markdown(
-                            label="Sources",
-                            elem_classes=["response-box"]
+                            label="Sources", elem_classes=["response-box"]
                         )
-                    
+
                     with gr.Column(scale=1):
                         status_output = gr.Markdown(
-                            label="Status",
-                            elem_classes=["status-box"]
+                            label="Status", elem_classes=["status-box"]
                         )
-                        
-                        refresh_status_btn = gr.Button("🔄 Refresh Status", size="sm")
-                
+
                 # Event handlers
-                def on_method_change(method):
-                    return gr.update(visible=method in ["local", "combined"])
-                
-                method_dropdown.change(
-                    fn=on_method_change,
-                    inputs=[method_dropdown],
-                    outputs=[paper_dir_input]
+                def on_config_change(config):
+                    return gr.update(visible=config in ["local_only", "combined"])
+
+                config_dropdown.change(
+                    fn=on_config_change,
+                    inputs=[config_dropdown],
+                    outputs=[paper_dir_input],
                 )
-                
-                def query_papers(question, method, config, paper_dir):
+
+                def query_papers(question, config, paper_dir):
                     if not question.strip():
                         return "Please enter a question.", "", "No question provided."
-                    
+
                     try:
                         # Import here to avoid circular imports
                         from src.paper_qa_core import PaperQACore
-                        
+
                         async def run_query():
                             core = PaperQACore(config)
-                            
-                            if method == "local":
+
+                            # Determine the appropriate query method based on configuration
+                            if config in ["local_only"]:
                                 if not paper_dir:
-                                    return "❌ Error: Paper directory required for local queries", "", "Error: Missing paper directory"
-                                result = await core.query_local_papers(question, paper_dir)
-                            elif method == "public":
+                                    return (
+                                        "❌ Error: Paper directory required for local queries",
+                                        "",
+                                        "Error: Missing paper directory",
+                                    )
+                                result = await core.query_local_papers(
+                                    question, paper_dir
+                                )
+                            elif config in [
+                                "public_only",
+                                "comprehensive",
+                                "agent_optimized",
+                            ]:
                                 result = await core.query_public_sources(question)
-                            elif method == "combined":
+                            elif config in ["combined"]:
                                 result = await core.query_combined(question, paper_dir)
-                            elif method == "semantic_scholar":
-                                result = await core.query_semantic_scholar_api(question)
-                            elif method == "clinical_trials":
+                            elif config in ["clinical_trials"]:
                                 result = await core.query_clinical_trials(question)
-                            elif method == "clinical_trials_only":
+                            elif config in ["clinical_trials_only"]:
                                 result = await core.query_clinical_trials_only(question)
                             else:
-                                return f"❌ Error: Unknown method {method}", "", f"Error: Invalid method {method}"
-                            
+                                # Default to public sources
+                                result = await core.query_public_sources(question)
+
                             if result.get("error"):
-                                return f"❌ Error: {result['error']}", "", f"Error: {result['error']}"
-                            
+                                return (
+                                    f"❌ Error: {result['error']}",
+                                    "",
+                                    f"Error: {result['error']}",
+                                )
+
                             # Format sources
                             sources_info = ""
                             if result.get("agent_metadata"):
@@ -757,47 +736,57 @@ def create_ui():
 - **Tool Calls:** {metadata.get('tool_calls', 0)}
 - **Method Used:** {result.get('method', 'Unknown')}
                                 """
-                            
-                            status = f"✅ Query completed using {method} method with {config} configuration"
-                            
-                            return result.get('answer', 'No answer generated'), sources_info, status
-                        
+
+                            status = f"✅ Query completed using {config} configuration"
+
+                            return (
+                                result.get("answer", "No answer generated"),
+                                sources_info,
+                                status,
+                            )
+
                         return asyncio.run(run_query())
-                        
+
                     except Exception as e:
                         error_msg = f"❌ Error: {str(e)}"
                         return error_msg, "", f"Error: {str(e)}"
-                
+
                 query_btn.click(
                     fn=query_papers,
-                    inputs=[question_input, method_dropdown, config_dropdown, paper_dir_input],
-                    outputs=[answer_output, sources_output, status_output]
+                    inputs=[
+                        question_input,
+                        config_dropdown,
+                        paper_dir_input,
+                    ],
+                    outputs=[answer_output, sources_output, status_output],
                 )
-                
+
                 clear_btn.click(
                     fn=lambda: ("", "", ""),
-                    outputs=[answer_output, sources_output, status_output]
+                    outputs=[answer_output, sources_output, status_output],
                 )
-                
+
                 # Example button handlers
                 for i, example in enumerate(example_questions):
-                    gr.Button(
-                        example,
-                        size="sm",
-                        variant="outline"
-                    ).click(
-                        fn=lambda q=example: (q, "public", "default", ""),
-                        outputs=[question_input, method_dropdown, config_dropdown, paper_dir_input]
+                    gr.Button(example, size="sm", variant="outline").click(
+                        fn=lambda q=example: (q, "public_only", ""),
+                        outputs=[
+                            question_input,
+                            config_dropdown,
+                            paper_dir_input,
+                        ],
                     )
-            
+
             # Configure Tab
             with gr.Tab("⚙️ Configure"):
                 from src.config_ui import create_config_ui
-                config_ui = create_config_ui()
-        
+
+                create_config_ui()
+
         # Footer
         gr.Markdown("---")
-        gr.Markdown("""
+        gr.Markdown(
+            """
         ### 🆕 New Features
         - **Clinical Trials Search**: Query clinicaltrials.gov for medical research
         - **Multiple Search Methods**: Public papers, local files, combined, and clinical trials
@@ -808,8 +797,9 @@ def create_ui():
         - [User Manual](docs/user_manual.md) - Complete usage guide
         - [Developer Guide](DEVELOPER.md) - Technical details
         - [Architecture](Architecture.md) - System design
-        """)
-    
+        """
+        )
+
     return demo
 
 

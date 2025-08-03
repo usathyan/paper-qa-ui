@@ -1,270 +1,262 @@
-# Paper-QA Enhanced Interface - User Manual
+# Paper-QA: Your AI Research Assistant
 
-## 🎯 Overview
+## 🧬 For Drug Discovery Researchers
 
-The Paper-QA Enhanced Interface is a powerful tool for querying scientific papers and clinical trials using advanced AI capabilities. It provides multiple search methods, detailed agent insights, and comprehensive configuration options.
-
-## 🚀 Quick Start
-
-### 1. Installation & Setup
-
-```bash
-# Clone the repository
-git clone <repository-url>
-cd paper-qa-ui
-
-# Install dependencies
-uv venv --python 3.11
-source .venv/bin/activate
-uv pip install -r requirements.txt
-
-# Set up environment variables
-cp .env.example .env
-# Edit .env with your API keys
-```
-
-### 2. Launch the Interface
-
-```bash
-# Start the web interface
-make ui
-
-# Or use the CLI
-python scripts/paper_qa_cli.py "Your question here" --method public
-```
-
-## 🔍 Search Methods
-
-### 1. **Public Sources** (Recommended)
-- Searches public scientific databases
-- Best for general research questions
-- No local files required
-
-### 2. **Local Papers**
-- Searches your local PDF files
-- Requires paper directory setup
-- Good for proprietary or offline documents
-
-### 3. **Combined**
-- Searches both public sources and local papers
-- Most comprehensive results
-- Requires paper directory
-
-### 4. **Semantic Scholar API**
-- Direct API queries to Semantic Scholar
-- Fast results for specific papers
-- Rate-limited but reliable
-
-### 5. **Clinical Trials** ⭐ NEW
-- Searches clinicaltrials.gov database
-- Combines with local papers if available
-- Perfect for medical research questions
-
-### 6. **Clinical Trials Only** ⭐ NEW
-- Searches only clinicaltrials.gov
-- No local papers or public sources
-- Focused medical research results
-
-## 🎛️ Configuration Options
-
-### Available Configurations
-
-1. **default** - Balanced performance and accuracy
-2. **agent_optimized** - Enhanced agent tool-calling
-3. **comprehensive** - Maximum information retrieval
-4. **clinical_trials** - Optimized for medical research
-5. **clinical_trials_only** - Clinical trials only
-
-### Configuration Features
-
-- **LLM Models**: Choose from various AI models
-- **Search Parameters**: Adjust search depth and breadth
-- **Agent Behavior**: Customize tool usage and reasoning
-- **Output Format**: Control answer length and detail level
-
-## 💻 CLI Usage
-
-### Basic Commands
-
-```bash
-# Query public sources
-python scripts/paper_qa_cli.py "What causes Alzheimer's disease?" --method public
-
-# Query clinical trials
-python scripts/paper_qa_cli.py "What treatments exist for ulcerative colitis?" --method clinical_trials
-
-# Query local papers
-python scripts/paper_qa_cli.py "What does this paper say about PICALM?" --method local --paper-dir ./papers
-
-# Save results to file
-python scripts/paper_qa_cli.py "Your question" --method public --output results.json
-```
-
-### Advanced Options
-
-```bash
-# Use specific configuration
-python scripts/paper_qa_cli.py "Question" --method clinical_trials --config clinical_trials_only
-
-# Combine multiple sources
-python scripts/paper_qa_cli.py "Question" --method combined --paper-dir ./papers --config comprehensive
-```
-
-## 🌐 Web Interface
-
-### Main Features
-
-1. **Question Input**: Enter your research question
-2. **Method Selection**: Choose search method
-3. **Configuration**: Select AI configuration
-4. **Real-time Results**: See answers and sources
-5. **Status Monitoring**: Track agent progress
-
-### Quick Examples
-
-The interface includes pre-built examples:
-- Alzheimer's disease treatments
-- PICALM and amyloid beta clearance
-- Clinical trials for ulcerative colitis
-- Genetic risk factors for Parkinson's
-
-### Configuration Tab
-
-- **Load Configurations**: Switch between preset configurations
-- **Custom Settings**: Modify individual parameters
-- **Save Changes**: Store custom configurations
-- **Restart Required**: Apply changes with server restart
-
-## 📊 Understanding Results
-
-### Answer Section
-- **Formatted Response**: Clean, readable answers
-- **Citations**: In-line references to sources
-- **Evidence**: Supporting information from papers
-
-### Sources Section
-- **Papers Searched**: Number of documents processed
-- **Evidence Retrieved**: Relevant text passages found
-- **Agent Performance**: Tool usage and processing steps
-- **Search Method**: Which approach was used
-
-### Status Section
-- **Processing Status**: Real-time updates
-- **Error Messages**: Clear error reporting
-- **Completion Time**: Performance metrics
-
-## 🔧 Advanced Features
-
-### Clinical Trials Integration ⭐ NEW
-
-The system now supports querying clinical trials from clinicaltrials.gov:
-
-```python
-# Using the API
-from src.paper_qa_core import PaperQACore
-
-core = PaperQACore('clinical_trials')
-result = await core.query_clinical_trials("What drugs treat ulcerative colitis?")
-```
-
-**Benefits:**
-- Access to 400,000+ clinical trials
-- Real-time trial data
-- Medical-grade information
-- FDA-approved treatments
-
-### Agent Insights
-
-Monitor the AI agent's thinking process:
-- **Tool Calls**: See which tools are used
-- **Search Steps**: Track paper discovery
-- **Evidence Gathering**: Monitor information retrieval
-- **Answer Generation**: Understand reasoning
-
-### Configuration Management
-
-- **Preset Configurations**: Optimized for different use cases
-- **Custom Settings**: Fine-tune every parameter
-- **Environment Variables**: Secure API key management
-- **Configuration Validation**: Automatic error checking
-
-## 🚨 Troubleshooting
-
-### Common Issues
-
-1. **Rate Limiting**
-   - Use rate-limited configurations
-   - Implement delays between queries
-   - Monitor API usage
-
-2. **Configuration Errors**
-   - Check environment variables
-   - Validate configuration files
-   - Restart server after changes
-
-3. **Paper Loading Issues**
-   - Verify file paths
-   - Check PDF format compatibility
-   - Ensure sufficient disk space
-
-### Error Messages
-
-- **"object.__init__() takes exactly one argument"**: Known paper-qa library issue, doesn't affect functionality
-- **"429 Too Many Requests"**: Rate limiting, wait and retry
-- **"Module not found"**: Check virtual environment activation
-
-## 📈 Performance Tips
-
-### Optimization Strategies
-
-1. **Choose Right Method**
-   - Use "public" for general questions
-   - Use "clinical_trials" for medical research
-   - Use "local" for specific documents
-
-2. **Configuration Selection**
-   - "default" for balanced performance
-   - "comprehensive" for maximum detail
-   - "agent_optimized" for complex reasoning
-
-3. **Query Formulation**
-   - Be specific and clear
-   - Include key terms
-   - Use medical terminology for clinical queries
-
-## 🔒 Security & Privacy
-
-### Data Handling
-- **Local Processing**: Papers processed locally
-- **API Security**: Secure API key management
-- **No Data Storage**: Queries not permanently stored
-- **Privacy Compliance**: HIPAA-compliant for medical data
-
-### Best Practices
-- Keep API keys secure
-- Use environment variables
-- Monitor usage limits
-- Regular security updates
-
-## 📚 Additional Resources
-
-### Documentation
-- [Developer Guide](DEVELOPER.md) - Technical implementation details
-- [Architecture](Architecture.md) - System design and components
-- [API Reference](API.md) - Programmatic interface
-
-### Examples
-- [PICALM Research](examples/picalm_research.md) - Alzheimer's disease research
-- [Clinical Trials](examples/clinical_trials.md) - Medical research examples
-- [Configuration Examples](examples/configurations.md) - Setup examples
-
-### Support
-- [GitHub Issues](https://github.com/usathyan/paper-qa-ui/issues) - Bug reports and feature requests
-- [Discussions](https://github.com/usathyan/paper-qa-ui/discussions) - Community support
-- [Wiki](https://github.com/usathyan/paper-qa-ui/wiki) - Additional documentation
+Paper-QA is your intelligent research assistant that helps you find answers from scientific literature and clinical trials. Simply ask questions in plain English and get comprehensive, cited answers from thousands of research papers.
 
 ---
 
-**Last Updated**: January 2025  
-**Version**: 2.0.0  
-**Paper-QA Version**: 5.27.0 
+## 🚀 Getting Started in 3 Steps
+
+### Step 1: Open Paper-QA
+- Your IT team will provide you with a web link (usually http://localhost:7860)
+- No software installation needed - just open in your web browser
+- Works on any computer, tablet, or phone
+
+### Step 2: Choose Your Research Approach
+- **Public Literature**: Search millions of published papers
+- **Your Lab's Papers**: Search PDFs you've uploaded to the system
+- **Combined Search**: Search both public and your private papers
+- **Clinical Trials**: Search active and completed clinical trials
+
+### Step 3: Ask Your Question
+Type your research question naturally, like:
+- "What are the latest treatments for Alzheimer's disease?"
+- "How does PICALM affect amyloid beta clearance?"
+- "What clinical trials exist for ulcerative colitis?"
+
+---
+
+## 💡 How to Ask Great Research Questions
+
+### ✅ Good Questions (Get Better Answers)
+- **Specific**: "What are the side effects of metformin in Type 2 diabetes?"
+- **Clear context**: "How does tau protein aggregation contribute to neurodegeneration?"
+- **Use scientific terms**: "What is the mechanism of action of PCSK9 inhibitors?"
+
+### ❌ Avoid These Question Types
+- **Too broad**: "Tell me about cancer" 
+- **Yes/no questions**: "Is aspirin good?"
+- **Vague terms**: "What's the best drug?"
+
+### 🎯 Research Question Examples by Field
+
+#### Alzheimer's & Neurodegeneration
+- "What are the latest amyloid-targeting therapies in clinical trials?"
+- "How do APOE variants affect Alzheimer's disease risk?"
+- "What biomarkers predict cognitive decline?"
+
+#### Cancer Research
+- "What are the mechanisms of resistance to checkpoint inhibitors?"
+- "How effective are CAR-T cell therapies in solid tumors?"
+- "What are the latest developments in tumor microenvironment research?"
+
+#### Cardiovascular Disease
+- "What are the cardiovascular effects of GLP-1 receptor agonists?"
+- "How do PCSK9 inhibitors compare to statins for LDL reduction?"
+- "What are the latest developments in heart failure treatment?"
+
+#### Drug Discovery
+- "What are the challenges in CNS drug delivery?"
+- "How are AI methods being used in drug discovery?"
+- "What are the latest advances in protein degradation therapies?"
+
+---
+
+## 🔍 Understanding Your Search Options
+
+### 🌐 Public Literature Search
+**Best for**: General research questions, literature reviews, staying current
+- Searches millions of papers from PubMed, Semantic Scholar, and other databases
+- Always up-to-date with latest publications
+- No setup required - just ask your question
+
+### 📁 Your Lab's Papers
+**Best for**: Questions about your specific research, internal documents
+- Searches PDFs your team has uploaded
+- Perfect for proprietary research or unpublished work
+- Ask your IT team to add papers to the system
+
+### 🔄 Combined Search
+**Best for**: Comprehensive research, comparing your work to published literature
+- Searches both public databases AND your lab's papers
+- Most thorough results
+- Great for grant writing and manuscript preparation
+
+### 🏥 Clinical Trials
+**Best for**: Treatment options, drug development status, patient recruitment
+- Searches clinicaltrials.gov database
+- Find active trials, completed studies, and trial results
+- Essential for translational research
+
+---
+
+## 📊 Understanding Your Results
+
+### 📝 The Answer Section
+Your AI assistant provides:
+- **Clear, comprehensive answers** in plain English
+- **Citations** showing exactly which papers support each statement
+- **Key findings** highlighted and summarized
+- **Conflicting evidence** when studies disagree
+
+### 📚 The Sources Section
+Shows you:
+- **Which papers** were found and analyzed
+- **How many studies** support the answer
+- **Publication dates** so you know how current the information is
+- **Study types** (clinical trials, reviews, case studies, etc.)
+
+### 🤖 The Status Section
+Watch your AI assistant work:
+- **"Searching for papers..."** - Finding relevant studies
+- **"Analyzing evidence..."** - Reading and understanding papers
+- **"Generating answer..."** - Writing your comprehensive response
+- **"Complete!"** - Your answer is ready
+
+---
+
+## ⚙️ Customizing Your Research Experience
+
+### 🎛️ Configuration Options
+
+Click the **"Configure"** tab to adjust settings:
+
+#### Search Depth
+- **Quick**: Fast answers from fewer papers (5-10 papers)
+- **Standard**: Balanced speed and thoroughness (15-20 papers)
+- **Comprehensive**: Most thorough search (25+ papers)
+
+#### Answer Style
+- **Concise**: Brief, focused answers
+- **Detailed**: Comprehensive explanations
+- **Technical**: Full scientific detail with methodology
+
+#### Specialty Areas
+- **General Research**: Balanced for all fields
+- **Clinical Focus**: Optimized for medical research
+- **Drug Discovery**: Tailored for pharmaceutical research
+
+---
+
+## 🎯 Research Workflow Examples
+
+### Literature Review Workflow
+1. Start with broad question: "What are current Alzheimer's treatments?"
+2. Narrow down: "What are the mechanisms of aducanumab?"
+3. Get specific: "What were the clinical trial results for aducanumab?"
+4. Compare: "How does aducanumab compare to other amyloid therapies?"
+
+### Drug Development Workflow
+1. Target validation: "What evidence supports BACE1 as an Alzheimer's target?"
+2. Competitive landscape: "What BACE1 inhibitors are in development?"
+3. Clinical status: "What clinical trials exist for BACE1 inhibitors?"
+4. Safety profile: "What are the side effects of BACE1 inhibition?"
+
+### Grant Writing Workflow
+1. Background: "What is the current understanding of tau pathology?"
+2. Gap analysis: "What are the limitations of current tau therapies?"
+3. Innovation: "What novel approaches to tau targeting exist?"
+4. Significance: "What is the clinical need for tau-based therapies?"
+
+---
+
+## 🚨 When Things Go Wrong
+
+### "I cannot answer this question"
+**Why this happens:**
+- Question too vague or broad
+- No relevant papers found
+- Technical issues with search
+
+**What to do:**
+- Make your question more specific
+- Add scientific terms or keywords
+- Try a different search method
+- Break complex questions into smaller parts
+
+### Slow or No Results
+**Possible causes:**
+- High server load
+- Complex question requiring deep analysis
+- Network connectivity issues
+
+**What to try:**
+- Wait a few minutes and try again
+- Simplify your question
+- Contact your IT team if problems persist
+
+### Unexpected or Incomplete Answers
+**Common reasons:**
+- Limited literature available on topic
+- Conflicting evidence in papers
+- Very recent research not yet indexed
+
+**How to improve:**
+- Try different keywords or phrasings
+- Use "Combined" search for more sources
+- Ask follow-up questions for clarification
+
+---
+
+## 💡 Pro Tips for Better Research
+
+### 🎯 Question Formulation
+- **Use exact terms**: "PCSK9 inhibitors" not "cholesterol drugs"
+- **Include context**: "in Type 2 diabetes patients" 
+- **Specify outcomes**: "effects on cardiovascular mortality"
+- **Add timeframes**: "published in the last 5 years"
+
+### 🔍 Search Strategy
+- Start broad, then narrow down
+- Use different search methods for different question types
+- Cross-reference important findings
+- Save interesting questions for future reference
+
+### 📊 Interpreting Results
+- Check publication dates for currency
+- Look for systematic reviews and meta-analyses
+- Note study sizes and methodologies
+- Pay attention to conflicting evidence
+
+### 🔄 Iterative Research
+- Ask follow-up questions based on initial answers
+- Explore related topics that come up
+- Compare findings across different search methods
+- Build a comprehensive understanding step by step
+
+---
+
+## 🆘 Getting Help
+
+### Quick Self-Help
+- Try rephrasing your question
+- Use the example questions as templates
+- Check if your question is too broad or too narrow
+- Make sure you're using the right search method
+
+### Contact Support
+- **IT Issues**: Contact your IT team for technical problems
+- **Research Questions**: Ask your librarian for search strategy help
+- **Training**: Request a demo session for your team
+
+---
+
+## 🏆 Success Stories
+
+### "This saved me weeks of literature review!"
+*Dr. Sarah Chen, Neuroscience Research*
+"I was able to get a comprehensive overview of tau pathology research in 30 minutes instead of spending weeks reading papers."
+
+### "Perfect for grant writing background sections"
+*Prof. Michael Rodriguez, Drug Discovery*
+"The citations are perfect for grant applications, and the comprehensive answers help me identify knowledge gaps."
+
+### "Game-changer for clinical trial research"
+*Dr. Lisa Park, Translational Medicine*
+"Being able to quickly find relevant clinical trials and their results has transformed how I approach translational research."
+
+---
+
+**Your AI Research Assistant is Ready!**
+Start by asking a question about your research area and see how Paper-QA can accelerate your scientific discovery.

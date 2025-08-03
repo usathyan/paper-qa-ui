@@ -11,13 +11,12 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 import argparse
 import asyncio
-import logging
 import json
+import logging
 
-from config_manager import setup_environment
 from paper_qa_core import query_combined, query_local_papers, query_public_sources
 from streaming import ConsoleStreamingCallback
-from utils import create_picalm_questions, print_system_status
+from utils import create_picalm_questions
 
 # Suppress all warnings and below globally
 logging.basicConfig(level=logging.ERROR)
@@ -139,7 +138,14 @@ async def main():
     parser.add_argument(
         "--method",
         "-m",
-        choices=["local", "public", "combined", "semantic_scholar", "clinical_trials", "clinical_trials_only"],
+        choices=[
+            "local",
+            "public",
+            "combined",
+            "semantic_scholar",
+            "clinical_trials",
+            "clinical_trials_only",
+        ],
         default="public",
         help="Query method (default: public for best results)",
     )
@@ -159,8 +165,9 @@ async def main():
     args = parser.parse_args()
 
     from src.paper_qa_core import PaperQACore
+
     core = PaperQACore(args.config)
-    
+
     if args.method == "local":
         if not args.paper_dir:
             print("❌ Error: --paper-dir is required for local queries")
@@ -186,15 +193,15 @@ async def main():
         return
 
     print(f"\n🎯 **Answer:**\n{result.get('answer', 'No answer generated')}")
-    
+
     if result.get("agent_metadata"):
         metadata = result["agent_metadata"]
-        print(f"\n📊 **Search Statistics**")
+        print("\n📊 **Search Statistics**")
         print(f"Total Papers Searched: {metadata.get('papers_searched', 0)}")
         print(f"Evidence Pieces Retrieved: {metadata.get('evidence_count', 0)}")
         print(f"Average Relevance Score: {metadata.get('avg_relevance_score', 'N/A')}")
-        
-        print(f"\n🤖 **Agent Performance**")
+
+        print("\n🤖 **Agent Performance**")
         print(f"Agent Steps: {metadata.get('agent_steps', 0)}")
         print(f"Tool Calls Made: {metadata.get('tool_calls', 0)}")
         print(f"Processing Time: {metadata.get('processing_time', 'N/A')}")

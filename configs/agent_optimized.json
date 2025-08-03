@@ -29,7 +29,6 @@
     "evidence_k": 20,
     "evidence_detailed_citations": true,
     "evidence_retrieval": true,
-    "evidence_relevance_score_cutoff": 1,
     "evidence_summary_length": "about 150 words",
     "evidence_skip_summary": false,
     "answer_max_sources": 15,
@@ -37,13 +36,11 @@
     "answer_length": "about 500 words",
     "max_concurrent_requests": 3,
     "answer_filter_extra_background": false,
-    "get_evidence_if_no_contexts": true,
-    "group_contexts_by_question": false
+    "get_evidence_if_no_contexts": true
   },
   "parsing": {
     "chunk_size": 5000,
     "page_size_limit": 1280000,
-    "pdfs_use_block_parsing": false,
     "use_doc_details": true,
     "overlap": 250,
     "disable_doc_valid_check": false,
@@ -57,4 +54,4 @@
     "select": "Select the most relevant papers for answering the question: {question}\n\nPapers: {papers}\n\nSelected papers:",
     "system": "You are a helpful AI assistant that answers questions based on scientific papers. Always cite your sources using the provided citation keys."
   }
-} 
+}

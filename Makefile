@@ -58,7 +58,7 @@ check-env:
 	else \
 		echo "⚠️  .env file not found. Copy env.template to .env and configure."; \
 	fi
-	@$(PYTHON) scripts/paper_qa_cli.py --status
+	@$(PYTHON) -c "from src.utils import print_system_status; print_system_status()"
 
 # Install dependencies
 install: check-venv

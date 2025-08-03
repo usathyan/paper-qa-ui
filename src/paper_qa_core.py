@@ -9,13 +9,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-import asyncio
-import json
 import logging
 import os
 import time
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Union, Tuple
+from typing import Any, Callable, Dict, List, Optional, Union
 
 import requests
 from tenacity import retry, stop_after_attempt, wait_exponential
@@ -148,7 +146,6 @@ class EnhancedStreamingCallback:
 
     def _get_timestamp(self, chunk: str) -> str:
         """Extract timestamp from log chunk."""
-        import time
 
         return time.strftime("%H:%M:%S")
 
@@ -174,11 +171,11 @@ class PaperQACore:
         self.config_name = config_name
 
         # Use config manager to load settings
-        from config_manager import ConfigManager
+        from src.config_manager import ConfigManager
 
-        config_manager = ConfigManager()
+        self.config_manager = ConfigManager()
         print(f"🔍 DEBUG: Loading configuration: {config_name}")
-        self.settings = config_manager.get_settings(config_name)
+        self.settings = self.config_manager.get_settings(config_name)
         print(f"🔍 DEBUG: Loaded LLM: {getattr(self.settings, 'llm', 'Not set')}")
         print(
             f"🔍 DEBUG: Loaded Agent LLM: {getattr(self.settings.agent, 'agent_llm', 'Not set')}"
@@ -188,18 +185,29 @@ class PaperQACore:
         self.logger = logging.getLogger(__name__)
 
     def _get_predefined_settings(self, settings_name: str) -> Optional[Settings]:
-        """Get predefined settings from paper-qa if available."""
+        """Get predefined settings from paper-qa if available, fallback to custom configs."""
+        # First try built-in paper-qa settings
         try:
-            if hasattr(Settings, 'from_name'):
+            if hasattr(Settings, "from_name"):
                 return Settings.from_name(settings_name)
         except Exception as e:
-            self.logger.warning(f"Could not load predefined settings '{settings_name}': {e}")
+            self.logger.warning(
+                f"Could not load built-in predefined settings '{settings_name}': {e}"
+            )
+
+        # Fallback to custom configuration files
+        try:
+            config = self.config_manager.load_config(settings_name)
+            return Settings(**config)
+        except Exception as e:
+            self.logger.warning(
+                f"Could not load custom configuration '{settings_name}': {e}"
+            )
+
         return None
 
     async def query_with_predefined_settings(
-        self, 
-        question: str, 
-        settings_name: str = "clinical_trials"
+        self, question: str, settings_name: str = "clinical_trials"
     ) -> Dict[str, Any]:
         """Query using paper-qa's predefined settings."""
         try:
@@ -209,35 +217,39 @@ class PaperQACore:
                     "error": f"Predefined settings '{settings_name}' not available",
                     "answer": None,
                     "agent_metadata": {},
-                    "thinking_process": []
+                    "thinking_process": [],
                 }
 
             self.logger.info(f"Using predefined settings: {settings_name}")
-            
+
             # Override with our API configuration if needed
-            if hasattr(predefined_settings, 'agent') and hasattr(predefined_settings.agent, 'agent_llm_config'):
+            if hasattr(predefined_settings, "agent") and hasattr(
+                predefined_settings.agent, "agent_llm_config"
+            ):
                 predefined_settings.agent.agent_llm_config = {
                     "api_key": os.getenv("OPENROUTER_API_KEY"),
-                    "base_url": "https://openrouter.ai/api/v1"
+                    "base_url": "https://openrouter.ai/api/v1",
                 }
-            
+
             # Override LLM models to use OpenRouter
             predefined_settings.llm = "openrouter/anthropic/claude-3.5-sonnet"
             predefined_settings.summary_llm = "openrouter/anthropic/claude-3.5-sonnet"
-            predefined_settings.agent.agent_llm = "openrouter/anthropic/claude-3.5-sonnet"
+            predefined_settings.agent.agent_llm = (
+                "openrouter/anthropic/claude-3.5-sonnet"
+            )
             predefined_settings.embedding = "ollama/nomic-embed-text"
 
-            result = await agent_query(question, settings=predefined_settings)
-            
+            result = await agent_query(query=question, settings=predefined_settings)
+
             return self._process_result(result, f"predefined_{settings_name}")
-            
+
         except Exception as e:
             self.logger.error(f"Error with predefined settings '{settings_name}': {e}")
             return {
                 "error": str(e),
                 "answer": None,
                 "agent_metadata": {},
-                "thinking_process": []
+                "thinking_process": [],
             }
 
     async def query_clinical_trials(self, question: str) -> Dict[str, Any]:
@@ -246,24 +258,24 @@ class PaperQACore:
 
     async def query_clinical_trials_only(self, question: str) -> Dict[str, Any]:
         """Query only clinical trials (no local papers)."""
-        return await self.query_with_predefined_settings(question, "search_only_clinical_trials")
+        return await self.query_with_predefined_settings(
+            question, "search_only_clinical_trials"
+        )
 
     async def query_with_custom_tools(
-        self, 
-        question: str, 
-        tool_names: List[str] = None
+        self, question: str, tool_names: List[str] = None
     ) -> Dict[str, Any]:
         """Query with custom tool configuration."""
         if tool_names is None:
             tool_names = DEFAULT_TOOL_NAMES + ["clinical_trials_search"]
-        
+
         # Create a copy of current settings with custom tools
         custom_settings = self.settings.copy()
-        if hasattr(custom_settings, 'agent'):
+        if hasattr(custom_settings, "agent"):
             custom_settings.agent.tool_names = tool_names
-        
+
         try:
-            result = await agent_query(question, settings=custom_settings)
+            result = await agent_query(query=question, settings=custom_settings)
             return self._process_result(result, f"custom_tools_{'_'.join(tool_names)}")
         except Exception as e:
             self.logger.error(f"Error with custom tools: {e}")
@@ -271,29 +283,31 @@ class PaperQACore:
                 "error": str(e),
                 "answer": None,
                 "agent_metadata": {},
-                "thinking_process": []
+                "thinking_process": [],
             }
 
     def _process_result(self, result: Any, method: str) -> Dict[str, Any]:
         """Process agent query result and extract detailed information."""
         try:
             # Extract basic information
-            answer = getattr(result, 'answer', 'No answer generated')
-            session = getattr(result, 'session', None)
-            
+            answer = getattr(result, "answer", "No answer generated")
+            session = getattr(result, "session", None)
+
             # Extract agent metadata
             agent_metadata = self._extract_agent_metadata(result)
-            
+
             # Extract thinking process
             thinking_process = []
-            if hasattr(result, 'thinking_process'):
+            if hasattr(result, "thinking_process"):
                 thinking_process = result.thinking_process
-            
+
             # Extract detailed context information
             detailed_contexts = []
-            if session and hasattr(session, 'contexts'):
-                detailed_contexts = self._extract_detailed_context_info(session.contexts)
-            
+            if session and hasattr(session, "contexts"):
+                detailed_contexts = self._extract_detailed_context_info(
+                    session.contexts
+                )
+
             return {
                 "answer": answer,
                 "method": method,
@@ -301,9 +315,9 @@ class PaperQACore:
                 "thinking_process": thinking_process,
                 "detailed_contexts": detailed_contexts,
                 "session": session,
-                "error": None
+                "error": None,
             }
-            
+
         except Exception as e:
             self.logger.error(f"Error processing result: {e}")
             return {
@@ -313,7 +327,7 @@ class PaperQACore:
                 "thinking_process": [],
                 "detailed_contexts": [],
                 "session": None,
-                "error": str(e)
+                "error": str(e),
             }
 
     async def initialize_docs(
@@ -570,7 +584,7 @@ class PaperQACore:
                 f"🔍 DEBUG: Settings agent_llm_config: {getattr(self.settings.agent, 'agent_llm_config', 'Not set')}"
             )
             result = await agent_query(
-                enhanced_question, self.settings, callbacks=all_callbacks
+                query=enhanced_question, settings=self.settings, callbacks=all_callbacks
             )
 
             # Check if we got a meaningful answer
@@ -607,7 +621,9 @@ class PaperQACore:
                 # Try with a more specific query
                 enhanced_question = f"{question} Please provide detailed information with specific data and statistics."
                 result = await agent_query(
-                    enhanced_question, self.settings, callbacks=all_callbacks
+                    query=enhanced_question,
+                    settings=self.settings,
+                    callbacks=all_callbacks,
                 )
 
                 # Extract detailed context information
@@ -695,9 +711,6 @@ class PaperQACore:
         This method bypasses paper-qa's internal search and uses direct
         Semantic Scholar API calls to find the specific papers we need.
         """
-        import time
-
-        import requests
 
         print(f"🔍 Direct Semantic Scholar API search: {question}")
 

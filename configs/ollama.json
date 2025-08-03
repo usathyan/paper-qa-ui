@@ -1,8 +1,8 @@
 {
-    "embedding": "ollama/nomic-embed-text",
-    "embedding_config": {
-        "api_base": "http://localhost:11434",
-        "dimensions": 768
-    },
-    "verbosity": 3
-} 
+  "embedding": "ollama/nomic-embed-text",
+  "embedding_config": {
+    "api_base": "http://localhost:11434",
+    "dimensions": 768
+  },
+  "verbosity": 3
+}

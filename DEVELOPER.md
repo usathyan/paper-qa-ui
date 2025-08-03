@@ -185,7 +185,199 @@ The Gradio UI required careful attention to:
 
 ---
 
-## 9. References
+## 9. CLI Interface (Legacy)
+
+> **Note:** The CLI interface is still available but the web UI is now the recommended interface for most users. The CLI is primarily maintained for developers and advanced automation use cases.
+
+### Basic CLI Usage
+
+```sh
+# Ask about your local papers
+make run-query QUESTION="What are the main findings of this research?" METHOD=local
+
+# Ask about public sources
+make run-query QUESTION="What are recent developments in machine learning?" METHOD=public
+
+# Ask about both local and public sources
+make run-query QUESTION="How does this research compare to current literature?" METHOD=combined
+
+# With specific configuration
+make run-query QUESTION="What is PICALM?" METHOD=public CONFIG=public_only
+```
+
+### CLI Parameters
+
+- `QUESTION` - Your research question (required)
+- `METHOD` - `local`, `public`, or `combined` (required)  
+- `CONFIG` - `default`, `local_only`, `public_only`, or `combined` (optional, defaults to appropriate config for method)
+
+### Direct CLI Script Usage
+
+```sh
+# Direct script usage (for automation)
+python3 scripts/paper_qa_cli.py \
+  --question "What are the main findings?" \
+  --method local \
+  --config local_only \
+  --paper-dir ./papers
+
+# With streaming output
+python3 scripts/paper_qa_cli.py \
+  --question "Recent ML developments?" \
+  --method public \
+  --stream
+```
+
+### CLI vs Web UI
+
+| Feature | CLI | Web UI |
+|---------|-----|--------|
+| Ease of use | ⚠️ Command line knowledge required | ✅ Point and click |
+| Configuration | ⚠️ Manual file editing | ✅ Visual interface |
+| Status updates | ⚠️ Text-based streaming | ✅ Real-time visual updates |
+| Agent thinking | ⚠️ Text logs only | ✅ Structured display |
+| Error handling | ⚠️ Raw error messages | ✅ User-friendly messages |
+| Automation | ✅ Perfect for scripts | ⚠️ Manual interaction |
+
+**Recommendation:** Use the web UI for interactive research and the CLI for automation scripts.
+
+---
+
+## 10. Python API (Programmatic Access)
+
+For developers who need to integrate Paper-QA into their own applications or scripts, the Python API provides full programmatic access to all functionality.
+
+### Basic Usage
+
+```python
+from paper_qa_core import PaperQACore
+import asyncio
+
+async def main():
+    # Initialize with default configuration
+    core = PaperQACore(config_name="default")
+    
+    # Query your local papers
+    result = await core.query_local_papers(
+        "What are the key conclusions of this research?", 
+        paper_directory="papers/"
+    )
+    
+    # Query public sources
+    result = await core.query_public_sources(
+        "What are the latest trends in this field?"
+    )
+    
+    # Query both sources
+    result = await core.query_combined(
+        "How does this research fit into the broader context?",
+        paper_directory="papers/"
+    )
+    
+    print(f"Answer: {result['answer']}")
+    print(f"Sources: {result['sources']}")
+
+# Run the async function
+asyncio.run(main())
+```
+
+### Advanced Configuration
+
+```python
+from paper_qa_core import PaperQACore
+from config_manager import ConfigManager
+
+# Load custom configuration
+config_manager = ConfigManager()
+custom_settings = config_manager.get_settings("clinical_trials_only")
+
+# Initialize with custom settings
+core = PaperQACore()
+core.settings = custom_settings
+
+# Query with predefined settings
+result = await core.query_with_predefined_settings(
+    "What clinical trials exist for this condition?",
+    "clinical_trials_only"
+)
+```
+
+### Error Handling
+
+```python
+try:
+    result = await core.query_public_sources(
+        "What are recent AI developments?"
+    )
+    
+    if result.get('error'):
+        print(f"Error occurred: {result['error']}")
+    else:
+        print(f"Success: {result['answer']}")
+        
+except Exception as e:
+    print(f"Unexpected error: {e}")
+```
+
+### Integration Examples
+
+#### Batch Processing
+```python
+questions = [
+    "What is the main hypothesis?",
+    "What methodology was used?", 
+    "What are the key findings?"
+]
+
+results = []
+for question in questions:
+    result = await core.query_local_papers(question, "papers/")
+    results.append({
+        'question': question,
+        'answer': result.get('answer', 'No answer found'),
+        'sources': result.get('sources', [])
+    })
+```
+
+#### Custom Callbacks
+```python
+from streaming import create_callback
+
+def my_status_callback(status):
+    print(f"Status: {status}")
+
+def my_result_callback(result):
+    print(f"Intermediate result: {result}")
+
+# Use custom callbacks
+result = await core.query_with_callbacks(
+    question="What are the implications?",
+    status_callback=my_status_callback,
+    result_callback=my_result_callback
+)
+```
+
+### API Reference
+
+| Method | Purpose | Parameters |
+|--------|---------|------------|
+| `query_local_papers()` | Search local PDFs | `question`, `paper_directory` |
+| `query_public_sources()` | Search public APIs | `question` |
+| `query_combined()` | Search both sources | `question`, `paper_directory` |
+| `query_with_predefined_settings()` | Use specific config | `question`, `config_name` |
+
+### Use Cases for Python API
+
+- **Automated research workflows**
+- **Batch processing of questions**
+- **Integration with existing Python applications**
+- **Custom UI development**
+- **Research data pipelines**
+- **Jupyter notebook integration**
+
+---
+
+## 11. References
 - [Paper-QA](https://github.com/Future-House/paper-qa)
 - [OpenRouter.ai](https://openrouter.ai/)
 - [Ollama](https://ollama.com/)
