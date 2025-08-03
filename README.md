@@ -41,8 +41,15 @@ Paper-QA lets you ask research questions and get answers with citations from you
    - Pull the required Ollama model
    - Set up directories and a `.env` file
 
-3. **Add your OpenRouter API key:**
-   - Edit `.env` and set `OPENROUTER_API_KEY=...`
+3. **Configure environment:**
+   ```sh
+   # Copy the template and edit with your API keys
+   cp env.template .env
+   # Edit .env and add your OpenRouter API key
+   ```
+   
+   - Get your OpenRouter key from [OpenRouter.ai](https://openrouter.ai/keys)
+   - The `.env` file is ignored by git for security
 
 4. **Add your PDF papers:**
    - Place PDFs in the `papers/` directory
