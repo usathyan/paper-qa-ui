@@ -4,6 +4,7 @@ Tests the core functionality and configuration.
 """
 
 import asyncio
+import logging
 import sys
 from pathlib import Path
 
@@ -16,6 +17,11 @@ from paper_qa_core import (
 )
 from streaming import ConsoleStreamingCallback, create_multi_callback
 from utils import create_picalm_questions, print_system_status, save_questions
+
+# Suppress all warnings and below globally
+logging.basicConfig(level=logging.ERROR)
+# Enable INFO for paperqa only
+logging.getLogger("paperqa").setLevel(logging.INFO)
 
 
 async def test_environment_setup():

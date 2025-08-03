@@ -17,8 +17,8 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 
 # Suppress all warnings and below globally
 logging.basicConfig(level=logging.ERROR)
-# Enable DEBUG for paperqa only
-logging.getLogger("paperqa").setLevel(logging.DEBUG)
+# Enable INFO for paperqa only
+logging.getLogger("paperqa").setLevel(logging.INFO)
 
 
 class PaperQACore:

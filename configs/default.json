@@ -3,7 +3,7 @@
   "summary_llm": "openrouter/google/gemini-2.5-flash-lite",
   "embedding": "ollama/nomic-embed-text",
   "temperature": 0.0,
-  "verbosity": 2,
+  "verbosity": 3,
   "answer": {
     "evidence_k": 10,
     "evidence_detailed_citations": true,

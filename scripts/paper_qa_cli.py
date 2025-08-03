@@ -20,8 +20,8 @@ from utils import create_picalm_questions, print_system_status
 
 # Suppress all warnings and below globally
 logging.basicConfig(level=logging.ERROR)
-# Enable DEBUG for paperqa only
-logging.getLogger("paperqa").setLevel(logging.DEBUG)
+# Enable INFO for paperqa only
+logging.getLogger("paperqa").setLevel(logging.INFO)
 
 
 async def run_query(

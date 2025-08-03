@@ -3,11 +3,11 @@
   "summary_llm": "openrouter/google/gemini-2.5-flash-lite",
   "embedding": "ollama/nomic-embed-text",
   "temperature": 0.0,
-  "verbosity": 2,
+  "verbosity": 3,
   "agent": {
     "agent_llm": "openrouter/google/gemini-2.5-flash-lite",
     "agent_type": "ToolSelector",
-    "search_count": 5,
+    "search_count": 3,
     "timeout": 300.0,
     "should_pre_search": false,
     "wipe_context_on_answer_failure": true,
