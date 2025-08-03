@@ -42,14 +42,9 @@ class ConfigManager:
         """Get Paper-QA Settings object from configuration."""
         config = self.load_config(config_name)
 
-        # Create Settings object with minimal required parameters
-        return Settings(
-            llm=config.get("llm"),
-            summary_llm=config.get("summary_llm"),
-            embedding=config.get("embedding"),
-            temperature=config.get("temperature", 0.0),
-            verbosity=config.get("verbosity", 2),
-        )
+        # Create Settings object with full configuration
+        # Pass all configuration parameters to Settings constructor
+        return Settings(**config)
 
     def validate_config(self, config: Dict[str, Any]) -> bool:
         """Validate configuration structure."""

@@ -91,6 +91,21 @@ def save_results(results: List[Dict[str, Any]], output_dir: Union[str, Path]) ->
     output_dir = ensure_directory(output_dir)
     timestamp = format_timestamp().replace(" ", "_").replace(":", "-")
 
+    # Clean results for JSON serialization
+    def clean_for_json(obj):
+        """Recursively clean objects for JSON serialization."""
+        if isinstance(obj, dict):
+            return {k: clean_for_json(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [clean_for_json(item) for item in obj]
+        elif hasattr(obj, "__dict__"):
+            # Convert objects to string representation
+            return str(obj)
+        else:
+            return obj
+
+    cleaned_results = clean_for_json(results)
+
     # Save summary
     summary = {
         "timestamp": timestamp,
@@ -104,13 +119,13 @@ def save_results(results: List[Dict[str, Any]], output_dir: Union[str, Path]) ->
     save_json(summary, output_dir / f"summary_{timestamp}.json")
 
     # Save individual results
-    for i, result in enumerate(results):
+    for i, result in enumerate(cleaned_results):
         result_file = output_dir / f"result_{i+1}_{timestamp}.json"
         save_json(result, result_file)
 
     # Save combined results
     combined_file = output_dir / f"combined_results_{timestamp}.json"
-    save_json(results, combined_file)
+    save_json(cleaned_results, combined_file)
 
 
 def validate_paper_directory(paper_dir: Union[str, Path]) -> Dict[str, Any]:

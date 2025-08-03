@@ -5,20 +5,19 @@
   "temperature": 0.0,
   "verbosity": 3,
   "answer": {
-    "evidence_k": 10,
+    "evidence_k": 15,
     "evidence_detailed_citations": true,
     "evidence_retrieval": true,
     "evidence_relevance_score_cutoff": 1,
-    "evidence_summary_length": "about 100 words",
+    "evidence_summary_length": "about 150 words",
     "evidence_skip_summary": false,
-    "answer_max_sources": 5,
+    "answer_max_sources": 10,
     "max_answer_attempts": 3,
-    "answer_length": "about 200 words, but can be longer",
-    "max_concurrent_requests": 4,
+    "answer_length": "about 400 words",
+    "max_concurrent_requests": 3,
     "answer_filter_extra_background": false,
     "get_evidence_if_no_contexts": true,
-    "group_contexts_by_question": false,
-    "skip_evidence_citation_strip": false
+    "group_contexts_by_question": false
   },
   "parsing": {
     "chunk_size": 5000,
@@ -39,20 +38,23 @@
   },
   "agent": {
     "agent_llm": "openrouter/google/gemini-2.5-flash-lite",
+    "agent_llm_config": {
+      "api_key": "${OPENROUTER_API_KEY}",
+      "base_url": "https://openrouter.ai/api/v1"
+    },
     "agent_type": "ToolSelector",
-    "search_count": 8,
-    "timeout": 500.0,
-    "should_pre_search": false,
+    "search_count": 20,
+    "timeout": 600.0,
+    "should_pre_search": true,
     "wipe_context_on_answer_failure": true,
-    "agent_evidence_n": 1,
-    "return_paper_metadata": false,
+    "agent_evidence_n": 3,
+    "return_paper_metadata": true,
     "index": {
       "paper_directory": "./papers",
       "index_directory": "./indexes",
       "recurse_subdirectories": true,
-      "concurrency": 5,
-      "sync_with_paper_directory": true,
-      "rebuild_index": true
+      "concurrency": 3,
+      "sync_with_paper_directory": false
     }
   }
 } 

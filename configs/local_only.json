@@ -6,21 +6,23 @@
   "verbosity": 3,
   "agent": {
     "agent_llm": "openrouter/google/gemini-2.5-flash-lite",
+    "agent_llm_config": {
+      "api_key": "${OPENROUTER_API_KEY}",
+      "base_url": "https://openrouter.ai/api/v1"
+    },
     "agent_type": "ToolSelector",
     "search_count": 3,
     "timeout": 300.0,
     "should_pre_search": false,
     "wipe_context_on_answer_failure": true,
     "agent_evidence_n": 1,
-    "return_paper_metadata": true,
-    "tool_names": ["GatherEvidence", "GenAnswer"],
+    "return_paper_metadata": false,
     "index": {
       "paper_directory": "./papers",
       "index_directory": "./indexes",
       "recurse_subdirectories": true,
-      "concurrency": 3,
-      "sync_with_paper_directory": true,
-      "rebuild_index": true
+      "concurrency": 5,
+      "sync_with_paper_directory": true
     }
   },
   "answer": {
@@ -30,13 +32,12 @@
     "evidence_relevance_score_cutoff": 1,
     "evidence_summary_length": "about 80 words",
     "evidence_skip_summary": false,
-    "answer_max_sources": 3,
+    "answer_max_sources": 5,
     "max_answer_attempts": 2,
-    "answer_length": "about 150 words",
-    "max_concurrent_requests": 2,
+    "answer_length": "about 200 words",
+    "max_concurrent_requests": 4,
     "answer_filter_extra_background": false,
     "get_evidence_if_no_contexts": true,
-    "group_contexts_by_question": false,
-    "skip_evidence_citation_strip": false
+    "group_contexts_by_question": false
   }
 } 
