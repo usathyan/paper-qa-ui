@@ -108,9 +108,13 @@ Paper-QA lets you ask research questions and get answers with citations from you
 
 ---
 
-## Usage
+## 📖 Documentation
 
-### Ask a Question (CLI)
+- **[📚 User Manual](docs/user_manual.md)** - Comprehensive guide to all features and functionality
+- **[🔧 Developer Guide](DEVELOPER.md)** - Technical details for developers
+- **[🏗️ Architecture](Architecture.md)** - System architecture and design
+
+## Usage
 ```sh
 # Ask about your local papers
 make run-query QUESTION="What are the main findings of this research?" METHOD=local
@@ -135,6 +139,20 @@ make run-query QUESTION="What is PICALM?" METHOD=public CONFIG=public_only
 make ui
 ```
 Then open http://localhost:7860 in your browser for a user-friendly web interface.
+
+**Enhanced Features:**
+- **🔍 Query Papers Tab**: Ask questions with multiple search methods
+- **⚙️ Configure Tab**: Complete configuration management through the UI
+- **🤖 Agent Thinking Process**: See exactly how the AI processes your questions
+- **📚 Detailed Context Information**: View the specific information used
+- **⚙️ Agent Metadata**: Technical details about processing and performance
+- **📊 Real-time Status Updates**: Live feedback on query progress
+
+**Search Methods:**
+- **Public**: Search online sources (Semantic Scholar, Crossref)
+- **Local**: Search your uploaded PDF papers
+- **Combined**: Search both local and public sources
+- **Semantic Scholar**: Direct API search with optimized patterns
 
 ### Programmatic Use (Python)
 ```python
