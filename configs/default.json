@@ -1,0 +1,58 @@
+{
+  "llm": "openrouter/google/gemini-2.5-flash-lite",
+  "summary_llm": "openrouter/google/gemini-2.5-flash-lite",
+  "embedding": "ollama/nomic-embed-text",
+  "temperature": 0.0,
+  "verbosity": 2,
+  "answer": {
+    "evidence_k": 10,
+    "evidence_detailed_citations": true,
+    "evidence_retrieval": true,
+    "evidence_relevance_score_cutoff": 1,
+    "evidence_summary_length": "about 100 words",
+    "evidence_skip_summary": false,
+    "answer_max_sources": 5,
+    "max_answer_attempts": 3,
+    "answer_length": "about 200 words, but can be longer",
+    "max_concurrent_requests": 4,
+    "answer_filter_extra_background": false,
+    "get_evidence_if_no_contexts": true,
+    "group_contexts_by_question": false,
+    "skip_evidence_citation_strip": false
+  },
+  "parsing": {
+    "chunk_size": 5000,
+    "page_size_limit": 1280000,
+    "pdfs_use_block_parsing": false,
+    "use_doc_details": true,
+    "overlap": 250,
+    "disable_doc_valid_check": false,
+    "defer_embedding": false,
+    "chunking_algorithm": "simple_overlap"
+  },
+  "prompts": {
+    "use_json": true,
+    "summary": "Summarize the following text in a concise way that is helpful for answering the user's question. Do not include information that is not relevant to the question. Do not include information that is not in the text.\n\nText: {text}\n\nSummary:",
+    "qa": "Answer the question '{question}'\nUse the context below if helpful. You can cite the context using the key like (pqac-abcd1234). If there is insufficient context, say so.\n\nContext: {context}",
+    "select": "Select the most relevant papers for answering the question: {question}\n\nPapers: {papers}\n\nSelected papers:",
+    "system": "You are a helpful AI assistant that answers questions based on scientific papers. Always cite your sources using the provided citation keys."
+  },
+  "agent": {
+    "agent_llm": "openrouter/google/gemini-2.5-flash-lite",
+    "agent_type": "ToolSelector",
+    "search_count": 8,
+    "timeout": 500.0,
+    "should_pre_search": false,
+    "wipe_context_on_answer_failure": true,
+    "agent_evidence_n": 1,
+    "return_paper_metadata": false,
+    "index": {
+      "paper_directory": "./papers",
+      "index_directory": "./indexes",
+      "recurse_subdirectories": true,
+      "concurrency": 5,
+      "sync_with_paper_directory": true,
+      "rebuild_index": true
+    }
+  }
+} 

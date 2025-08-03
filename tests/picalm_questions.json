@@ -1,0 +1,20 @@
+[
+  {
+    "id": "picalm_basic",
+    "question": "What is the role of PICALM in Alzheimer's disease pathogenesis?",
+    "type": "basic_research",
+    "description": "Basic research question about PICALM's role in Alzheimer's disease"
+  },
+  {
+    "id": "picalm_mechanistic",
+    "question": "How does PICALM interact with amyloid-beta and tau proteins in Alzheimer's disease?",
+    "type": "mechanistic",
+    "description": "Mechanistic question about PICALM's interactions with key proteins"
+  },
+  {
+    "id": "picalm_therapeutic",
+    "question": "What are the potential therapeutic targets related to PICALM in Alzheimer's disease treatment?",
+    "type": "therapeutic",
+    "description": "Therapeutic question about PICALM as a drug target"
+  }
+]

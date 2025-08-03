@@ -1,1 +1,0 @@
-PaperQA is a scientific paper question-answering system that uses AI to analyze research papers and answer questions about their content. It can search through local documents and public databases to find relevant information.

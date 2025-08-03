@@ -1,597 +1,324 @@
-# PaperQA Discovery Architecture
+# Paper-QA Architecture
 
 ## Overview
 
-PaperQA Discovery is a web-based interface for the PaperQA2 scientific paper question-answering system. It provides an intuitive way to query scientific literature using natural language questions, with support for both local document collections and public domain searches.
-
-## Current Implementation Status
-
-### ✅ Working Features
-- **Cloud LLM Processing**: Using OpenRouter.ai with GLM-4.5-Air model
-- **Local Embeddings**: Using Ollama with nomic-embed-text model
-- **Public Domain Search**: Search external scientific databases (when API keys configured)
-- **Web Interface**: React frontend with FastAPI backend
-- **Document Management**: Upload, list, and delete papers
-- **Enhanced API Documentation**: Comprehensive Swagger UI with detailed schemas
-- **Health Monitoring**: System status and environment validation
-
-### ⚠️ Current Limitations
-- **No Local Papers**: `uploaded_papers` directory has been deleted
-- **External API Keys**: Required for full public domain search functionality
-- **Rate Limits**: OpenRouter.ai free tier has rate limits
-
-### 🔧 Current Configuration
-
-**LLM Provider**: OpenRouter.ai
-- **Primary Model**: `z-ai/glm-4.5-air:free`
-- **Alternative**: `google/gemma-3n-e2b-it:free` (commented out)
-- **Embeddings**: Ollama `nomic-embed-text:latest`
-
-**Environment Variables**:
-```bash
-OPENROUTER_API_KEY="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"
-```
+This document describes the technical architecture of the Paper-QA project, which provides a clean, focused implementation of Paper-QA using OpenRouter.ai with Google Gemini 2.5 Flash Lite model and Ollama's nomad-embed-text for embeddings.
 
 ## System Architecture
 
-### High-Level System Flow
+### High-Level Architecture
 
-```mermaid
-graph TB
-    A[User Query] --> B[Frontend React App]
-    B --> C[FastAPI Backend]
-    C --> D{Query Source Type}
-    
-    D -->|Local| E[Local Document Search]
-    D -->|Public| F[External Paper Search]
-    D -->|All| G[Combined Search]
-    
-    E --> H[PaperQA Direct Query]
-    F --> I[PaperQA Direct Query]
-    G --> J[PaperQA Direct Query]
-    
-    H --> K[OpenRouter.ai LLM]
-    I --> K
-    J --> K
-    
-    K --> L[Formatted Answer]
-    L --> M[Evidence & Sources]
-    M --> N[Response to User]
-    
-    subgraph "Cloud Infrastructure"
-        O[OpenRouter.ai API]
-        P[GLM-4.5-Air Model]
-    end
-    
-    K --> O
-    O --> P
-    
-    subgraph "Local Infrastructure"
-        Q[Ollama Server]
-        R[Embedding Model: nomic-embed-text]
-    end
-    
-    H --> Q
-    Q --> R
-    
-    subgraph "External APIs (Optional)"
-        S[Semantic Scholar]
-        T[Crossref]
-        U[Other Scientific DBs]
-    end
-    
-    I --> S
-    I --> T
-    I --> U
-    
-    style O fill:#ff9999
-    style Q fill:#99ccff
-    style S fill:#99ff99
 ```
-
-### Current Query Processing Flow
-
-```mermaid
-graph TD
-    A[User Question] --> B[Source Selection]
-    B --> C{Source Type}
-    
-    C -->|Local| D[Check Local Papers]
-    C -->|Public| E[External Search Only]
-    C -->|All| F[Combined Search]
-    
-    D --> G{Local Papers Available?}
-    G -->|No| H[Return "No Papers Loaded"]
-    G -->|Yes| I[Vector Search in Local Index]
-    
-    E --> J[PaperQA Direct Query]
-    F --> K[PaperQA Direct Query]
-    I --> L[PaperQA Direct Query]
-    
-    J --> M[OpenRouter.ai Processing]
-    K --> M
-    L --> M
-    
-    M --> N[Answer Generation]
-    N --> O[Evidence Extraction]
-    O --> P[Response Formatting]
-    
-    subgraph "Current State"
-        Q[No Uploaded Papers]
-        R[OpenRouter.ai LLM]
-        S[Ollama Embeddings]
-    end
-    
-    G --> Q
-    M --> R
-    I --> S
-    
-    style Q fill:#ffcccc
-    style R fill:#ccffcc
-    style S fill:#ccccff
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   User Input    │    │   Paper-QA      │    │   Output        │
+│                 │    │   Core          │    │                 │
+│ - Questions     │───▶│ - Query Engine  │───▶│ - Answers       │
+│ - Paper Files   │    │ - Embeddings    │    │ - Citations     │
+│ - Config        │    │ - LLM Interface │    │ - Sources       │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+                              │
+                              ▼
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Local Papers  │    │   Public APIs   │    │   Streaming     │
+│                 │    │                 │    │                 │
+│ - PDF Files     │    │ - Semantic      │    │ - Console       │
+│ - Indexes       │    │   Scholar       │    │ - Rich UI       │
+│ - Embeddings    │    │ - Crossref      │    │ - Files         │
+└─────────────────┘    │ - OpenAlex      │    └─────────────────┘
+                       └─────────────────┘
 ```
-
-### Data Flow Architecture
-
-```mermaid
-flowchart LR
-    A[User Query] --> B[Query Processing]
-    B --> C[Source Analysis]
-    C --> D{Source Type}
-    
-    D -->|Local| E[Local Vector Search]
-    D -->|Public| F[External API Search]
-    D -->|All| G[Hybrid Search]
-    
-    E --> H[Ollama Embeddings]
-    F --> I[External APIs]
-    G --> J[Combined Processing]
-    
-    H --> K[Vector Similarity]
-    I --> L[Paper Retrieval]
-    J --> M[Merged Results]
-    
-    K --> N[Context Assembly]
-    L --> N
-    M --> N
-    
-    N --> O[OpenRouter.ai LLM]
-    O --> P[Answer Generation]
-    P --> Q[Response to User]
-    
-    subgraph "Current Infrastructure"
-        R[OpenRouter.ai API]
-        S[Ollama Server]
-        T[No Local Papers]
-    end
-    
-    O --> R
-    H --> S
-    E --> T
-    
-    style T fill:#ffcccc
-    style R fill:#ccffcc
-    style S fill:#ccccff
-```
-
-## Functional Requirements Level
 
 ### Core Components
 
-#### 1. Current Query Processing Pipeline
+#### 1. Paper-QA Core (`src/paper_qa_core.py`)
 
-```mermaid
-graph LR
-    A[Natural Language Query] --> B[Source Selection]
-    B --> C{Search Strategy}
-    
-    C -->|Local| D[Check Local Papers]
-    C -->|Public| E[External Search]
-    C -->|All| F[Combined Search]
-    
-    D --> G{Local Papers?}
-    G -->|No| H[Return Error]
-    G -->|Yes| I[Vector Search]
-    
-    E --> J[PaperQA Direct Query]
-    F --> K[PaperQA Direct Query]
-    I --> L[PaperQA Direct Query]
-    
-    J --> M[OpenRouter.ai LLM]
-    K --> M
-    L --> M
-    
-    M --> N[Answer Generation]
-    N --> O[Evidence Collection]
-    O --> P[Response Formatting]
-    
-    subgraph "Current State"
-        Q[No Local Papers]
-        R[OpenRouter.ai Active]
-        S[Ollama Embeddings]
-    end
-    
-    G --> Q
-    M --> R
-    I --> S
-    
-    style Q fill:#ffcccc
-    style R fill:#ccffcc
-    style S fill:#ccccff
+The central component that orchestrates all Paper-QA operations:
+
+- **PaperQACore Class**: Main interface for all Paper-QA operations
+- **Query Functions**: Three main query types (local, public, combined)
+- **Error Handling**: Robust error handling with tenacity retry logic
+- **Streaming Support**: Real-time response streaming
+
+**Key Methods:**
+```python
+class PaperQACore:
+    async def query_local_papers(question, paper_directory, callbacks)
+    async def query_public_sources(question, callbacks)
+    async def query_combined(question, paper_directory, callbacks)
 ```
 
-#### 2. Current Agent System
+#### 2. Configuration Management (`src/config_manager.py`)
 
-```mermaid
-graph TD
-    A[User Query] --> B[PaperQA Direct Query]
-    B --> C[Settings Configuration]
-    C --> D[LLM Processing]
-    
-    D --> E[OpenRouter.ai API]
-    E --> F[GLM-4.5-Air Model]
-    F --> G[Answer Generation]
-    
-    G --> H[Evidence Extraction]
-    H --> I[Source Citations]
-    I --> J[Response Formatting]
-    
-    subgraph "Current Configuration"
-        K[OpenRouter.ai LLM]
-        L[Ollama Embeddings]
-        M[No Agent Tools]
-    end
-    
-    D --> K
-    B --> L
-    B --> M
-    
-    style K fill:#ccffcc
-    style L fill:#ccccff
-    style M fill:#ffcccc
+Manages all configuration aspects of the system:
+
+- **ConfigManager Class**: Handles JSON configuration files
+- **Environment Setup**: Loads and validates environment variables
+- **Configuration Validation**: Ensures required settings are present
+- **Dynamic Configuration**: Supports runtime configuration changes
+
+**Configuration Structure:**
+```json
+{
+  "llm": "openrouter/google/gemini-2.5-flash-lite",
+  "embedding": "ollama/nomad-embed-text",
+  "agent": {
+    "agent_type": "ToolSelector",
+    "search_count": 8,
+    "timeout": 500.0
+  },
+  "answer": {
+    "evidence_k": 10,
+    "answer_max_sources": 5
+  }
+}
 ```
 
-#### 3. Current Tool System
+#### 3. Streaming System (`src/streaming.py`)
 
-```mermaid
-graph TB
-    A[Query Input] --> B[Direct PaperQA Query]
-    B --> C[Settings Application]
-    C --> D[LLM Processing]
-    
-    D --> E[OpenRouter.ai API]
-    E --> F[Model Response]
-    F --> G[Answer Synthesis]
-    
-    subgraph "Current State"
-        H[No Agent Tools]
-        I[Direct aquery() Method]
-        J[Simplified Processing]
-    end
-    
-    B --> H
-    B --> I
-    B --> J
-    
-    style H fill:#ffcccc
-    style I fill:#ccffcc
-    style J fill:#ccccff
+Provides real-time response streaming capabilities:
+
+- **StreamingCallback Base Class**: Abstract base for all streaming callbacks
+- **ConsoleStreamingCallback**: Simple console output
+- **RichStreamingCallback**: Rich-formatted output with progress
+- **ProgressStreamingCallback**: Progress bar with status updates
+- **FileStreamingCallback**: File output with timestamps
+- **MultiStreamingCallback**: Combines multiple streaming methods
+
+**Usage Example:**
+```python
+callback = create_multi_callback(
+    console=True,
+    progress=True,
+    file="output.txt"
+)
 ```
 
-## User Requirements Level
+#### 4. Utilities (`src/utils.py`)
 
-### Current User Journey Flow
+Common utility functions and helpers:
 
-```mermaid
-journey
-    title PaperQA Discovery Current User Journey
-    section System State
-      No Local Papers: 1: System
-      OpenRouter.ai Active: 5: System
-      Public Search Available: 3: System
-    section User Actions
-      Ask Question: 5: User
-      Select Source: 4: User
-      Get Response: 5: User
-      Upload Papers: 2: User
-    section System Response
-      Local Query: 1: System
-      Public Query: 4: System
-      All Sources Query: 3: System
+- **File Operations**: JSON save/load, directory management
+- **System Status**: Ollama and OpenRouter.ai health checks
+- **Result Management**: Save and format query results
+- **Question Management**: PICALM research questions
+
+## Data Flow
+
+### 1. Local Papers Query Flow
+
+```
+User Question → PaperQACore → Docs Object → Local PDFs → Embeddings → LLM → Answer
+     │              │              │            │            │         │
+     ▼              ▼              ▼            ▼            ▼         ▼
+Streaming      Configuration   Paper Index   nomad-embed   Gemini    Citations
+Callbacks         Settings      Tantivy       -text        2.5 Flash
 ```
 
-### Current User Interface Architecture
+### 2. Public Sources Query Flow
 
-```mermaid
-graph TB
-    A[User Interface] --> B[Query Interface]
-    A --> C[Library Management]
-    A --> D[Results Display]
-    
-    B --> E[Question Input]
-    B --> F[Source Selection]
-    B --> G[Search Options]
-    
-    C --> H[Paper Upload]
-    C --> I[Paper List - Empty]
-    C --> J[Paper Deletion]
-    
-    D --> K[Answer Display]
-    D --> L[Evidence List]
-    D --> M[Source Citations]
-    D --> N[Thinking Details]
-    
-    subgraph "Current Source Types"
-        O[Local - No Papers]
-        P[Public - Available]
-        Q[All - Limited]
-    end
-    
-    F --> O
-    F --> P
-    F --> Q
-    
-    style O fill:#ffcccc
-    style P fill:#ccffcc
-    style Q fill:#ffffcc
+```
+User Question → PaperQACore → Agent System → Search Tools → Public APIs → LLM → Answer
+     │              │              │             │             │         │
+     ▼              ▼              ▼             ▼             ▼         ▼
+Streaming      Configuration   ToolSelector   Semantic      Gemini    Citations
+Callbacks         Settings      Agent         Scholar      2.5 Flash
 ```
 
-### Current API Architecture
+### 3. Combined Query Flow
 
-```mermaid
-graph LR
-    A[Frontend React] --> B[FastAPI Backend]
-    B --> C[PaperQA Core]
-    C --> D[OpenRouter.ai LLM]
-    C --> E[Ollama Embeddings]
-    C --> F[External APIs]
-    
-    subgraph "API Endpoints"
-        G[/api/query]
-        H[/api/papers]
-        I[/api/upload]
-        J[/api/load-papers]
-        K[/health]
-    end
-    
-    A --> G
-    A --> H
-    A --> I
-    A --> J
-    A --> K
-    
-    subgraph "External Services"
-        L[OpenRouter.ai]
-        M[Ollama Server]
-        N[Semantic Scholar]
-        O[Crossref]
-    end
-    
-    D --> L
-    E --> M
-    F --> N
-    F --> O
-    
-    style L fill:#ccffcc
-    style M fill:#ccccff
-    style N fill:#99ff99
-    style O fill:#99ff99
+```
+User Question → PaperQACore → Local Query → Public Query → Result Merge → Final Answer
+     │              │              │             │              │
+     ▼              ▼              ▼             ▼              ▼
+Streaming      Configuration   Local Papers  Public APIs   Combined
+Callbacks         Settings      + Embeddings  + Search      Results
 ```
 
-## Technical Implementation Details
+## Technology Stack
 
-### Current Model Configuration
+### Core Dependencies
 
-```mermaid
-graph TD
-    A[Settings Configuration] --> B[LLM Models]
-    A --> C[Embedding Models]
-    A --> D[Query Processing]
-    
-    B --> E[OpenRouter.ai GLM-4.5-Air]
-    B --> F[Summary LLM - Same]
-    B --> G[Agent LLM - Same]
-    
-    C --> H[Ollama nomic-embed-text]
-    
-    D --> I[Direct aquery() Method]
-    D --> J[No Agent Tools]
-    D --> K[Simplified Processing]
-    
-    subgraph "Current Setup"
-        L[Cloud LLM]
-        M[Local Embeddings]
-        N[No Local Papers]
-    end
-    
-    E --> L
-    H --> M
-    I --> N
-    
-    style L fill:#ccffcc
-    style M fill:#ccccff
-    style N fill:#ffcccc
+- **Paper-QA**: Main RAG framework
+- **OpenRouter.ai**: LLM provider (Google Gemini 2.5 Flash Lite)
+- **Ollama**: Local embedding model (nomad-embed-text)
+- **Tenacity**: Retry logic and error handling
+- **Rich**: Rich console output and formatting
+- **Pydantic**: Data validation and settings management
+
+### External Services
+
+#### OpenRouter.ai
+- **Model**: Google Gemini 2.5 Flash Lite
+- **API**: REST API with authentication
+- **Rate Limits**: Configurable based on plan
+- **Features**: Streaming, function calling, reasoning
+
+#### Ollama
+- **Model**: nomad-embed-text
+- **API**: Local HTTP API (localhost:11434)
+- **Features**: Local embeddings, no rate limits
+- **Performance**: Fast, private, offline-capable
+
+#### Public APIs (No Authentication Required)
+- **Semantic Scholar**: Research paper search and metadata
+- **Crossref**: DOI resolution and paper metadata
+- **OpenAlex**: Academic paper database
+- **Unpaywall**: Open access information
+
+## Configuration Architecture
+
+### Configuration Hierarchy
+
+```
+1. Environment Variables (.env)
+2. Configuration Files (configs/*.json)
+3. Default Settings (paper-qa defaults)
+4. Runtime Overrides (programmatic)
 ```
 
-### Current Search Strategy Flow
+### Configuration Types
 
-```mermaid
-graph TD
-    A[Query Input] --> B[Source Analysis]
-    B --> C{Source Type}
-    
-    C -->|Local| D[Check Local Papers]
-    C -->|Public| E[External Search]
-    C -->|All| F[Combined Search]
-    
-    D --> G{Local Papers Available?}
-    G -->|No| H[Return "No Papers"]
-    G -->|Yes| I[Local Vector Search]
-    
-    E --> J[PaperQA Direct Query]
-    F --> K[PaperQA Direct Query]
-    I --> L[PaperQA Direct Query]
-    
-    J --> M[OpenRouter.ai Processing]
-    K --> M
-    L --> M
-    
-    M --> N[Answer Generation]
-    N --> O[Evidence Processing]
-    O --> P[Response Formatting]
-    
-    subgraph "Current State"
-        Q[No Local Papers]
-        R[OpenRouter.ai Active]
-        S[Public Search Works]
-    end
-    
-    G --> Q
-    M --> R
-    E --> S
-    
-    style Q fill:#ffcccc
-    style R fill:#ccffcc
-    style S fill:#ccffcc
-```
+#### 1. Default Configuration (`configs/default.json`)
+- Base configuration for all operations
+- Balanced settings for general use
+- OpenRouter.ai + Ollama setup
 
-## Current Implementation Details
+#### 2. OpenRouter.ai Configuration (`configs/openrouter.json`)
+- OpenRouter.ai specific settings
+- API configuration and authentication
+- Model-specific parameters
 
-### Source Type Behavior
+#### 3. Ollama Configuration (`configs/ollama.json`)
+- Ollama embedding model settings
+- Local API configuration
+- Model parameters
 
-| Source Type | Current Behavior | Status |
-|-------------|------------------|--------|
-| **Local** | ❌ No papers available | `uploaded_papers` deleted |
-| **Public** | ✅ Works with external APIs | Requires API keys for full functionality |
-| **All** | ⚠️ Limited to public search | No local papers to combine |
+#### 4. Scenario Configurations
+- **Local Only** (`configs/local_only.json`): Optimized for local papers
+- **Public Only** (`configs/public_only.json`): Optimized for public sources
+- **Combined** (`configs/combined.json`): Optimized for mixed sources
 
-### Current Configuration
+## Error Handling and Resilience
+
+### Retry Strategy
 
 ```python
-# Current LLM Configuration
-settings = Settings(
-    llm="openrouter/z-ai/glm-4.5-air:free",
-    summary_llm="openrouter/z-ai/glm-4.5-air:free", 
-    embedding="ollama/nomic-embed-text:latest",
-    verbosity=1,  # Reduced to avoid debug noise
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=4, max=10)
 )
-
-# Current Query Processing
-result = await query_docs.aquery(query.query, settings=settings)
 ```
 
-### External API Integration
+### Error Categories
 
-```mermaid
-graph TD
-    A[Public Domain Query] --> B{API Keys Available?}
-    B -->|Yes| C[Full External Search]
-    B -->|No| D[Limited Functionality]
-    
-    C --> E[Semantic Scholar Search]
-    C --> F[Crossref Search]
-    E --> G[Paper Retrieval]
-    F --> G
-    
-    D --> H[Basic PaperQA Query]
-    H --> I[Limited Results]
-    
-    G --> J[Answer Generation]
-    I --> J
-    
-    J --> K[Response to User]
-    
-    subgraph "Current State"
-        L[No Local Papers]
-        M[OpenRouter.ai Active]
-        N[External APIs Optional]
-    end
-    
-    A --> L
-    J --> M
-    B --> N
-    
-    style L fill:#ffcccc
-    style M fill:#ccffcc
-    style N fill:#ffffcc
-```
+1. **Network Errors**: API timeouts, connection failures
+2. **Rate Limiting**: API quota exceeded
+3. **Authentication Errors**: Invalid API keys
+4. **Model Errors**: LLM/embedding model failures
+5. **File System Errors**: Paper loading, index issues
 
-## Key Features
+### Graceful Degradation
 
-### 1. Current Multi-Source Search
-- **Local Papers**: ❌ No papers available (directory deleted)
-- **Public Domain**: ✅ Works with external scientific databases
-- **All Sources**: ⚠️ Limited to public search only
-
-### 2. Current Processing System
-- **OpenRouter.ai LLM**: Cloud-based text generation ✅
-- **Ollama Embeddings**: Local embedding generation ✅
-- **Direct Query Processing**: Simplified PaperQA integration ✅
-- **Enhanced Logging**: Clean output without debug noise ✅
-
-### 3. Current Document Processing
-- **No Local Documents**: `uploaded_papers` directory deleted
-- **External Search**: Available when API keys configured
-- **Upload Capability**: Ready for new papers
-
-### 4. Current AI Processing
-- **OpenRouter.ai Integration**: Cloud LLM processing ✅
-- **Local Embeddings**: Privacy-preserving embedding generation ✅
-- **Real-time Processing**: Fast query response times ✅
+- **Local Fallback**: Use local papers when public APIs fail
+- **Model Fallback**: Switch to alternative models if primary fails
+- **Partial Results**: Return partial answers when possible
+- **Error Reporting**: Comprehensive error messages and logging
 
 ## Performance Considerations
 
-### Current Scalability
-- **Cloud LLM**: Scalable processing via OpenRouter.ai ✅
-- **Local Embeddings**: Efficient local embedding generation ✅
-- **API Rate Limits**: OpenRouter.ai free tier limitations ⚠️
+### Optimization Strategies
 
-### Current Reliability
-- **Error Handling**: Graceful degradation for API failures ✅
-- **Fallback Strategies**: Clear error messages ✅
-- **Data Validation**: Input validation and sanitization ✅
+1. **Embedding Caching**: Cache embeddings to avoid recomputation
+2. **Index Management**: Efficient paper indexing and retrieval
+3. **Concurrent Processing**: Parallel API calls where possible
+4. **Streaming**: Real-time response generation
+5. **Memory Management**: Efficient handling of large paper collections
 
-### Current Security
-- **Cloud Processing**: Data sent to OpenRouter.ai for LLM processing
-- **Local Embeddings**: Embedding generation stays local ✅
-- **Input Sanitization**: Protection against malicious inputs ✅
+### Resource Requirements
 
-## Immediate Actions Needed
+- **CPU**: Moderate (embedding generation, text processing)
+- **Memory**: Variable (depends on paper collection size)
+- **Storage**: Variable (paper files, indexes, embeddings)
+- **Network**: Low for local, high for public queries
 
-### 1. Restore Local Papers (Optional)
-```bash
-# Create new papers directory
-mkdir uploaded_papers
+## Security Considerations
 
-# Upload some sample papers for testing
-# Use the web interface or API endpoints
-```
+### Data Privacy
 
-### 2. Configure External APIs (Optional)
-```bash
-# Set environment variables for full public search
-export SEMANTIC_SCHOLAR_API_KEY="your-key"
-export CROSSREF_API_KEY="your-key"
-```
+- **Local Processing**: Papers processed locally with Ollama
+- **No Data Storage**: No user data stored on external servers
+- **API Key Management**: Secure environment variable handling
+- **Network Security**: HTTPS for all external API calls
 
-### 3. Current System Status
-- ✅ **Backend**: Running with OpenRouter.ai + Ollama
-- ✅ **Frontend**: React app with clean interface
-- ✅ **API Documentation**: Enhanced Swagger UI
-- ✅ **Health Monitoring**: System status available
-- ❌ **Local Papers**: No papers available
-- ⚠️ **Public Search**: Limited without API keys
+### Access Control
+
+- **Local Files**: Standard file system permissions
+- **API Keys**: Environment variable protection
+- **No Authentication**: No user accounts or sessions
+
+## Monitoring and Observability
+
+### Logging
+
+- **Verbosity Levels**: 0-3 (minimal to detailed)
+- **Structured Logging**: JSON format for machine processing
+- **Performance Metrics**: Query duration, success rates
+- **Error Tracking**: Comprehensive error logging
+
+### Health Checks
+
+- **Ollama Status**: Local embedding service health
+- **OpenRouter.ai Status**: External LLM service health
+- **Configuration Validation**: Settings verification
+- **System Resources**: Memory, disk space monitoring
+
+## Testing Strategy
+
+### Test Types
+
+1. **Unit Tests**: Individual component testing
+2. **Integration Tests**: Component interaction testing
+3. **End-to-End Tests**: Full workflow testing
+4. **Performance Tests**: Load and stress testing
+
+### Test Coverage
+
+- **Core Functions**: All main query functions
+- **Configuration**: Settings loading and validation
+- **Streaming**: Real-time response handling
+- **Error Handling**: Retry logic and error recovery
+- **System Status**: Health check functionality
+
+## Deployment Considerations
+
+### Environment Setup
+
+1. **Python Environment**: Python 3.11+ with virtual environment
+2. **Ollama Installation**: Local Ollama server with nomad-embed-text
+3. **API Keys**: OpenRouter.ai API key configuration
+4. **Paper Directory**: Local PDF collection setup
+
+### Production Considerations
+
+- **Resource Scaling**: Handle large paper collections
+- **Backup Strategy**: Paper collection and index backup
+- **Monitoring**: System health and performance monitoring
+- **Updates**: Regular dependency and model updates
 
 ## Future Enhancements
 
 ### Planned Features
-- **Paper Upload**: Restore local paper functionality
-- **Advanced Filtering**: Date ranges, authors, journals
-- **Export Capabilities**: Multiple output formats
-- **API Integration**: Additional scientific databases
 
-### Current System Ready For
-- **Public Domain Queries**: When API keys configured
-- **Paper Uploads**: Ready to accept new papers
-- **Enhanced Queries**: Full PaperQA functionality
-- **System Monitoring**: Health checks and validation 
+1. **Web Interface**: React-based web UI
+2. **Advanced Analytics**: Query analytics and insights
+3. **Multi-language Support**: Non-English paper processing
+4. **Collaborative Features**: Shared paper collections
+5. **Advanced Search**: Semantic search capabilities
+
+### Technical Improvements
+
+1. **Vector Database**: Replace Tantivy with dedicated vector DB
+2. **Model Optimization**: Quantized models for better performance
+3. **Caching Layer**: Redis-based caching for frequent queries
+4. **Microservices**: Service-oriented architecture
+5. **Containerization**: Docker deployment support 

@@ -1,0 +1,42 @@
+{
+  "llm": "openrouter/google/gemini-2.5-flash-lite",
+  "summary_llm": "openrouter/google/gemini-2.5-flash-lite",
+  "embedding": "ollama/nomic-embed-text",
+  "temperature": 0.0,
+  "verbosity": 2,
+  "agent": {
+    "agent_llm": "openrouter/google/gemini-2.5-flash-lite",
+    "agent_type": "ToolSelector",
+    "search_count": 10,
+    "timeout": 600.0,
+    "should_pre_search": true,
+    "wipe_context_on_answer_failure": true,
+    "agent_evidence_n": 2,
+    "return_paper_metadata": true,
+    "tool_names": ["Search", "GatherEvidence", "GenAnswer"],
+    "index": {
+      "paper_directory": "./papers",
+      "index_directory": "./indexes",
+      "recurse_subdirectories": true,
+      "concurrency": 5,
+      "sync_with_paper_directory": false,
+      "rebuild_index": false
+    }
+  },
+  "answer": {
+    "evidence_k": 12,
+    "evidence_detailed_citations": true,
+    "evidence_retrieval": true,
+    "evidence_relevance_score_cutoff": 1,
+    "evidence_summary_length": "about 120 words",
+    "evidence_skip_summary": false,
+    "answer_max_sources": 8,
+    "max_answer_attempts": 3,
+    "answer_length": "about 300 words",
+    "max_concurrent_requests": 4,
+    "answer_filter_extra_background": false,
+    "get_evidence_if_no_contexts": true,
+    "group_contexts_by_question": false,
+    "skip_evidence_citation_strip": false
+  }
+} 
