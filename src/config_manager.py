@@ -41,10 +41,19 @@ class ConfigManager:
     def get_settings(self, config_name: str) -> Settings:
         """Get Paper-QA Settings object from configuration."""
         config = self.load_config(config_name)
+        print(
+            f"🔍 DEBUG: ConfigManager loading {config_name}: {config.get('llm', 'Not found')}"
+        )
 
         # Create Settings object with full configuration
         # Pass all configuration parameters to Settings constructor
-        return Settings(**config)
+        try:
+            settings = Settings(**config)
+            print(f"🔍 DEBUG: Settings created successfully for {config_name}")
+            return settings
+        except Exception as e:
+            print(f"🔍 DEBUG: Error creating Settings for {config_name}: {e}")
+            raise
 
     def validate_config(self, config: Dict[str, Any]) -> bool:
         """Validate configuration structure."""

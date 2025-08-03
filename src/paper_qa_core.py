@@ -163,7 +163,12 @@ class PaperQACore:
         from config_manager import ConfigManager
 
         config_manager = ConfigManager()
+        print(f"🔍 DEBUG: Loading configuration: {config_name}")
         self.settings = config_manager.get_settings(config_name)
+        print(f"🔍 DEBUG: Loaded LLM: {getattr(self.settings, 'llm', 'Not set')}")
+        print(
+            f"🔍 DEBUG: Loaded Agent LLM: {getattr(self.settings.agent, 'agent_llm', 'Not set')}"
+        )
 
         self.docs: Optional[Docs] = None
 

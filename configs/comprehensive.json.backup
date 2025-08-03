@@ -12,7 +12,7 @@
     },
     "agent_type": "ToolSelector",
     "search_count": 50,
-    "timeout": 1200.0,
+    "timeout": 1200,
     "should_pre_search": false,
     "wipe_context_on_answer_failure": true,
     "agent_evidence_n": 20,
@@ -57,4 +57,4 @@
     "select": "Select the most relevant papers for answering the question: {question}\n\nPapers: {papers}\n\nSelected papers (provide detailed reasoning for each selection):",
     "system": "You are an expert scientific research assistant that provides comprehensive, detailed answers based on scientific papers. Always cite your sources using the provided citation keys and provide thorough explanations with specific findings and conclusions."
   }
-} 
+}
