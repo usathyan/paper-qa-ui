@@ -5,6 +5,8 @@ Provides a web interface for querying papers and public sources.
 
 import asyncio
 import logging
+import queue
+import time
 from typing import Optional
 
 import gradio as gr
@@ -17,6 +19,9 @@ logger = logging.getLogger(__name__)
 
 # Global core instance
 paper_qa_core: Optional[PaperQACore] = None
+
+# Status update queue
+status_queue = queue.Queue()
 
 
 def initialize_core(config_name: str = "default") -> PaperQACore:
@@ -33,7 +38,7 @@ async def query_papers(
     config_name: str,
     paper_directory: str,
     max_sources: int = 10,
-) -> tuple[str, str, str]:
+) -> tuple[str, str, str, str]:
     """
     Query papers using the specified method.
 
@@ -41,10 +46,14 @@ async def query_papers(
         tuple: (answer, sources_info, status)
     """
     if not question.strip():
-        return "", "", "❌ Please enter a question."
+        return "", "", "❌ Please enter a question.", "Ready to query..."
 
     try:
+        # Add initial status update
+        add_status_update(f"🔍 Starting {method} query...")
+
         # Initialize core
+        add_status_update("⚙️ Initializing Paper-QA core...")
         core = initialize_core(config_name)
 
         # Set up callbacks for streaming
@@ -57,14 +66,19 @@ async def query_papers(
 
         # Execute query based on method
         if method == "local":
+            add_status_update("📚 Loading local papers...")
             result = await core.query_local_papers(
                 question,
                 paper_directory=paper_directory if paper_directory else None,
                 callbacks=callbacks,
             )
         elif method == "public":
+            add_status_update(
+                "🌐 Searching public sources (Semantic Scholar, Crossref, etc.)..."
+            )
             result = await core.query_public_sources(question)
         elif method == "combined":
+            add_status_update("🔄 Searching both local and public sources...")
             result = await core.query_combined(
                 question,
                 paper_directory=paper_directory if paper_directory else None,
@@ -74,6 +88,7 @@ async def query_papers(
             return "", "", f"❌ Unknown method: {method}"
 
             # Process results
+        add_status_update("📝 Processing results...")
         if result["success"]:
             answer = result["answer"]
             sources_count = result["sources"]
@@ -82,25 +97,30 @@ async def query_papers(
             # Check if answer is meaningful
             if answer.strip() == "I cannot answer." or answer.strip() == "":
                 status = "⚠️ Query completed but no relevant information found. Try rephrasing your question or using a different method."
+                add_status_update("⚠️ No relevant information found")
                 return (
                     "No relevant information found. Try:\n• Rephrasing your question\n• Using 'combined' method instead of 'public'\n• Adding more specific terms",
                     sources_info,
                     status,
+                    get_status_updates(),
                 )
 
-            # Truncate answer if too long
+                # Truncate answer if too long
             if len(answer) > 5000:
                 answer = answer[:5000] + "\n\n... (truncated for display)"
 
+            add_status_update("✅ Query completed successfully")
             status = f"✅ Query completed successfully using {method} method"
-            return answer, sources_info, status
+            return answer, sources_info, status, get_status_updates()
         else:
             error_msg = result.get("error", "Unknown error")
-            return "", "", f"❌ Query failed: {error_msg}"
+            add_status_update(f"❌ Query failed: {error_msg}")
+            return "", "", f"❌ Query failed: {error_msg}", get_status_updates()
 
     except Exception as e:
         logger.error(f"Error in query_papers: {e}")
-        return "", "", f"❌ Error: {str(e)}"
+        add_status_update(f"❌ Error: {str(e)}")
+        return "", "", f"❌ Error: {str(e)}", get_status_updates()
 
 
 def query_papers_sync(
@@ -109,7 +129,7 @@ def query_papers_sync(
     config_name: str,
     paper_directory: str,
     max_sources: int = 10,
-) -> tuple[str, str, str]:
+) -> tuple[str, str, str, str]:
     """
     Synchronous wrapper for query_papers to work with Gradio.
     """
@@ -138,6 +158,39 @@ def query_papers_sync(
     except Exception as e:
         logger.error(f"Error in query_papers_sync: {e}")
         return "", "", f"❌ Error: {str(e)}"
+
+
+def get_status_updates() -> str:
+    """
+    Get current status updates for display in the UI.
+    """
+    try:
+        # Get all available status updates
+        updates = []
+        while not status_queue.empty():
+            try:
+                update = status_queue.get_nowait()
+                updates.append(update)
+            except queue.Empty:
+                break
+
+        if updates:
+            return "\n".join(updates[-5:])  # Show last 5 updates
+        else:
+            return "Ready to query..."
+    except Exception as e:
+        return f"Status error: {str(e)}"
+
+
+def add_status_update(message: str):
+    """
+    Add a status update to the queue.
+    """
+    try:
+        timestamp = time.strftime("%H:%M:%S")
+        status_queue.put(f"[{timestamp}] {message}")
+    except Exception as e:
+        logger.error(f"Error adding status update: {e}")
 
 
 def create_ui():
@@ -262,6 +315,17 @@ def create_ui():
 
                 status_output = gr.Textbox(label="Status", interactive=False)
 
+            # Real-time status updates
+            with gr.Group():
+                gr.Markdown("### 🔄 Real-time Status")
+                status_updates_output = gr.Textbox(
+                    label="Query Progress",
+                    lines=5,
+                    max_lines=10,
+                    interactive=False,
+                    value="Ready to query...",
+                )
+
         # Footer
         gr.HTML(
             """
@@ -282,7 +346,12 @@ def create_ui():
                 paper_dir_input,
                 max_sources_input,
             ],
-            outputs=[answer_output, sources_output, status_output],
+            outputs=[
+                answer_output,
+                sources_output,
+                status_output,
+                status_updates_output,
+            ],
         )
 
         # Enter key support
@@ -295,7 +364,12 @@ def create_ui():
                 paper_dir_input,
                 max_sources_input,
             ],
-            outputs=[answer_output, sources_output, status_output],
+            outputs=[
+                answer_output,
+                sources_output,
+                status_output,
+                status_updates_output,
+            ],
         )
 
     return demo
