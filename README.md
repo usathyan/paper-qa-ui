@@ -48,18 +48,30 @@ Paper-QA lets you ask research questions and get answers with citations from you
    - Place PDFs in the `papers/` directory
    
    **Download initial papers (optional):**
+   
+   The papers directory contains sample research papers for testing. Since these are large files, they're not included in the git repository. You can:
+   
+   **Option 1: Use your own PDFs**
+   - Place any PDF research papers in the `papers/` directory
+   
+   **Option 2: Download sample papers from public sources**
    ```sh
    # Create papers directory if it doesn't exist
    mkdir -p papers
    
-   # Download the 4 included research papers
-   curl -L -o papers/Alzheimer_Pathogenesis_2021.pdf "https://github.com/usathyan/paper-qa-ui/raw/main/papers/Alzheimer_Pathogenesis_2021.pdf"
-   curl -L -o papers/PICALM_Mechanisms_2020.pdf "https://github.com/usathyan/paper-qa-ui/raw/main/papers/PICALM_Mechanisms_2020.pdf"
-   curl -L -o papers/Alzheimer_GWAS_2019.pdf "https://github.com/usathyan/paper-qa-ui/raw/main/papers/Alzheimer_GWAS_2019.pdf"
-   curl -L -o papers/PICALM_Alzheimer_Review_2021.pdf "https://github.com/usathyan/paper-qa-ui/raw/main/papers/PICALM_Alzheimer_Review_2021.pdf"
+   # Download sample papers from public repositories
+   # (Replace these URLs with actual public paper URLs)
+   curl -L -o papers/sample_paper_1.pdf "https://example.com/sample_paper_1.pdf"
+   curl -L -o papers/sample_paper_2.pdf "https://example.com/sample_paper_2.pdf"
    ```
    
-   These papers focus on Alzheimer's disease research and PICALM mechanisms, providing a good starting point for testing the system.
+   **Option 3: Get papers from Semantic Scholar/PubMed**
+   - Use the public sources feature to search for papers on your topic of interest
+   - The system can access papers from Semantic Scholar, Crossref, and OpenAlex
+   
+   For testing, you can start with any PDF research papers you have locally.
+   
+   > **Note:** PDF files are excluded from the git repository (see `.gitignore`) to keep the repository size manageable. This is why the papers directory appears empty when cloned.
 
 5. **Run a demo:**
    ```sh
