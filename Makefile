@@ -27,6 +27,12 @@ help:
 	@echo "  make run-query QUESTION='Your question' METHOD=local"
 	@echo "  make run-query QUESTION='Your question' METHOD=public"
 	@echo "  make run-query QUESTION='Your question' METHOD=combined"
+	@echo "  make run-query QUESTION='Your question' METHOD=public CONFIG=public_only"
+	@echo ""
+	@echo "Parameters:"
+	@echo "  QUESTION - Your research question (required)"
+	@echo "  METHOD   - local, public, or combined (required)"
+	@echo "  CONFIG   - default, local_only, public_only, or combined (optional)"
 
 # Variables
 PYTHON := .venv/bin/python

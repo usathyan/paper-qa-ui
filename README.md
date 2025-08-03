@@ -98,8 +98,15 @@ make run-query QUESTION="What are recent developments in machine learning?" METH
 
 # Ask about both local and public sources
 make run-query QUESTION="How does this research compare to current literature?" METHOD=combined
+
+# With specific configuration
+make run-query QUESTION="What is PICALM?" METHOD=public CONFIG=public_only
 ```
-- `METHOD` can be `local`, `public`, or `combined`
+
+**Parameters:**
+- `QUESTION` - Your research question (required)
+- `METHOD` - `local`, `public`, or `combined` (required)
+- `CONFIG` - `default`, `local_only`, `public_only`, or `combined` (optional, defaults to appropriate config for method)
 
 ### Web Interface (Gradio)
 ```sh
@@ -147,6 +154,11 @@ See `scripts/example_local.py` for more examples.
 - **Ollama not running?** Start it with `ollama serve`.
 - **Missing API key?** Set `OPENROUTER_API_KEY` in `.env`.
 - **Model errors?** Ensure you have the correct model names in your config files.
+- **"I cannot answer" responses?** Try:
+  - Rephrasing your question to be more specific
+  - Using `METHOD=combined` instead of `METHOD=public`
+  - Adding scientific terminology to your question
+- **Configuration errors?** Use `CONFIG=public_only` for public queries, `CONFIG=local_only` for local papers
 - **Still stuck?** See `DEVELOPER.md` or open an issue.
 
 ---
