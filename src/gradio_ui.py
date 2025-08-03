@@ -10,6 +10,7 @@ from typing import Optional
 
 import gradio as gr
 
+from config_ui import create_config_ui
 from paper_qa_core import PaperQACore
 
 # Configure logging
@@ -256,8 +257,8 @@ def query_papers_sync(
         return "", "", f"❌ Error: {str(e)}", "", "", ""
 
 
-def create_ui():
-    """Create the Gradio interface."""
+def create_query_ui() -> gr.Blocks:
+    """Create the main query interface."""
 
     # Custom CSS for better styling
     css = """
@@ -437,16 +438,6 @@ def create_ui():
                 value="Ready to display agent metadata...",
             )
 
-        # Footer
-        gr.HTML(
-            """
-        <div style="text-align: center; margin-top: 2rem; color: #666;">
-            <p>Powered by Paper-QA with OpenRouter.ai and Ollama</p>
-            <p>Enhanced with detailed agent thinking processes and context information</p>
-        </div>
-        """
-        )
-
         # Event handlers
         query_btn.click(
             fn=query_papers_sync,
@@ -485,6 +476,33 @@ def create_ui():
                 contexts_output,
                 metadata_output,
             ],
+        )
+
+    return demo
+
+
+def create_ui():
+    """Create the complete Gradio interface with tabs."""
+
+    with gr.Blocks(title="Paper-QA Enhanced Web Interface") as demo:
+        # Create tabs
+        with gr.Tabs():
+            # Query tab
+            with gr.TabItem("🔍 Query Papers", id=0):
+                create_query_ui()
+
+            # Configuration tab
+            with gr.TabItem("⚙️ Configure", id=1):
+                create_config_ui()
+
+        # Footer
+        gr.HTML(
+            """
+        <div style="text-align: center; margin-top: 2rem; color: #666;">
+            <p>Powered by Paper-QA with OpenRouter.ai and Ollama</p>
+            <p>Enhanced with detailed agent thinking processes and configuration management</p>
+        </div>
+        """
         )
 
     return demo
