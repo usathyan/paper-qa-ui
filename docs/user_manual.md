@@ -52,6 +52,7 @@ Choose from pre-configured settings:
 | **Local Only** | Optimized for local papers | When working with your own PDF collection |
 | **Public Only** | Optimized for online sources | When searching for recent research |
 | **Combined** | Optimized for mixed sources | When you want comprehensive coverage |
+| **Agent Optimized** | Enhanced agent tool calling with Claude 3.5 Sonnet | When you want to see detailed agent thinking process |
 
 #### **Papers Directory (Optional)**
 - **Purpose**: Specify path to your PDF papers
@@ -372,6 +373,22 @@ The Configure tab gives you complete control over how Paper-QA works. You can cu
 - **Local**: When you have specific papers you want to analyze
 - **Combined**: For comprehensive research requiring both perspectives
 - **Semantic Scholar**: For specific topics with known successful search patterns
+
+### Optimizing Agent Thinking Process
+
+To see detailed agent thinking processes (steps, tool calls, etc.):
+
+1. **Use Agent Optimized Configuration**: This configuration is specifically designed for enhanced agent behavior
+2. **Disable Pre-search**: Set `should_pre_search` to `false` in the Configure tab
+3. **Use Claude 3.5 Sonnet**: This model has better tool-calling capabilities than Gemini 2.5 Flash Lite
+4. **Increase Agent Evidence Count**: Higher values (5-10) provide more detailed processing
+5. **Monitor Verbosity**: Set verbosity to 3 or higher to see detailed logs
+
+**Why Agent Optimized Works Better:**
+- **Claude 3.5 Sonnet**: Better tool-calling and reasoning capabilities
+- **No Pre-search**: Forces the agent to use its tool-calling abilities
+- **Higher Temperature**: Slight randomness (0.1) helps with creative thinking
+- **More Evidence**: Agent processes more information before answering
 
 ### Configuration Optimization
 

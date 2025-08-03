@@ -339,6 +339,7 @@ def create_query_ui() -> gr.Blocks:
                                 "local_only",
                                 "public_only",
                                 "combined",
+                                "agent_optimized",
                             ],
                             value="default",
                             label="Configuration",
@@ -380,6 +381,7 @@ def create_query_ui() -> gr.Blocks:
                     - **Local Only**: Optimized for local papers
                     - **Public Only**: Optimized for online sources
                     - **Combined**: Optimized for mixed sources
+                    - **Agent Optimized**: Enhanced agent tool calling with Claude 3.5 Sonnet
                     
                     **💡 Tips for Better Results:**
                     - Be specific in your questions
