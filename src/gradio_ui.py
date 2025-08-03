@@ -24,8 +24,17 @@ paper_qa_core: Optional[PaperQACore] = None
 def initialize_core(config_name: str = "default") -> PaperQACore:
     """Initialize the Paper-QA core with the specified configuration."""
     global paper_qa_core
+    print(f"🔍 DEBUG: initialize_core called with config_name: {config_name}")
+    print(
+        f"🔍 DEBUG: Current paper_qa_core config: {getattr(paper_qa_core, 'config_name', 'None') if paper_qa_core else 'None'}"
+    )
+
     if paper_qa_core is None or paper_qa_core.config_name != config_name:
+        print(f"🔍 DEBUG: Creating new PaperQACore with config: {config_name}")
         paper_qa_core = PaperQACore(config_name=config_name)
+    else:
+        print(f"🔍 DEBUG: Reusing existing PaperQACore with config: {config_name}")
+
     return paper_qa_core
 
 
