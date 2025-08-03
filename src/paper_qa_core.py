@@ -140,7 +140,7 @@ class EnhancedStreamingCallback:
 
     def get_summary(self) -> Dict[str, Any]:
         """Get a summary of all captured information."""
-        return {
+        summary = {
             "thinking_process": self.thinking_process,
             "tool_calls": self.tool_calls,
             "agent_steps": self.agent_steps,
@@ -148,6 +148,8 @@ class EnhancedStreamingCallback:
             "total_steps": self.current_step,
             "total_tool_calls": len(self.tool_calls),
         }
+        print(f"🔍 DEBUG: EnhancedStreamingCallback summary: {summary}")
+        return summary
 
 
 class PaperQACore:
@@ -232,9 +234,9 @@ class PaperQACore:
         return detailed_contexts
 
     def _extract_agent_metadata(self, result: Any) -> Dict[str, Any]:
-        """Extract detailed metadata from agent result."""
+        """Extract agent metadata from result."""
         metadata = {
-            "agent_type": getattr(self.settings.agent, "agent_type", "ToolSelector"),
+            "agent_type": getattr(self.settings.agent, "agent_type", "Unknown"),
             "search_count": getattr(self.settings.agent, "search_count", 0),
             "agent_evidence_n": getattr(self.settings.agent, "agent_evidence_n", 0),
             "timeout": getattr(self.settings.agent, "timeout", 0),
@@ -249,9 +251,17 @@ class PaperQACore:
             ),
         }
 
+        # Debug logging
+        print(f"🔍 DEBUG: Result type: {type(result)}")
+        print(f"🔍 DEBUG: Result attributes: {dir(result)}")
+        print(f"🔍 DEBUG: Has session attribute: {hasattr(result, 'session')}")
+
         # Extract session information if available
         if hasattr(result, "session"):
             session = result.session
+            print(f"🔍 DEBUG: Session type: {type(session)}")
+            print(f"🔍 DEBUG: Session attributes: {dir(session)}")
+
             metadata.update(
                 {
                     "session_id": getattr(session, "id", None),
@@ -263,7 +273,19 @@ class PaperQACore:
                     "session_papers_searched": getattr(session, "papers_searched", 0),
                 }
             )
+        else:
+            print("🔍 DEBUG: No session attribute found")
+            # Try to extract from other attributes
+            if hasattr(result, "papers_searched"):
+                metadata["session_papers_searched"] = getattr(
+                    result, "papers_searched", 0
+                )
+            if hasattr(result, "steps"):
+                metadata["session_steps"] = getattr(result, "steps", 0)
+            if hasattr(result, "tools_used"):
+                metadata["session_tools_used"] = getattr(result, "tools_used", [])
 
+        print(f"🔍 DEBUG: Final metadata: {metadata}")
         return metadata
 
     @retry(
