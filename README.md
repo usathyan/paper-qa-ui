@@ -84,17 +84,50 @@ Paper-QA lets you ask research questions and get answers with citations from you
 
 ### Ask a Question (CLI)
 ```sh
-make run-query QUESTION="What is the role of PICALM in Alzheimer's disease?" METHOD=public
+# Ask about your local papers
+make run-query QUESTION="What are the main findings of this research?" METHOD=local
+
+# Ask about public sources
+make run-query QUESTION="What are recent developments in machine learning?" METHOD=public
+
+# Ask about both local and public sources
+make run-query QUESTION="How does this research compare to current literature?" METHOD=combined
 ```
 - `METHOD` can be `local`, `public`, or `combined`
 
 ### Programmatic Use (Python)
 ```python
 from paper_qa_core import PaperQACore
+
+# Initialize with default configuration
 core = PaperQACore(config_name="default")
-result = await core.query_local_papers("What is ...?", paper_directory="papers/")
+
+# Query your local papers
+result = await core.query_local_papers(
+    "What are the key conclusions of this research?", 
+    paper_directory="papers/"
+)
+
+# Query public sources
+result = await core.query_public_sources(
+    "What are the latest trends in this field?"
+)
+
+# Query both sources
+result = await core.query_combined(
+    "How does this research fit into the broader context?",
+    paper_directory="papers/"
+)
 ```
-See `scripts/example_local.py` for more.
+See `scripts/example_local.py` for more examples.
+
+### Example Questions for Any Research Papers
+- "What is the main research question being addressed?"
+- "What methodology was used in this study?"
+- "What are the key findings and conclusions?"
+- "What are the limitations of this research?"
+- "How does this work contribute to the field?"
+- "What future research directions are suggested?"
 
 ---
 
