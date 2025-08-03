@@ -1,5 +1,5 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = ">=3.11"
 resolution-markers = [
     "python_full_version >= '3.13' and platform_python_implementation == 'PyPy'",
@@ -12,9 +12,9 @@ resolution-markers = [
 
 [manifest]
 members = [
-    "paper-qa",
     "paper-qa-pymupdf",
     "paper-qa-pypdf",
+    "paper-qa-ui",
 ]
 
 [[package]]
@@ -573,6 +573,20 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/91/50/a9d80c47ff289c611ff12e63f7c5d13942c65d68125160cefd768c73e6e4/executing-2.2.0.tar.gz", hash = "sha256:5d108c028108fe2551d1a7b2e8b713341e2cb4fc0aa7dcf966fa4327a5226755", size = 978693, upload-time = "2025-01-22T15:41:29.403Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/7b/8f/c4d9bafc34ad7ad5d8dc16dd1347ee0e507a52c3adb6bfa8887e1c6a26ba/executing-2.2.0-py2.py3-none-any.whl", hash = "sha256:11387150cad388d62750327a53d3339fad4888b39a6fe233c3afbb54ecffd3aa", size = 26702, upload-time = "2025-01-22T15:41:25.929Z" },
+]
+
+[[package]]
+name = "fastapi"
+version = "0.116.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pydantic" },
+    { name = "starlette" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/78/d7/6c8b3bfe33eeffa208183ec037fee0cce9f7f024089ab1c5d12ef04bd27c/fastapi-0.116.1.tar.gz", hash = "sha256:ed52cbf946abfd70c5a0dccb24673f0670deeb517a88b3544d03c2a6bf283143", size = 296485, upload-time = "2025-07-11T16:22:32.057Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e5/47/d63c60f59a59467fda0f93f46335c9d18526d7071f025cb5b89d5353ea42/fastapi-0.116.1-py3-none-any.whl", hash = "sha256:c46ac7c312df840f0c9e220f7964bada936781bc4e2e6eb71f1c4d7553786565", size = 95631, upload-time = "2025-07-11T16:22:30.485Z" },
 ]
 
 [[package]]
@@ -1888,7 +1902,8 @@ wheels = [
 
 [[package]]
 name = "paper-qa"
-source = { editable = "." }
+version = "5.27.0"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
     { name = "anyio" },
@@ -1906,6 +1921,10 @@ dependencies = [
     { name = "tantivy" },
     { name = "tenacity" },
     { name = "tiktoken" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/79/2a/a27aca5ce636731b4e20676a6ef2ee5a9f16d11b791df7724f52cb4386b9/paper_qa-5.27.0.tar.gz", hash = "sha256:36230d6f631865eb7c7067b6783341ca4422e33ff591629762f4fb11157fc02b", size = 4362523, upload-time = "2025-07-25T22:31:56.563Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/cc/c2/967cc1c1e2995c431c48038da217f87a85e8598491c4d0fa1ba5a25a88b0/paper_qa-5.27.0-py3-none-any.whl", hash = "sha256:78ae0de798bd785d0f4b8bec876b552ba64039c4e61690597d93e0508d4479c2", size = 536683, upload-time = "2025-07-25T22:31:51.011Z" },
 ]
 
 [package.optional-dependencies]
@@ -1946,6 +1965,113 @@ ldp = [
 local = [
     { name = "sentence-transformers" },
 ]
+pymupdf = [
+    { name = "paper-qa-pymupdf" },
+]
+pypdf = [
+    { name = "paper-qa-pypdf" },
+]
+qdrant = [
+    { name = "qdrant-client" },
+]
+typing = [
+    { name = "tantivy" },
+    { name = "types-pyyaml" },
+    { name = "types-setuptools" },
+]
+zotero = [
+    { name = "paper-qa-pymupdf" },
+    { name = "pyzotero" },
+]
+
+[[package]]
+name = "paper-qa-pymupdf"
+source = { editable = "packages/paper-qa-pymupdf" }
+dependencies = [
+    { name = "paper-qa" },
+    { name = "pymupdf" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "paper-qa" },
+    { name = "pymupdf", specifier = ">=1.24.12" },
+]
+
+[[package]]
+name = "paper-qa-pypdf"
+source = { editable = "packages/paper-qa-pypdf" }
+dependencies = [
+    { name = "paper-qa" },
+    { name = "pypdf" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "paper-qa" },
+    { name = "pypdf", specifier = ">=3" },
+]
+
+[[package]]
+name = "paper-qa-ui"
+source = { editable = "." }
+dependencies = [
+    { name = "aiohttp" },
+    { name = "anyio" },
+    { name = "fastapi" },
+    { name = "fhaviary", extra = ["llm"] },
+    { name = "fhlmi" },
+    { name = "html2text" },
+    { name = "httpx" },
+    { name = "numpy" },
+    { name = "paper-qa-pypdf" },
+    { name = "pybtex" },
+    { name = "pydantic" },
+    { name = "pydantic-settings" },
+    { name = "python-dotenv" },
+    { name = "python-multipart" },
+    { name = "rich" },
+    { name = "setuptools" },
+    { name = "tantivy" },
+    { name = "tenacity" },
+    { name = "tiktoken" },
+    { name = "uvicorn" },
+]
+
+[package.optional-dependencies]
+api = [
+    { name = "fastapi" },
+    { name = "uvicorn" },
+]
+dev = [
+    { name = "fhlmi" },
+    { name = "ipykernel" },
+    { name = "ipython" },
+    { name = "litellm" },
+    { name = "mypy" },
+    { name = "paper-qa", extra = ["ldp", "local", "pymupdf", "pypdf", "qdrant", "typing", "zotero"] },
+    { name = "pre-commit" },
+    { name = "pydantic" },
+    { name = "pylint-pydantic" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "pytest-recording" },
+    { name = "pytest-rerunfailures" },
+    { name = "pytest-subtests" },
+    { name = "pytest-sugar" },
+    { name = "pytest-timer", extra = ["colorama"] },
+    { name = "pytest-xdist" },
+    { name = "python-dotenv" },
+    { name = "refurb" },
+    { name = "typeguard" },
+    { name = "vcrpy" },
+]
+ldp = [
+    { name = "ldp" },
+]
+local = [
+    { name = "sentence-transformers" },
+]
 openreview = [
     { name = "openreview-py" },
 ]
@@ -1977,6 +2103,8 @@ dev = [
 requires-dist = [
     { name = "aiohttp", specifier = ">=3.10.6" },
     { name = "anyio" },
+    { name = "fastapi", specifier = ">=0.116.1" },
+    { name = "fastapi", marker = "extra == 'api'" },
     { name = "fhaviary", extras = ["llm"], specifier = ">=0.20" },
     { name = "fhlmi", specifier = ">=0.25.4" },
     { name = "fhlmi", marker = "extra == 'dev'", specifier = ">=0.28" },
@@ -1989,7 +2117,7 @@ requires-dist = [
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.8" },
     { name = "numpy" },
     { name = "openreview-py", marker = "extra == 'openreview'" },
-    { name = "paper-qa", extras = ["ldp", "local", "pymupdf", "pypdf", "qdrant", "typing", "zotero"], marker = "extra == 'dev'", editable = "." },
+    { name = "paper-qa", extras = ["ldp", "local", "pymupdf", "pypdf", "qdrant", "typing", "zotero"], marker = "extra == 'dev'" },
     { name = "paper-qa-pymupdf", marker = "extra == 'pymupdf'", editable = "packages/paper-qa-pymupdf" },
     { name = "paper-qa-pymupdf", marker = "extra == 'zotero'", editable = "packages/paper-qa-pymupdf" },
     { name = "paper-qa-pypdf", editable = "packages/paper-qa-pypdf" },
@@ -2008,7 +2136,9 @@ requires-dist = [
     { name = "pytest-sugar", marker = "extra == 'dev'" },
     { name = "pytest-timer", extras = ["colorama"], marker = "extra == 'dev'" },
     { name = "pytest-xdist", marker = "extra == 'dev'" },
+    { name = "python-dotenv", specifier = ">=1.1.1" },
     { name = "python-dotenv", marker = "extra == 'dev'" },
+    { name = "python-multipart", specifier = ">=0.0.20" },
     { name = "pyzotero", marker = "extra == 'zotero'" },
     { name = "qdrant-client", marker = "extra == 'qdrant'" },
     { name = "refurb", marker = "extra == 'dev'", specifier = ">=2" },
@@ -2022,40 +2152,14 @@ requires-dist = [
     { name = "typeguard", marker = "extra == 'dev'" },
     { name = "types-pyyaml", marker = "extra == 'typing'" },
     { name = "types-setuptools", marker = "extra == 'typing'" },
+    { name = "uvicorn", specifier = ">=0.35.0" },
+    { name = "uvicorn", marker = "extra == 'api'" },
     { name = "vcrpy", marker = "extra == 'dev'", specifier = ">=6" },
 ]
-provides-extras = ["dev", "ldp", "local", "openreview", "pymupdf", "pypdf", "qdrant", "typing", "zotero"]
+provides-extras = ["dev", "ldp", "local", "openreview", "pymupdf", "pypdf", "qdrant", "typing", "zotero", "api"]
 
 [package.metadata.requires-dev]
-dev = [{ name = "paper-qa", extras = ["dev"], editable = "." }]
-
-[[package]]
-name = "paper-qa-pymupdf"
-source = { editable = "packages/paper-qa-pymupdf" }
-dependencies = [
-    { name = "paper-qa" },
-    { name = "pymupdf" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "paper-qa", editable = "." },
-    { name = "pymupdf", specifier = ">=1.24.12" },
-]
-
-[[package]]
-name = "paper-qa-pypdf"
-source = { editable = "packages/paper-qa-pypdf" }
-dependencies = [
-    { name = "paper-qa" },
-    { name = "pypdf" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "paper-qa", editable = "." },
-    { name = "pypdf", specifier = ">=3" },
-]
+dev = [{ name = "paper-qa", extras = ["dev"] }]
 
 [[package]]
 name = "parso"
@@ -2740,6 +2844,15 @@ wheels = [
 ]
 
 [[package]]
+name = "python-multipart"
+version = "0.0.20"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/f3/87/f44d7c9f274c7ee665a29b885ec97089ec5dc034c7f3fafa03da9e39a09e/python_multipart-0.0.20.tar.gz", hash = "sha256:8dd0cab45b8e23064ae09147625994d090fa46f5b0d1e13af944c331a7fa9d13", size = 37158, upload-time = "2024-12-16T19:45:46.972Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/45/58/38b5afbc1a800eeea951b9285d3912613f2603bdf897a4ab0f4bd7f405fc/python_multipart-0.0.20-py3-none-any.whl", hash = "sha256:8a62d3a8335e06589fe01f2a3e178cdcc632f3fbe0d492ad9ee0ec35aab1f104", size = 24546, upload-time = "2024-12-16T19:45:44.423Z" },
+]
+
+[[package]]
 name = "pytz"
 version = "2025.2"
 source = { registry = "https://pypi.org/simple" }
@@ -3322,6 +3435,19 @@ wheels = [
 ]
 
 [[package]]
+name = "starlette"
+version = "0.47.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "anyio" },
+    { name = "typing-extensions", marker = "python_full_version < '3.13'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/04/57/d062573f391d062710d4088fa1369428c38d51460ab6fedff920efef932e/starlette-0.47.2.tar.gz", hash = "sha256:6ae9aa5db235e4846decc1e7b79c4f346adf41e9777aebeb49dfd09bbd7023d8", size = 2583948, upload-time = "2025-07-20T17:31:58.522Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/f7/1f/b876b1f83aef204198a42dc101613fefccb32258e5428b5f9259677864b4/starlette-0.47.2-py3-none-any.whl", hash = "sha256:c5847e96134e5c5371ee9fac6fdf1a67336d5815e09eb2a01fdb57a351ef915b", size = 72984, upload-time = "2025-07-20T17:31:56.738Z" },
+]
+
+[[package]]
 name = "sympy"
 version = "1.14.0"
 source = { registry = "https://pypi.org/simple" }
@@ -3693,6 +3819,19 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/da/45/c5bb38cf69e03e5d859aa4ebfb3793df2087dd0d707c026614b0bd58ac6c/usearch-2.19.1-cp313-cp313t-musllinux_1_2_x86_64.whl", hash = "sha256:6cad97c0ea452b84676a2c4e95634eaee3b97279e4fae8947c50d45f47b893d2", size = 2110273, upload-time = "2025-07-11T19:45:19.045Z" },
     { url = "https://files.pythonhosted.org/packages/82/6b/fd57a70a490e330d83a4f800979cfd0660927d0517f2e2b5813dd6da31c6/usearch-2.19.1-cp313-cp313t-win_amd64.whl", hash = "sha256:a76b5df5ffffa329287371b2d826b753908951d5bfd652d36d7b02e04d9a9fff", size = 315161, upload-time = "2025-07-11T19:45:20.929Z" },
     { url = "https://files.pythonhosted.org/packages/d1/5a/f52af0450856ed1c6bfe3387072dc9c996fd5ab668ba6a342b4f38cc6198/usearch-2.19.1-cp313-cp313t-win_arm64.whl", hash = "sha256:3e2c4aa3936967fe94568aa7c5833d5ff6c01b9ad3e446a8f87dd6c2941b5841", size = 304001, upload-time = "2025-07-11T19:45:22.712Z" },
+]
+
+[[package]]
+name = "uvicorn"
+version = "0.35.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "click" },
+    { name = "h11" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/5e/42/e0e305207bb88c6b8d3061399c6a961ffe5fbb7e2aa63c9234df7259e9cd/uvicorn-0.35.0.tar.gz", hash = "sha256:bc662f087f7cf2ce11a1d7fd70b90c9f98ef2e2831556dd078d131b96cc94a01", size = 78473, upload-time = "2025-06-28T16:15:46.058Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d2/e2/dc81b1bd1dcfe91735810265e9d26bc8ec5da45b4c0f6237e286819194c3/uvicorn-0.35.0-py3-none-any.whl", hash = "sha256:197535216b25ff9b785e29a0b79199f55222193d47f820816e7da751e9bc8d4a", size = 66406, upload-time = "2025-06-28T16:15:44.816Z" },
 ]
 
 [[package]]

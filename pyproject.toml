@@ -24,24 +24,28 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 dependencies = [
-    "aiohttp>=3.10.6",  # TODO: remove in favor of httpx, pin for aiohttp.ClientConnectionResetError
+    "aiohttp>=3.10.6", # TODO: remove in favor of httpx, pin for aiohttp.ClientConnectionResetError
     "anyio",
-    "fhaviary[llm]>=0.20",  # For Environment.get_id
-    "fhlmi>=0.25.4",  # For LLM reasoning
-    "html2text",  # TODO: evaluate moving to an opt-in dependency
+    "fastapi>=0.116.1",
+    "fhaviary[llm]>=0.20", # For Environment.get_id
+    "fhlmi>=0.25.4", # For LLM reasoning
+    "html2text", # TODO: evaluate moving to an opt-in dependency
     "httpx",
     "numpy",
-    "paper-qa-pypdf",  # TODO: after https://peps.python.org/pep-0771/, make this opt-out if 'pymupdf' extra is specified`
+    "paper-qa-pypdf", # TODO: after https://peps.python.org/pep-0771/, make this opt-out if 'pymupdf' extra is specified`
     "pybtex",
     "pydantic-settings",
-    "pydantic~=2.0,>=2.10.1",  # Pin 2.10 for typing breaks
+    "pydantic~=2.0,>=2.10.1", # Pin 2.10 for typing breaks
+    "python-dotenv>=1.1.1",
+    "python-multipart>=0.0.20",
     "rich",
-    "setuptools",  # TODO: remove after release of https://bitbucket.org/pybtex-devs/pybtex/pull-requests/46/replace-pkg_resources-with-importlib
+    "setuptools", # TODO: remove after release of https://bitbucket.org/pybtex-devs/pybtex/pull-requests/46/replace-pkg_resources-with-importlib
     "tantivy",
     "tenacity",
     "tiktoken>=0.4.0",
+    "uvicorn>=0.35.0",
 ]
-description = "LLM Chain for answering questions from docs"
+description = "PaperQA2 Web Interface - A graphical frontend for the PaperQA2 scientific paper question-answering system"
 dynamic = ["version"]
 keywords = ["question answering"]
 license = {file = "LICENSE"}
@@ -50,7 +54,7 @@ maintainers = [
     {email = "michael.skarlinski@gmail.com", name = "Michael Skarlinski"},
     {email = "white.d.andrew@gmail.com", name = "Andrew White"},
 ]
-name = "paper-qa"
+name = "paper-qa-ui"
 readme = "README.md"
 requires-python = ">=3.11"
 
@@ -101,13 +105,17 @@ zotero = [
     "paper-qa-pymupdf",
     "pyzotero",
 ]
+api = [
+    "fastapi",
+    "uvicorn",
+]
 
 [project.scripts]
 pqa = "paperqa.agents:main"
 
 [project.urls]
-issues = "https://github.com/Future-House/paper-qa/issues"
-repository = "https://github.com/Future-House/paper-qa"
+issues = "https://github.com/Future-House/paper-qa-ui-ui/issues"
+repository = "https://github.com/Future-House/paper-qa-ui"
 
 [tool.black]
 preview = true
@@ -607,7 +615,7 @@ extend-exclude = [
 ]
 
 [tool.uv.sources]
-paper-qa = {workspace = true}
+paper-qa-ui = {workspace = true}
 paper-qa-pymupdf = {workspace = true}
 paper-qa-pypdf = {workspace = true}
 
