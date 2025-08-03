@@ -41,6 +41,9 @@ class EnhancedStreamingCallback:
             self._capture_agent_step(chunk)
         elif "Status:" in chunk:
             self._capture_status_update(chunk)
+        elif "INFO:paperqa.agents.main.agent_callers:" in chunk:
+            # This is the final answer, capture it as a step
+            self._capture_final_answer(chunk)
         else:
             self.thinking_process.append(chunk)
 
@@ -70,15 +73,39 @@ class EnhancedStreamingCallback:
                     "details": chunk.strip(),
                 }
             )
+        elif "paper_search for query" in chunk:
+            self.tool_calls.append(
+                {
+                    "type": "paper_search_results",
+                    "timestamp": self._get_timestamp(chunk),
+                    "details": chunk.strip(),
+                }
+            )
+        elif "Completing" in chunk:
+            self.tool_calls.append(
+                {
+                    "type": "completion",
+                    "timestamp": self._get_timestamp(chunk),
+                    "details": chunk.strip(),
+                }
+            )
 
     def _capture_agent_step(self, chunk: str):
         """Extract agent step information."""
         self.current_step += 1
+        # Extract the meaningful part of the log message
+        if "Beginning agent" in chunk:
+            action = "Agent started processing"
+        elif "Finished agent" in chunk:
+            action = "Agent completed processing"
+        else:
+            action = chunk.strip()
+
         self.agent_steps.append(
             {
                 "step": self.current_step,
                 "timestamp": self._get_timestamp(chunk),
-                "action": chunk.strip(),
+                "action": action,
             }
         )
 
@@ -93,6 +120,17 @@ class EnhancedStreamingCallback:
                     "details": status_info,
                 }
             )
+
+    def _capture_final_answer(self, chunk: str):
+        """Extract final answer information."""
+        self.current_step += 1
+        self.agent_steps.append(
+            {
+                "step": self.current_step,
+                "timestamp": self._get_timestamp(chunk),
+                "action": "Generated final answer",
+            }
+        )
 
     def _get_timestamp(self, chunk: str) -> str:
         """Extract timestamp from log chunk."""
