@@ -73,11 +73,20 @@ async def query_papers(
         else:
             return "", "", f"❌ Unknown method: {method}"
 
-        # Process results
+            # Process results
         if result["success"]:
             answer = result["answer"]
             sources_count = result["sources"]
             sources_info = f"📚 Found {sources_count} sources"
+
+            # Check if answer is meaningful
+            if answer.strip() == "I cannot answer." or answer.strip() == "":
+                status = "⚠️ Query completed but no relevant information found. Try rephrasing your question or using a different method."
+                return (
+                    "No relevant information found. Try:\n• Rephrasing your question\n• Using 'combined' method instead of 'public'\n• Adding more specific terms",
+                    sources_info,
+                    status,
+                )
 
             # Truncate answer if too long
             if len(answer) > 5000:
@@ -91,6 +100,43 @@ async def query_papers(
 
     except Exception as e:
         logger.error(f"Error in query_papers: {e}")
+        return "", "", f"❌ Error: {str(e)}"
+
+
+def query_papers_sync(
+    question: str,
+    method: str,
+    config_name: str,
+    paper_directory: str,
+    max_sources: int = 10,
+) -> tuple[str, str, str]:
+    """
+    Synchronous wrapper for query_papers to work with Gradio.
+    """
+    try:
+        # Check if there's already an event loop running
+        try:
+            asyncio.get_running_loop()
+            # If we're in an event loop, we need to create a new task
+            import concurrent.futures
+
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                future = executor.submit(
+                    asyncio.run,
+                    query_papers(
+                        question, method, config_name, paper_directory, max_sources
+                    ),
+                )
+                return future.result()
+        except RuntimeError:
+            # No event loop running, we can use asyncio.run
+            return asyncio.run(
+                query_papers(
+                    question, method, config_name, paper_directory, max_sources
+                )
+            )
+    except Exception as e:
+        logger.error(f"Error in query_papers_sync: {e}")
         return "", "", f"❌ Error: {str(e)}"
 
 
@@ -195,6 +241,12 @@ def create_ui():
                     - **Local Only**: Optimized for local papers
                     - **Public Only**: Optimized for online sources
                     - **Combined**: Optimized for mixed sources
+                    
+                    **💡 Tips for Better Results:**
+                    - Be specific in your questions
+                    - Use scientific terminology
+                    - Try different query methods if one doesn't work
+                    - For broad topics, use "combined" method
                     """
                     )
 
@@ -222,7 +274,7 @@ def create_ui():
 
         # Event handlers
         query_btn.click(
-            fn=lambda q, m, c, p, s: asyncio.run(query_papers(q, m, c, p, s)),
+            fn=query_papers,
             inputs=[
                 question_input,
                 method_dropdown,
@@ -235,7 +287,7 @@ def create_ui():
 
         # Enter key support
         question_input.submit(
-            fn=lambda q, m, c, p, s: asyncio.run(query_papers(q, m, c, p, s)),
+            fn=query_papers,
             inputs=[
                 question_input,
                 method_dropdown,
