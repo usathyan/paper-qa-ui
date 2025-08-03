@@ -57,6 +57,12 @@ async def run_query(
                 config_name=config,
                 callbacks=[callback],
             )
+        elif method == "semantic_scholar":
+            # Use the core directly for semantic scholar API
+            from src.paper_qa_core import PaperQACore
+
+            core = PaperQACore(config)
+            result = await core.query_semantic_scholar_api(question)
         else:
             print(f"Unknown method: {method}")
             return None
@@ -129,9 +135,9 @@ async def main():
     parser.add_argument(
         "--method",
         "-m",
-        choices=["local", "public", "combined"],
-        default="combined",
-        help="Query method",
+        choices=["local", "public", "combined", "semantic_scholar"],
+        default="public",
+        help="Query method (default: public for best results)",
     )
     parser.add_argument("--paper-dir", "-p", help="Paper directory for local queries")
     parser.add_argument(

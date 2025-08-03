@@ -76,6 +76,8 @@ async def query_papers(
             add_status_update(
                 "🌐 Searching public sources (Semantic Scholar, Crossref, etc.)..."
             )
+            add_status_update("🔍 Querying Semantic Scholar database...")
+            add_status_update("📄 Searching for relevant papers...")
             result = await core.query_public_sources(question)
         elif method == "combined":
             add_status_update("🔄 Searching both local and public sources...")
@@ -84,11 +86,15 @@ async def query_papers(
                 paper_directory=paper_directory if paper_directory else None,
                 callbacks=callbacks,
             )
+        elif method == "semantic_scholar":
+            add_status_update("🔍 Direct Semantic Scholar API search...")
+            result = await core.query_semantic_scholar_api(question)
         else:
             return "", "", f"❌ Unknown method: {method}"
 
-            # Process results
-        add_status_update("📝 Processing results...")
+        # Process results
+        add_status_update("📝 Processing results and generating answer...")
+        add_status_update("🤖 Generating AI response...")
         if result["success"]:
             answer = result["answer"]
             sources_count = result["sources"]
@@ -109,12 +115,18 @@ async def query_papers(
             if len(answer) > 5000:
                 answer = answer[:5000] + "\n\n... (truncated for display)"
 
-            add_status_update("✅ Query completed successfully")
+            add_status_update(f"✅ Success! Found {sources_count} sources")
+            add_status_update(f"📄 Generated {len(answer)} character answer")
+            add_status_update("🎉 Query completed successfully!")
             status = f"✅ Query completed successfully using {method} method"
             return answer, sources_info, status, get_status_updates()
         else:
             error_msg = result.get("error", "Unknown error")
             add_status_update(f"❌ Query failed: {error_msg}")
+            if "rate limit" in error_msg.lower():
+                add_status_update(
+                    "💡 Tip: Consider getting a Semantic Scholar API key for higher rate limits"
+                )
             return "", "", f"❌ Query failed: {error_msg}", get_status_updates()
 
     except Exception as e:
@@ -175,9 +187,11 @@ def get_status_updates() -> str:
                 break
 
         if updates:
-            return "\n".join(updates[-5:])  # Show last 5 updates
+            # Show last 8 updates for better visibility
+            recent_updates = updates[-8:] if len(updates) > 8 else updates
+            return "\n".join(recent_updates)
         else:
-            return "Ready to query..."
+            return "Ready to query...\n\n💡 Tip: Enter a question and click 'Ask Question' to start"
     except Exception as e:
         return f"Status error: {str(e)}"
 
@@ -188,7 +202,12 @@ def add_status_update(message: str):
     """
     try:
         timestamp = time.strftime("%H:%M:%S")
-        status_queue.put(f"[{timestamp}] {message}")
+        # Add emoji and better formatting
+        formatted_message = f"[{timestamp}] {message}"
+        status_queue.put(formatted_message)
+
+        # Also log to console for debugging
+        print(f"📊 Status: {formatted_message}")
     except Exception as e:
         logger.error(f"Error adding status update: {e}")
 
@@ -240,10 +259,10 @@ def create_ui():
                 with gr.Row():
                     with gr.Column():
                         method_dropdown = gr.Dropdown(
-                            choices=["local", "public", "combined"],
+                            choices=["local", "public", "combined", "semantic_scholar"],
                             value="public",
-                            label="Query Method",
-                            info="local: Your PDFs only, public: Online sources only, combined: Both",
+                            label="Search Method",
+                            info="public: Semantic Scholar & Crossref | local: Your PDFs | combined: Both | semantic_scholar: Direct API search",
                         )
 
                     with gr.Column():
@@ -318,13 +337,15 @@ def create_ui():
             # Real-time status updates
             with gr.Group():
                 gr.Markdown("### 🔄 Real-time Status")
-                status_updates_output = gr.Textbox(
-                    label="Query Progress",
-                    lines=5,
-                    max_lines=10,
-                    interactive=False,
-                    value="Ready to query...",
-                )
+                with gr.Row():
+                    status_updates_output = gr.Textbox(
+                        label="Query Progress",
+                        lines=5,
+                        max_lines=10,
+                        interactive=False,
+                        value="Ready to query...\n\n💡 Tip: Enter a question and click 'Ask Question' to start",
+                    )
+                    refresh_status_btn = gr.Button("🔄 Refresh Status", size="sm")
 
         # Footer
         gr.HTML(
@@ -370,6 +391,16 @@ def create_ui():
                 status_output,
                 status_updates_output,
             ],
+        )
+
+        # Manual refresh button for status updates
+        def update_status():
+            return get_status_updates()
+
+        refresh_status_btn.click(
+            fn=update_status,
+            inputs=[],
+            outputs=status_updates_output,
         )
 
     return demo

@@ -5,15 +5,15 @@
   "temperature": 0.0,
   "verbosity": 3,
   "answer": {
-    "evidence_k": 15,
+    "evidence_k": 20,
     "evidence_detailed_citations": true,
     "evidence_retrieval": true,
     "evidence_relevance_score_cutoff": 1,
     "evidence_summary_length": "about 150 words",
     "evidence_skip_summary": false,
-    "answer_max_sources": 10,
+    "answer_max_sources": 15,
     "max_answer_attempts": 3,
-    "answer_length": "about 400 words",
+    "answer_length": "about 500 words",
     "max_concurrent_requests": 3,
     "answer_filter_extra_background": false,
     "get_evidence_if_no_contexts": true,
@@ -47,7 +47,7 @@
     "timeout": 600.0,
     "should_pre_search": true,
     "wipe_context_on_answer_failure": true,
-    "agent_evidence_n": 3,
+    "agent_evidence_n": 5,
     "return_paper_metadata": true,
     "index": {
       "paper_directory": "./papers",
@@ -57,4 +57,4 @@
       "sync_with_paper_directory": false
     }
   }
-} 
+}

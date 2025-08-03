@@ -11,17 +11,17 @@
       "base_url": "https://openrouter.ai/api/v1"
     },
     "agent_type": "ToolSelector",
-    "search_count": 20,
-    "timeout": 500.0,
+    "search_count": 15,
+    "timeout": 600.0,
     "should_pre_search": true,
     "wipe_context_on_answer_failure": true,
-    "agent_evidence_n": 5,
+    "agent_evidence_n": 10,
     "return_paper_metadata": true,
     "index": {
       "paper_directory": "./papers",
       "index_directory": "./indexes",
       "recurse_subdirectories": true,
-      "concurrency": 5,
+      "concurrency": 2,
       "sync_with_paper_directory": false
     }
   },
@@ -35,9 +35,9 @@
     "answer_max_sources": 15,
     "max_answer_attempts": 3,
     "answer_length": "about 300 words",
-    "max_concurrent_requests": 4,
+    "max_concurrent_requests": 2,
     "answer_filter_extra_background": false,
     "get_evidence_if_no_contexts": true,
     "group_contexts_by_question": false
   }
-} 
+}

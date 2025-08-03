@@ -12,6 +12,7 @@ Paper-QA lets you ask research questions and get answers with citations from you
 - **Fast, streaming responses**
 - **No vendor lock-in: uses OpenRouter.ai (Google Gemini 2.5 Flash Lite) and Ollama (nomic-embed-text)**
 - **CLI and programmatic API**
+- **Built-in rate limiting for reliable API access**
 
 ---
 
@@ -51,7 +52,21 @@ Paper-QA lets you ask research questions and get answers with citations from you
    - Get your OpenRouter key from [OpenRouter.ai](https://openrouter.ai/keys)
    - The `.env` file is ignored by git for security
 
-4. **Add your PDF papers:**
+4. **Configure rate limiting (recommended):**
+   ```sh
+   # Run the rate limiting configuration script
+   python3 scripts/configure_rate_limits.py
+   
+   # Edit .env and update email addresses for better API limits
+   nano .env
+   ```
+   
+   This will:
+   - Add rate limiting environment variables to `.env`
+   - Optimize configuration files for better API reliability
+   - Set up proper timeouts and concurrency settings
+
+5. **Add your PDF papers:**
    - Place PDFs in the `papers/` directory
    
    **Download initial papers (optional):**
@@ -80,12 +95,12 @@ Paper-QA lets you ask research questions and get answers with citations from you
    
    > **Note:** PDF files are excluded from the git repository (see `.gitignore`) to keep the repository size manageable. This is why the papers directory appears empty when cloned.
 
-5. **Run a demo:**
+6. **Run a demo:**
    ```sh
    make run
    ```
 
-6. **Or run the web interface:**
+7. **Or run the web interface:**
    ```sh
    make ui
    ```
@@ -145,7 +160,6 @@ result = await core.query_combined(
     paper_directory="papers/"
 )
 ```
-See `scripts/example_local.py` for more examples.
 
 ### Example Questions for Any Research Papers
 - "What is the main research question being addressed?"
@@ -154,6 +168,38 @@ See `scripts/example_local.py` for more examples.
 - "What are the limitations of this research?"
 - "How does this work contribute to the field?"
 - "What future research directions are suggested?"
+
+---
+
+## Rate Limiting & API Reliability
+
+Paper-QA includes built-in rate limiting mechanisms to ensure reliable access to public APIs:
+
+### Automatic Features
+- **Exponential backoff**: Automatic retry with 4-10 second delays
+- **HTTP status handling**: Handles 403, 429, 500, 502, 503, 504 errors
+- **Async retrying**: Non-blocking retry behavior with maximum 3 attempts
+- **Configurable timeouts**: 30-second API timeouts, 600-second overall timeouts
+
+### Configuration
+The system is pre-configured for optimal rate limit handling:
+- **Reduced concurrency**: 2-3 concurrent requests (vs 5 default)
+- **Optimized search count**: 15-20 papers for better quality
+- **Email addresses**: Improves API limits for Semantic Scholar, Crossref, etc.
+
+### API-Specific Limits
+- **Semantic Scholar**: 100 requests per 5 minutes (without API key), improved with email
+- **Crossref**: 500 requests per day (without email), 1000 with email
+- **OpenAlex**: 100,000 requests per day, email required for better limits
+- **Unpaywall**: 100,000 requests per day, email required for better limits
+
+### Setup
+Run the configuration script to set up rate limiting:
+```sh
+python3 scripts/configure_rate_limits.py
+```
+
+Then update email addresses in `.env` for better API limits.
 
 ---
 
@@ -166,6 +212,7 @@ See `scripts/example_local.py` for more examples.
   - Using `METHOD=combined` instead of `METHOD=public`
   - Adding scientific terminology to your question
 - **Configuration errors?** Use `CONFIG=public_only` for public queries, `CONFIG=local_only` for local papers
+- **Rate limiting errors?** Run `python3 scripts/configure_rate_limits.py` and update email addresses in `.env`
 - **Still stuck?** See `DEVELOPER.md` or open an issue.
 
 ---
