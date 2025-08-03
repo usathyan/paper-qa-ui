@@ -14,10 +14,19 @@ help:
 	@echo "  pytest     - Run pytest only"
 	@echo "  run        - Run the demo"
 	@echo "  ui         - Run the Gradio web interface"
+	@echo "  run-query  - Run custom query with QUESTION and METHOD"
+	@echo "  run-local  - Run query on local papers only"
+	@echo "  run-public - Run query on public sources only"
+	@echo "  run-combined - Run query on both local and public sources"
 	@echo "  clean      - Clean up generated files"
 	@echo "  setup      - Setup environment and install dependencies"
 	@echo "  check-env  - Check environment status"
 	@echo "  test-rate-limits - Test rate limit handling"
+	@echo ""
+	@echo "Query examples:"
+	@echo "  make run-query QUESTION='Your question' METHOD=local"
+	@echo "  make run-query QUESTION='Your question' METHOD=public"
+	@echo "  make run-query QUESTION='Your question' METHOD=combined"
 
 # Variables
 PYTHON := .venv/bin/python
