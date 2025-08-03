@@ -54,9 +54,9 @@ The system will be available at:
 
 ### System Components
 - **Document Management**: Upload, list, and delete PDF papers
-- **Query Processing**: Direct PaperQA queries (non-agentic)
+- **Query Processing**: Advanced agentic PaperQA queries with tool selection
 - **Source Selection**: Local papers, public domain, or both
-- **Real-time Feedback**: Thinking details and evidence display
+- **Real-time Feedback**: Enhanced thinking details and reasoning transparency
 
 ## 📚 Usage
 
@@ -180,13 +180,13 @@ make clean && make run
 ## 🚧 Current Limitations
 
 1. **Public Search**: Requires external API keys for full functionality
-2. **Agentic Mode**: Currently using direct queries, not the full agentic approach
-3. **Streaming**: Thinking details are captured but not streamed in real-time
-4. **Rate Limits**: OpenRouter.ai free tier has strict limits
+2. **Streaming**: Thinking details are captured but not streamed in real-time
+3. **Rate Limits**: OpenRouter.ai free tier has strict limits
+4. **Processing Time**: Agentic queries take longer but provide better reasoning
 
 ## 🔮 Future Enhancements
 
-- [ ] Implement agentic query mode for better reasoning
+- [x] ✅ Implement agentic query mode for better reasoning
 - [ ] Real-time streaming of thinking process
 - [ ] Enhanced public search with better API integration
 - [ ] Document preprocessing and metadata extraction

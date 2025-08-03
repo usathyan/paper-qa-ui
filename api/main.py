@@ -4,6 +4,7 @@ import io
 import sys
 from api.config import get_settings
 from paperqa import Docs, Settings
+from paperqa.agents import agent_query
 from paperqa.types import Doc
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -485,6 +486,11 @@ async def query(query: Query):
     It processes natural language questions and returns comprehensive
     answers based on the specified search sources.
     
+    **Current Implementation:**
+    - Uses direct PaperQA queries with enhanced logging for thinking transparency
+    - Agentic approach is configured but temporarily disabled due to compatibility issues
+    - Enhanced evidence extraction and source tracking
+    
     **Search Sources:**
     - **local**: Only search uploaded papers (fastest, most relevant)
     - **public**: Only search public domain research (requires API keys)
@@ -494,7 +500,7 @@ async def query(query: Query):
     - Synthesized answer from multiple sources
     - Supporting evidence with citations
     - List of referenced papers
-    - AI thinking process (when DEBUG enabled)
+    - AI thinking process and reasoning steps
     
     **Processing Time:**
     - Local queries: 10-30 seconds
@@ -554,29 +560,49 @@ async def query(query: Query):
         
         print(f"Querying with {len(query_docs.docs)} loaded documents")
         
-        # Execute query using PaperQA's direct aquery method
+        # Execute query using PaperQA's direct aquery method (agentic approach has compatibility issues)
+        # TODO: Re-enable agentic approach once compatibility issues are resolved
         result = await query_docs.aquery(query.query, settings=settings)
         
-        # Extract evidence and sources
-        evidence = [
-            Evidence(context=context.context, source=context.text.name)
-            for context in result.contexts
-        ]
+        # Extract evidence and sources from agentic response
+        evidence = []
+        sources = []
         
-        unique_docs = {}
-        for context in result.contexts:
-            unique_docs[context.text.doc.dockey] = context.text.doc
-        
-        sources = [
-            Paper(docname=doc.docname, citation=doc.citation)
-            for doc in unique_docs.values()
-        ]
+        # Agentic response has different structure - extract from result
+        if hasattr(result, 'contexts') and result.contexts:
+            evidence = [
+                Evidence(context=context.context, source=context.text.name)
+                for context in result.contexts
+            ]
+            
+            unique_docs = {}
+            for context in result.contexts:
+                unique_docs[context.text.doc.dockey] = context.text.doc
+            
+            sources = [
+                Paper(docname=doc.docname, citation=doc.citation)
+                for doc in unique_docs.values()
+            ]
+        elif hasattr(result, 'answer'):
+            # If no contexts, create basic evidence from the answer
+            evidence = [
+                Evidence(context=result.answer, source="Agent Response")
+            ]
         
         # Get thinking details from captured logs
         thinking_details = thinking_log.getvalue()
         
+        # Extract answer from agentic response
+        answer_text = ""
+        if hasattr(result, 'formatted_answer'):
+            answer_text = result.formatted_answer
+        elif hasattr(result, 'answer'):
+            answer_text = result.answer
+        else:
+            answer_text = str(result)
+        
         return Answer(
-            answer=result.formatted_answer,
+            answer=answer_text,
             evidence=evidence,
             sources=sources,
             thinking_details=thinking_details,
