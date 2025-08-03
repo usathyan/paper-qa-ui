@@ -101,7 +101,11 @@ ui: check-venv check-env
 # Run with custom question
 run-query: check-venv check-env
 	@echo "🔍 Running custom query..."
-	@$(PYTHON) scripts/paper_qa_cli.py --question "$(QUESTION)" --method "$(METHOD)" --config "$(CONFIG)"
+	@if [ -z "$(CONFIG)" ]; then \
+		$(PYTHON) scripts/paper_qa_cli.py --question "$(QUESTION)" --method "$(METHOD)" --config "default"; \
+	else \
+		$(PYTHON) scripts/paper_qa_cli.py --question "$(QUESTION)" --method "$(METHOD)" --config "$(CONFIG)"; \
+	fi
 
 # Clean up generated files
 clean:
