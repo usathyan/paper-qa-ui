@@ -48,11 +48,18 @@ class ConfigManager:
         # Create Settings object with full configuration
         # Pass all configuration parameters to Settings constructor
         try:
+            print(
+                f"🔍 DEBUG: Creating Settings with config keys: {list(config.keys())}"
+            )
             settings = Settings(**config)
             print(f"🔍 DEBUG: Settings created successfully for {config_name}")
             return settings
         except Exception as e:
             print(f"🔍 DEBUG: Error creating Settings for {config_name}: {e}")
+            print(f"🔍 DEBUG: Error type: {type(e)}")
+            import traceback
+
+            print(f"🔍 DEBUG: Full traceback: {traceback.format_exc()}")
             raise
 
     def validate_config(self, config: Dict[str, Any]) -> bool:
