@@ -401,6 +401,12 @@ class PaperQACore:
         print(
             f"  - Agent Evidence N: {getattr(self.settings.agent, 'agent_evidence_n', 'Not set')}"
         )
+        print(
+            f"  - Agent LLM Config: {getattr(self.settings.agent, 'agent_llm_config', 'Not set')}"
+        )
+        print(
+            f"  - Agent Config: {getattr(self.settings.agent, 'agent_config', 'Not set')}"
+        )
 
         # Enhanced search strategy based on successful Semantic Scholar patterns
         enhanced_question = self._enhance_search_query(question)
@@ -413,6 +419,12 @@ class PaperQACore:
             all_callbacks.extend(callbacks)
 
         try:
+            print(
+                f"🔍 DEBUG: About to call agent_query with settings type: {type(self.settings)}"
+            )
+            print(
+                f"🔍 DEBUG: Settings agent_llm_config: {getattr(self.settings.agent, 'agent_llm_config', 'Not set')}"
+            )
             result = await agent_query(
                 enhanced_question, self.settings, callbacks=all_callbacks
             )
