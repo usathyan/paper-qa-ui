@@ -16,6 +16,7 @@ help:
 	@echo "  clean      - Clean up generated files"
 	@echo "  setup      - Setup environment and install dependencies"
 	@echo "  check-env  - Check environment status"
+	@echo "  test-rate-limits - Test rate limit handling"
 
 # Variables
 PYTHON := .venv/bin/python
@@ -149,6 +150,11 @@ status: check-venv
 	@echo "📊 System Status:"
 	@$(PYTHON) scripts/paper_qa_cli.py --status
 
+# Test rate limit handling
+test-rate-limits: check-venv check-env
+	@echo "🧪 Testing rate limit handling..."
+	@$(PYTHON) scripts/test_rate_limits.py
+
 # Show help for running queries
 help-run:
 	@echo "Usage examples:"
@@ -157,6 +163,7 @@ help-run:
 	@echo "  make run-local QUESTION='Your question'"
 	@echo "  make run-public QUESTION='Your question'"
 	@echo "  make run-combined QUESTION='Your question'"
+	@echo "  make test-rate-limits                       # Test rate limit handling"
 	@echo ""
 	@echo "Available methods: local, public, combined"
 	@echo "Available configs: default, local_only, public_only, combined" 
