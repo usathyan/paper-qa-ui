@@ -22,6 +22,7 @@ class ConfigUIManager:
             "combined": "combined.json",
             "openrouter": "openrouter.json",
             "agent_optimized": "agent_optimized.json",
+            "comprehensive": "comprehensive.json",
         }
 
     def get_available_configs(self) -> List[str]:

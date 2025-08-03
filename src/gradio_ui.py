@@ -133,21 +133,72 @@ def format_agent_metadata(metadata: dict) -> str:
     return "\n".join(formatted)
 
 
+def extract_detailed_info(
+    result: dict, thinking_summary: dict, config_name: str
+) -> tuple:
+    """Extract detailed information from query results."""
+
+    # Search statistics
+    total_papers = result.get("agent_metadata", {}).get("session_papers_searched", 0)
+    evidence_count = len(result.get("detailed_contexts", []))
+
+    # Calculate average relevance score
+    contexts = result.get("detailed_contexts", [])
+    if contexts:
+        avg_relevance = sum(ctx.get("score", 0) for ctx in contexts) / len(contexts)
+        relevance_scores = f"{avg_relevance:.2f}/10"
+    else:
+        relevance_scores = "N/A"
+
+    # Agent performance
+    agent_steps = thinking_summary.get("total_steps", 0)
+    tool_calls = thinking_summary.get("total_tool_calls", 0)
+    processing_time = "N/A"  # Could be calculated if we track start/end times
+
+    # Top sources
+    top_sources = []
+    for i, ctx in enumerate(contexts[:5], 1):
+        citation = ctx.get("citation", "Unknown")
+        score = ctx.get("score", 0)
+        top_sources.append(f"{i}. {citation} (Score: {score:.2f})")
+    top_sources_text = "\n".join(top_sources) if top_sources else "No sources found"
+
+    # Configuration used
+    config_used = f"Configuration: {config_name}\n"
+    config_used += f"Evidence K: {result.get('agent_metadata', {}).get('agent_evidence_n', 'N/A')}\n"
+    config_used += (
+        f"Search Count: {result.get('agent_metadata', {}).get('search_count', 'N/A')}\n"
+    )
+    config_used += f"Max Sources: {result.get('agent_metadata', {}).get('answer_max_sources', 'N/A')}"
+
+    return (
+        str(total_papers),
+        str(evidence_count),
+        relevance_scores,
+        str(agent_steps),
+        str(tool_calls),
+        processing_time,
+        top_sources_text,
+        config_used,
+    )
+
+
 async def query_papers(
     question: str,
     method: str,
     config_name: str,
     paper_directory: str,
     max_sources: int = 10,
-) -> tuple[str, str, str]:
+) -> tuple[str, str, str, str, str, str, str, str, str, str, str, str]:
     """
     Query papers using the specified method.
 
     Returns:
-        tuple: (answer, sources_info, status)
+        tuple: (answer, sources_info, status, total_papers, evidence_count, relevance_scores,
+                agent_steps, tool_calls, processing_time, top_sources, config_used)
     """
     if not question.strip():
-        return "", "", "❌ Please enter a question."
+        return "", "", "❌ Please enter a question.", "", "", "", "", "", "", "", ""
 
     try:
         # Initialize core
@@ -180,10 +231,14 @@ async def query_papers(
             # Check if answer is meaningful
             if answer.strip() == "I cannot answer." or answer.strip() == "":
                 status = "⚠️ Query completed but no relevant information found. Try rephrasing your question or using a different method."
+                detailed_info = extract_detailed_info(
+                    result, result.get("thinking_process", {}), config_name
+                )
                 return (
                     "**No relevant information found.**\n\nTry:\n• Rephrasing your question\n• Using 'combined' method instead of 'public'\n• Adding more specific terms",
                     sources_info,
                     status,
+                    *detailed_info,
                 )
 
             # Truncate answer if too long
@@ -198,14 +253,29 @@ async def query_papers(
                 )
 
             status = f"✅ Query completed successfully using {method} method"
-            return formatted_answer, sources_info, status
+            detailed_info = extract_detailed_info(
+                result, result.get("thinking_process", {}), config_name
+            )
+            return formatted_answer, sources_info, status, *detailed_info
         else:
             error_msg = result.get("error", "Unknown error")
-            return "", "", f"❌ Query failed: {error_msg}"
+            return (
+                "",
+                "",
+                f"❌ Query failed: {error_msg}",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+            )
 
     except Exception as e:
         logger.error(f"Error in query_papers: {e}")
-        return "", "", f"❌ Error: {str(e)}"
+        return "", "", f"❌ Error: {str(e)}", "", "", "", "", "", "", "", ""
 
 
 def query_papers_sync(
@@ -214,7 +284,7 @@ def query_papers_sync(
     config_name: str,
     paper_directory: str,
     max_sources: int = 10,
-) -> tuple[str, str, str]:
+) -> tuple[str, str, str, str, str, str, str, str, str, str, str, str]:
     """
     Synchronous wrapper for query_papers to work with Gradio.
     """
@@ -339,6 +409,7 @@ def create_query_ui() -> gr.Blocks:
                                 "public_only",
                                 "combined",
                                 "agent_optimized",
+                                "comprehensive",
                             ],
                             value="default",
                             label="Configuration",
@@ -381,6 +452,7 @@ def create_query_ui() -> gr.Blocks:
                     - **Public Only**: Optimized for online sources
                     - **Combined**: Optimized for mixed sources
                     - **Agent Optimized**: Enhanced agent tool calling with Claude 3.5 Sonnet
+                    - **Comprehensive**: Maximum information retrieval with all features enabled
                     
                     **💡 Tips for Better Results:**
                     - Be specific in your questions
@@ -411,6 +483,52 @@ def create_query_ui() -> gr.Blocks:
                 )
                 status_output = gr.Textbox(label="Status", interactive=False, scale=1)
 
+        # Detailed Information Section (Collapsible)
+        with gr.Accordion("🔍 Detailed Information", open=False):
+            with gr.Row():
+                with gr.Column():
+                    gr.Markdown("### 📊 Search Statistics")
+                    total_papers_output = gr.Textbox(
+                        label="Total Papers Searched", interactive=False
+                    )
+                    evidence_count_output = gr.Textbox(
+                        label="Evidence Pieces Retrieved", interactive=False
+                    )
+                    relevance_scores_output = gr.Textbox(
+                        label="Average Relevance Score", interactive=False
+                    )
+
+                with gr.Column():
+                    gr.Markdown("### 🤖 Agent Performance")
+                    agent_steps_output = gr.Textbox(
+                        label="Agent Steps", interactive=False
+                    )
+                    tool_calls_output = gr.Textbox(
+                        label="Tool Calls Made", interactive=False
+                    )
+                    processing_time_output = gr.Textbox(
+                        label="Processing Time", interactive=False
+                    )
+
+            with gr.Row():
+                with gr.Column():
+                    gr.Markdown("### 📚 Top Sources")
+                    top_sources_output = gr.Textbox(
+                        label="Most Relevant Sources",
+                        lines=8,
+                        max_lines=15,
+                        interactive=False,
+                    )
+
+                with gr.Column():
+                    gr.Markdown("### ⚙️ Configuration Used")
+                    config_used_output = gr.Textbox(
+                        label="Active Configuration",
+                        lines=8,
+                        max_lines=15,
+                        interactive=False,
+                    )
+
         # Event handlers
         query_btn.click(
             fn=query_papers_sync,
@@ -425,6 +543,14 @@ def create_query_ui() -> gr.Blocks:
                 answer_output,
                 sources_output,
                 status_output,
+                total_papers_output,
+                evidence_count_output,
+                relevance_scores_output,
+                agent_steps_output,
+                tool_calls_output,
+                processing_time_output,
+                top_sources_output,
+                config_used_output,
             ],
         )
 
@@ -442,6 +568,14 @@ def create_query_ui() -> gr.Blocks:
                 answer_output,
                 sources_output,
                 status_output,
+                total_papers_output,
+                evidence_count_output,
+                relevance_scores_output,
+                agent_steps_output,
+                tool_calls_output,
+                processing_time_output,
+                top_sources_output,
+                config_used_output,
             ],
         )
 
