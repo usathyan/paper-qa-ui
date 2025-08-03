@@ -1,11 +1,11 @@
 {
-  "llm": "openrouter/google/gemini-2.5-flash-lite",
-  "summary_llm": "openrouter/google/gemini-2.5-flash-lite",
+  "llm": "openrouter/anthropic/claude-3.5-sonnet",
+  "summary_llm": "openrouter/anthropic/claude-3.5-sonnet",
   "embedding": "ollama/nomic-embed-text",
   "temperature": 0.5,
   "verbosity": 5,
   "agent": {
-    "agent_llm": "openrouter/google/gemini-2.5-flash-lite",
+    "agent_llm": "openrouter/anthropic/claude-3.5-sonnet",
     "agent_llm_config": {
       "api_key": "${OPENROUTER_API_KEY}",
       "base_url": "https://openrouter.ai/api/v1"
@@ -13,7 +13,7 @@
     "agent_type": "ToolSelector",
     "search_count": 20,
     "timeout": 600,
-    "should_pre_search": true,
+    "should_pre_search": false,
     "wipe_context_on_answer_failure": true,
     "agent_evidence_n": 5,
     "return_paper_metadata": true,
