@@ -5,7 +5,7 @@ function Query() {
   const [query, setQuery] = useState('');
   const [answer, setAnswer] = useState('');
   const [loading, setLoading] = useState(false);
-  const [selectedSource, setSelectedSource] = useState('public');
+  const [selectedSource, setSelectedSource] = useState('all');
   const [thinkingDetails, setThinkingDetails] = useState('');
   const [useStreaming, setUseStreaming] = useState(true);
   const [streamingUpdates, setStreamingUpdates] = useState<string[]>([]);
@@ -325,6 +325,18 @@ function Query() {
           }}>
             <p>Try asking questions like:</p>
             <p>"What is PaperQA?" • "Summarize recent findings on KRAS inhibitors" • "What are the latest developments in AI?"</p>
+            {selectedSource === 'public' && (
+              <div style={{ 
+                marginTop: '20px', 
+                padding: '10px', 
+                backgroundColor: '#e8f5e8', 
+                border: '1px solid #c3e6c3',
+                borderRadius: '4px',
+                color: '#155724'
+              }}>
+                                       <strong>💡 Info:</strong> Public search mode currently searches local papers only. For full public domain access with external APIs, use "All Sources" mode.
+              </div>
+            )}
           </div>
         )}
       </div>

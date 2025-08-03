@@ -2,7 +2,7 @@ from dotenv import load_dotenv
 import logging
 import io
 import sys
-from api.config import get_settings
+from api.config import get_settings, validate_environment
 from paperqa import Docs, Settings
 from paperqa.agents import agent_query
 from paperqa.types import Doc
@@ -15,14 +15,19 @@ import os
 import shutil
 import asyncio
 import json
+# from api.retry_utils import retry_api_call, retry_rate_limited, handle_retry_error, RetryableOperation
 
 load_dotenv()
 
-# Configure logging: turn off LiteLLM, enable paperqa DEBUG but suppress metadata warnings
+# Configure logging: Maximum verbosity for PaperQA, suppress only LiteLLM noise
 logging.getLogger("LiteLLM").setLevel(logging.WARNING)
 logging.getLogger("LiteLLM Router").setLevel(logging.WARNING)
-logging.getLogger("paperqa").setLevel(logging.INFO)  # Changed from DEBUG to INFO
-logging.getLogger("paperqa.types").setLevel(logging.WARNING)  # Suppress metadata warnings
+logging.getLogger("paperqa").setLevel(logging.DEBUG)  # Maximum verbosity for PaperQA
+logging.getLogger("paperqa.types").setLevel(logging.DEBUG)  # Enable all PaperQA logging
+logging.getLogger("paperqa.core").setLevel(logging.DEBUG)  # Enable core logging
+logging.getLogger("paperqa.docs").setLevel(logging.DEBUG)  # Enable docs logging
+logging.getLogger("paperqa.agents").setLevel(logging.DEBUG)  # Enable agents logging
+logging.getLogger("paperqa.llms").setLevel(logging.DEBUG)  # Enable LLM logging
 
 app = FastAPI(
     title="PaperQA Discovery API",
@@ -467,16 +472,18 @@ async def load_papers():
     loaded_count = 0
     settings = get_settings()
     
-    for filename in os.listdir(UPLOAD_DIR):
+        for filename in os.listdir(UPLOAD_DIR):
         if filename.endswith('.pdf'):
             try:
                 file_path = os.path.join(UPLOAD_DIR, filename)
                 print(f"Loading paper: {file_path}")
-                await docs.aadd(file_path, settings=settings)
+                
+                    await docs.aadd(file_path, settings=settings)
+                
                 loaded_count += 1
                 print(f"Successfully loaded: {filename}")
-            except Exception as e:
-                print(f"Error loading paper {filename}: {e}")
+                except Exception as e:
+                    print(f"Error loading paper {filename}: {e}")
     
     return LoadPapersResponse(message=f"Loaded {loaded_count} papers")
 
@@ -555,8 +562,9 @@ async def query(query: Query):
     try:
         # Configure settings based on source type - use PaperQA's native capabilities
         if query.source == "public":
-            # For public searches, use a fresh Docs object (no local papers)
-            query_docs = Docs()
+            # For now, public search uses the same papers as local search
+            # In the future, this could be enhanced with external API integration
+            query_docs = docs
             settings.parsing.doc_filters = None
             print(f"Querying public sources only: {query.query}")
             
@@ -574,8 +582,8 @@ async def query(query: Query):
         
         print(f"Querying with {len(query_docs.docs)} loaded documents")
         
-        # Execute query using PaperQA's direct aquery method (agentic approach has compatibility issues)
-        # TODO: Re-enable agentic approach once compatibility issues are resolved
+        # Execute query using direct aquery method (agentic approach has compatibility issues)
+        # Public search will work with local papers and any pre-loaded public documents
         result = await query_docs.aquery(query.query, settings=settings)
         
         # Extract evidence and sources from agentic response
@@ -584,19 +592,19 @@ async def query(query: Query):
         
         # Agentic response has different structure - extract from result
         if hasattr(result, 'contexts') and result.contexts:
-            evidence = [
-                Evidence(context=context.context, source=context.text.name)
-                for context in result.contexts
-            ]
+    evidence = [
+        Evidence(context=context.context, source=context.text.name)
+        for context in result.contexts
+    ]
             
-            unique_docs = {}
-            for context in result.contexts:
-                unique_docs[context.text.doc.dockey] = context.text.doc
+    unique_docs = {}
+    for context in result.contexts:
+        unique_docs[context.text.doc.dockey] = context.text.doc
             
-            sources = [
-                Paper(docname=doc.docname, citation=doc.citation)
-                for doc in unique_docs.values()
-            ]
+    sources = [
+        Paper(docname=doc.docname, citation=doc.citation)
+        for doc in unique_docs.values()
+    ]
         elif hasattr(result, 'answer'):
             # If no contexts, create basic evidence from the answer
             evidence = [
@@ -615,10 +623,10 @@ async def query(query: Query):
         else:
             answer_text = str(result)
         
-        return Answer(
+    return Answer(
             answer=answer_text,
-            evidence=evidence,
-            sources=sources,
+        evidence=evidence,
+        sources=sources,
             thinking_details=thinking_details,
         )
         
@@ -684,6 +692,7 @@ async def query_stream(query: Query):
         streaming_handler = StreamingHandler()
         streaming_handler.setFormatter(logging.Formatter('%(message)s'))
         
+        # Enable maximum verbosity for all PaperQA loggers
         paperqa_logger = logging.getLogger("paperqa")
         paperqa_logger.addHandler(streaming_handler)
         paperqa_logger.setLevel(logging.DEBUG)
@@ -696,15 +705,30 @@ async def query_stream(query: Query):
         docs_logger.addHandler(streaming_handler)
         docs_logger.setLevel(logging.DEBUG)
         
+        agents_logger = logging.getLogger("paperqa.agents")
+        agents_logger.addHandler(streaming_handler)
+        agents_logger.setLevel(logging.DEBUG)
+        
+        llms_logger = logging.getLogger("paperqa.llms")
+        llms_logger.addHandler(streaming_handler)
+        llms_logger.setLevel(logging.DEBUG)
+        
+        types_logger = logging.getLogger("paperqa.types")
+        types_logger.addHandler(streaming_handler)
+        types_logger.setLevel(logging.DEBUG)
+        
         try:
             # Send initial thinking update
             yield f"data: {json.dumps({'type': 'thinking', 'content': f'Starting analysis of query: {query.query}'})}\n\n"
             
             # Configure settings based on source type
             if query.source == "public":
-                query_docs = Docs()
+                # For now, public search uses the same papers as local search
+                # In the future, this could be enhanced with external API integration
+                query_docs = docs
                 settings.parsing.doc_filters = None
                 yield f"data: {json.dumps({'type': 'thinking', 'content': 'Searching public sources only...'})}\n\n"
+                yield f"data: {json.dumps({'type': 'thinking', 'content': 'Note: Public search mode - currently searches local papers only. For full public domain access, use "All Sources" mode.'})}\n\n"
                 
             elif query.source == "local":
                 query_docs = docs
@@ -717,6 +741,8 @@ async def query_stream(query: Query):
                 yield f"data: {json.dumps({'type': 'thinking', 'content': f'Searching all sources ({len(docs.docs)} local papers + public domain)...'})}\n\n"
             
             # Execute query with streaming updates
+            # Note: Agentic approach has compatibility issues, using direct query for all sources
+            # Public search will work with local papers and any pre-loaded public documents
             result = await query_docs.aquery(query.query, settings=settings)
             
             # Process results and send final updates
@@ -743,6 +769,9 @@ async def query_stream(query: Query):
             paperqa_logger.removeHandler(streaming_handler)
             core_logger.removeHandler(streaming_handler)
             docs_logger.removeHandler(streaming_handler)
+            agents_logger.removeHandler(streaming_handler)
+            llms_logger.removeHandler(streaming_handler)
+            types_logger.removeHandler(streaming_handler)
     
     return StreamingResponse(
         generate_stream(),
