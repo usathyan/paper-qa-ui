@@ -13,6 +13,7 @@ help:
 	@echo "  lint       - Run linting only"
 	@echo "  pytest     - Run pytest only"
 	@echo "  run        - Run the demo"
+	@echo "  ui         - Run the Gradio web interface"
 	@echo "  clean      - Clean up generated files"
 	@echo "  setup      - Setup environment and install dependencies"
 	@echo "  check-env  - Check environment status"
@@ -81,6 +82,12 @@ test: check-venv lint pytest
 run: check-venv check-env
 	@echo "🎬 Running Paper-QA demo..."
 	@$(PYTHON) scripts/paper_qa_cli.py --demo
+
+# Run the Gradio UI
+ui: check-venv check-env
+	@echo "🌐 Starting Paper-QA Gradio UI..."
+	@echo "📱 Open your browser to: http://localhost:7860"
+	@$(PYTHON) scripts/run_gradio_ui.py
 
 # Run with custom question
 run-query: check-venv check-env

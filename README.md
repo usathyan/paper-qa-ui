@@ -78,6 +78,12 @@ Paper-QA lets you ask research questions and get answers with citations from you
    make run
    ```
 
+6. **Or run the web interface:**
+   ```sh
+   make ui
+   ```
+   This will start a Gradio web interface at http://localhost:7860
+
 ---
 
 ## Usage
@@ -94,6 +100,12 @@ make run-query QUESTION="What are recent developments in machine learning?" METH
 make run-query QUESTION="How does this research compare to current literature?" METHOD=combined
 ```
 - `METHOD` can be `local`, `public`, or `combined`
+
+### Web Interface (Gradio)
+```sh
+make ui
+```
+Then open http://localhost:7860 in your browser for a user-friendly web interface.
 
 ### Programmatic Use (Python)
 ```python
