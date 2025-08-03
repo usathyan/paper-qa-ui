@@ -381,6 +381,22 @@ class PaperQACore:
         """
         print(f"Querying public sources: {question}")
 
+        # Debug agent settings
+        print("🔍 DEBUG: Agent settings:")
+        print(f"  - Agent LLM: {getattr(self.settings.agent, 'agent_llm', 'Not set')}")
+        print(
+            f"  - Agent Type: {getattr(self.settings.agent, 'agent_type', 'Not set')}"
+        )
+        print(
+            f"  - Search Count: {getattr(self.settings.agent, 'search_count', 'Not set')}"
+        )
+        print(
+            f"  - Should Pre-search: {getattr(self.settings.agent, 'should_pre_search', 'Not set')}"
+        )
+        print(
+            f"  - Agent Evidence N: {getattr(self.settings.agent, 'agent_evidence_n', 'Not set')}"
+        )
+
         # Enhanced search strategy based on successful Semantic Scholar patterns
         enhanced_question = self._enhance_search_query(question)
         print(f"Enhanced query: {enhanced_question}")
@@ -392,7 +408,9 @@ class PaperQACore:
             all_callbacks.extend(callbacks)
 
         try:
-            result = await agent_query(enhanced_question, self.settings)
+            result = await agent_query(
+                enhanced_question, self.settings, callbacks=all_callbacks
+            )
 
             # Check if we got a meaningful answer
             if (
@@ -427,7 +445,9 @@ class PaperQACore:
                 print("⚠️ No meaningful answer found, trying alternative approach...")
                 # Try with a more specific query
                 enhanced_question = f"{question} Please provide detailed information with specific data and statistics."
-                result = await agent_query(enhanced_question, self.settings)
+                result = await agent_query(
+                    enhanced_question, self.settings, callbacks=all_callbacks
+                )
 
                 # Extract detailed context information
                 detailed_contexts = self._extract_detailed_context_info(
