@@ -25,6 +25,7 @@ def get_openrouter_settings():
         summary_llm="openrouter/z-ai/glm-4.5-air:free", 
         embedding="ollama/nomic-embed-text:latest",  # Use Ollama for embeddings
         verbosity=1,  # Reduced verbosity to avoid excessive debug messages
+        prompts={'use_json': False},  # Disable JSON output to avoid parsing errors
         # Alternative model option (commented out):
         # llm="openrouter/google/gemma-3n-e2b-it:free",
         # summary_llm="openrouter/google/gemma-3n-e2b-it:free",
@@ -108,6 +109,7 @@ def get_openrouter_gemma_settings():
         summary_llm="openrouter/google/gemma-3n-e2b-it:free", 
         embedding="ollama/nomic-embed-text:latest",  # Use Ollama for embeddings
         verbosity=1,  # Reduced verbosity to avoid excessive debug messages
+        prompts={'use_json': False},  # Disable JSON output to avoid parsing errors
         llm_config={
             "model_list": [
                 {
@@ -185,6 +187,7 @@ def get_ollama_settings():
         summary_llm="ollama/gemma3:latest",
         embedding="ollama/nomic-embed-text:latest",
         verbosity=1,  # Reduced verbosity to avoid excessive debug messages
+        prompts={'use_json': False},  # Disable JSON output to avoid parsing errors
         llm_config={
             "model_list": [
                 {

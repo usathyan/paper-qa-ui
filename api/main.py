@@ -8,10 +8,13 @@ from paperqa.agents import agent_query
 from paperqa.types import Doc
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from typing import List, Dict, Literal
 import os
 import shutil
+import asyncio
+import json
 
 load_dotenv()
 
@@ -480,7 +483,7 @@ async def load_papers():
 @app.post("/api/query", response_model=Answer, tags=["Question Answering"])
 async def query(query: Query):
     """
-    Ask a question about scientific papers and get an intelligent answer.
+    Ask a question about scientific papers and get an intelligent answer with streaming thinking details.
     
     This is the main endpoint for interacting with the PaperQA system.
     It processes natural language questions and returns comprehensive
@@ -490,6 +493,7 @@ async def query(query: Query):
     - Uses direct PaperQA queries with enhanced logging for thinking transparency
     - Agentic approach is configured but temporarily disabled due to compatibility issues
     - Enhanced evidence extraction and source tracking
+    - Real-time thinking details capture
     
     **Search Sources:**
     - **local**: Only search uploaded papers (fastest, most relevant)
@@ -523,15 +527,25 @@ async def query(query: Query):
     # Get settings
     settings = get_settings()
     
-    # Set up logging to capture paperqa thinking details (filtered)
+    # Set up enhanced logging to capture ALL thinking details
     thinking_log = io.StringIO()
     thinking_handler = logging.StreamHandler(thinking_log)
-    thinking_handler.setLevel(logging.INFO)  # Changed from DEBUG to INFO
+    thinking_handler.setLevel(logging.DEBUG)  # Capture ALL levels for maximum detail
     thinking_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
     
-    # Add handler to paperqa logger only
+    # Add handler to ALL relevant loggers for comprehensive thinking capture
     paperqa_logger = logging.getLogger("paperqa")
     paperqa_logger.addHandler(thinking_handler)
+    paperqa_logger.setLevel(logging.DEBUG)  # Ensure we get all details
+    
+    # Also capture from sub-modules
+    core_logger = logging.getLogger("paperqa.core")
+    core_logger.addHandler(thinking_handler)
+    core_logger.setLevel(logging.DEBUG)
+    
+    docs_logger = logging.getLogger("paperqa.docs")
+    docs_logger.addHandler(thinking_handler)
+    docs_logger.setLevel(logging.DEBUG)
     
     # Temporarily suppress metadata warnings during query
     types_logger = logging.getLogger("paperqa.types")
@@ -614,11 +628,131 @@ async def query(query: Query):
             detail=f"Query failed: {str(e)}"
         )
     finally:
-        # Clean up logging handler
+        # Clean up logging handlers
         paperqa_logger.removeHandler(thinking_handler)
+        core_logger.removeHandler(thinking_handler)
+        docs_logger.removeHandler(thinking_handler)
         thinking_log.close()
-        # Restore original logger level
+        # Restore original logger levels
         types_logger.setLevel(original_level)
+
+@app.post("/api/query/stream", tags=["Question Answering"])
+async def query_stream(query: Query):
+    """
+    Stream a question about scientific papers with real-time thinking updates.
+    
+    This endpoint provides real-time streaming of the AI's thinking process
+    as it processes your question, followed by the final answer.
+    
+    **Streaming Format:**
+    - Each line is a JSON object with 'type' and 'content' fields
+    - Types: 'thinking', 'evidence', 'answer', 'complete'
+    - Real-time updates show the AI's reasoning process
+    
+    **Example Stream:**
+    ```
+    {"type": "thinking", "content": "Analyzing query: What are KRAS inhibitors?"}
+    {"type": "thinking", "content": "Searching local papers for relevant information..."}
+    {"type": "thinking", "content": "Found 3 relevant documents, extracting key information..."}
+    {"type": "evidence", "content": "Document A: KRAS inhibitors show 45% response rate..."}
+    {"type": "answer", "content": "KRAS inhibitors have shown promising results..."}
+    {"type": "complete", "content": "Query completed successfully"}
+    ```
+    """
+    async def generate_stream():
+        # Ensure papers are loaded
+        if len(docs.docs) == 0:
+            await load_papers()
+        
+        settings = get_settings()
+        
+        # Set up streaming thinking capture
+        thinking_queue = asyncio.Queue()
+        
+        class StreamingHandler(logging.Handler):
+            def emit(self, record):
+                try:
+                    msg = self.format(record)
+                    asyncio.create_task(thinking_queue.put({
+                        "type": "thinking",
+                        "content": msg
+                    }))
+                except Exception:
+                    pass
+        
+        # Add streaming handler to all relevant loggers
+        streaming_handler = StreamingHandler()
+        streaming_handler.setFormatter(logging.Formatter('%(message)s'))
+        
+        paperqa_logger = logging.getLogger("paperqa")
+        paperqa_logger.addHandler(streaming_handler)
+        paperqa_logger.setLevel(logging.DEBUG)
+        
+        core_logger = logging.getLogger("paperqa.core")
+        core_logger.addHandler(streaming_handler)
+        core_logger.setLevel(logging.DEBUG)
+        
+        docs_logger = logging.getLogger("paperqa.docs")
+        docs_logger.addHandler(streaming_handler)
+        docs_logger.setLevel(logging.DEBUG)
+        
+        try:
+            # Send initial thinking update
+            yield f"data: {json.dumps({'type': 'thinking', 'content': f'Starting analysis of query: {query.query}'})}\n\n"
+            
+            # Configure settings based on source type
+            if query.source == "public":
+                query_docs = Docs()
+                settings.parsing.doc_filters = None
+                yield f"data: {json.dumps({'type': 'thinking', 'content': 'Searching public sources only...'})}\n\n"
+                
+            elif query.source == "local":
+                query_docs = docs
+                settings.parsing.doc_filters = [{"file_location": UPLOAD_DIR}]
+                yield f"data: {json.dumps({'type': 'thinking', 'content': f'Searching {len(docs.docs)} local papers...'})}\n\n"
+                
+            else:  # "all"
+                query_docs = docs
+                settings.parsing.doc_filters = None
+                yield f"data: {json.dumps({'type': 'thinking', 'content': f'Searching all sources ({len(docs.docs)} local papers + public domain)...'})}\n\n"
+            
+            # Execute query with streaming updates
+            result = await query_docs.aquery(query.query, settings=settings)
+            
+            # Process results and send final updates
+            if hasattr(result, 'contexts') and result.contexts:
+                for i, context in enumerate(result.contexts[:3]):  # Show top 3 pieces of evidence
+                    yield f"data: {json.dumps({'type': 'evidence', 'content': f'Evidence {i+1}: {context.context[:200]}...'})}\n\n"
+            
+            # Send final answer
+            answer_text = ""
+            if hasattr(result, 'formatted_answer'):
+                answer_text = result.formatted_answer
+            elif hasattr(result, 'answer'):
+                answer_text = result.answer
+            else:
+                answer_text = str(result)
+            
+            yield f"data: {json.dumps({'type': 'answer', 'content': answer_text})}\n\n"
+            yield f"data: {json.dumps({'type': 'complete', 'content': 'Query completed successfully'})}\n\n"
+            
+        except Exception as e:
+            yield f"data: {json.dumps({'type': 'error', 'content': f'Query failed: {str(e)}'})}\n\n"
+        finally:
+            # Clean up handlers
+            paperqa_logger.removeHandler(streaming_handler)
+            core_logger.removeHandler(streaming_handler)
+            docs_logger.removeHandler(streaming_handler)
+    
+    return StreamingResponse(
+        generate_stream(),
+        media_type="text/plain",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "Content-Type": "text/event-stream"
+        }
+    )
 
 if __name__ == "__main__":
     import uvicorn

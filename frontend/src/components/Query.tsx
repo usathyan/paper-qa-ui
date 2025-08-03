@@ -1,30 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import axios from 'axios';
 
 function Query() {
   const [query, setQuery] = useState('');
   const [answer, setAnswer] = useState('');
   const [loading, setLoading] = useState(false);
-  const [selectedSource, setSelectedSource] = useState('all');
-  const [backendStatus, setBackendStatus] = useState('Unknown');
+  const [selectedSource, setSelectedSource] = useState('public');
   const [thinkingDetails, setThinkingDetails] = useState('');
-
-  // Test backend connection on component mount
-  useEffect(() => {
-      const testBackend = async () => {
-    try {
-      await axios.get('http://127.0.0.1:8000/docs', {
-        timeout: 5000
-      });
-      setBackendStatus('Connected');
-      console.log('Backend connection successful');
-    } catch (error: any) {
-      setBackendStatus('Disconnected');
-      console.error('Backend connection failed:', error);
-    }
-  };
-    testBackend();
-  }, []);
+  const [useStreaming, setUseStreaming] = useState(true);
+  const [streamingUpdates, setStreamingUpdates] = useState<string[]>([]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,63 +17,138 @@ function Query() {
     setLoading(true);
     setAnswer('');
     setThinkingDetails('');
+    setStreamingUpdates([]);
 
-    try {
-      console.log('Sending query:', { query, source: selectedSource });
-      
-      const response = await axios.post('http://127.0.0.1:8000/api/query', {
-        query: query.trim(),
-        source: selectedSource,
-      }, {
-        timeout: 120000, // 2 minutes timeout
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      });
-      
-      console.log('Response received:', response.data);
-      
-      if (response.data && response.data.answer) {
-        const answerText = response.data.answer.trim();
-        console.log('Answer text:', answerText);
+    if (useStreaming) {
+      // Use streaming endpoint
+      try {
+        console.log('Sending streaming query:', { query, source: selectedSource });
         
-        // Show the actual PaperQA response instead of filtering it
-        setAnswer(response.data.answer);
+        const response = await fetch('http://127.0.0.1:8000/api/query/stream', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            query: query.trim(),
+            source: selectedSource,
+          }),
+        });
 
-        // Set thinking details if available
-        if (response.data.thinking_details) {
-          setThinkingDetails(response.data.thinking_details);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
         }
-      } else {
-        console.error('No answer in response:', response.data);
-        setAnswer('No answer received from server. Check console for details.');
+
+        const reader = response.body?.getReader();
+        if (!reader) {
+          throw new Error('No response body');
+        }
+
+        const decoder = new TextDecoder();
+        let finalAnswer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value);
+          const lines = chunk.split('\n');
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(line.slice(6));
+                console.log('Streaming update:', data);
+
+                switch (data.type) {
+                  case 'thinking':
+                    setStreamingUpdates(prev => [...prev, `🤔 ${data.content}`]);
+                    break;
+                  case 'evidence':
+                    setStreamingUpdates(prev => [...prev, `📄 ${data.content}`]);
+                    break;
+                  case 'answer':
+                    finalAnswer = data.content;
+                    setAnswer(data.content);
+                    break;
+                  case 'complete':
+                    setStreamingUpdates(prev => [...prev, `✅ ${data.content}`]);
+                    break;
+                  case 'error':
+                    setAnswer(`Error: ${data.content}`);
+                    break;
+                }
+              } catch (e) {
+                console.error('Error parsing streaming data:', e);
+              }
+            }
+          }
+        }
+
+        if (!finalAnswer) {
+          setAnswer('No answer received from streaming endpoint.');
+        }
+
+      } catch (error: any) {
+        console.error('Error in streaming query:', error);
+        setAnswer(`Streaming error: ${error.message}`);
+      } finally {
+        setLoading(false);
       }
-    } catch (error: any) {
-      console.error('Error fetching answer:', error);
-      if (axios.isCancel(error)) {
-        setAnswer('Request cancelled.');
-      } else if (error.code === 'ECONNABORTED') {
-        setAnswer('Request timed out. The query is taking too long to process.');
-      } else if (error.response) {
-        setAnswer(`Server error: ${error.response.status} - ${error.response.statusText}`);
-      } else if (error.request) {
-        setAnswer('Network error: Could not connect to server. Is the backend running?');
-      } else {
-        setAnswer('Error: ' + error.message);
+    } else {
+      // Use regular endpoint
+      try {
+        console.log('Sending regular query:', { query, source: selectedSource });
+        
+        const response = await axios.post('http://127.0.0.1:8000/api/query', {
+          query: query.trim(),
+          source: selectedSource,
+        }, {
+          timeout: 120000, // 2 minutes timeout
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        });
+        
+        console.log('Response received:', response.data);
+        
+        if (response.data && response.data.answer) {
+          const answerText = response.data.answer.trim();
+          console.log('Answer text:', answerText);
+          
+          // Show the actual PaperQA response instead of filtering it
+          setAnswer(response.data.answer);
+
+          // Set thinking details if available
+          if (response.data.thinking_details) {
+            setThinkingDetails(response.data.thinking_details);
+          }
+        } else {
+          console.error('No answer in response:', response.data);
+          setAnswer('No answer received from server. Check console for details.');
+        }
+      } catch (error: any) {
+        console.error('Error fetching answer:', error);
+        if (axios.isCancel(error)) {
+          setAnswer('Request cancelled.');
+        } else if (error.code === 'ECONNABORTED') {
+          setAnswer('Request timed out. The query is taking too long to process.');
+        } else if (error.response) {
+          setAnswer(`Server error: ${error.response.status} - ${error.response.statusText}`);
+        } else if (error.request) {
+          setAnswer('Network error: Could not connect to server. Is the backend running?');
+        } else {
+          setAnswer('Error: ' + error.message);
+        }
+      } finally {
+        setLoading(false);
       }
-    } finally {
-      setLoading(false);
     }
   };
 
   return (
     <div className="main-content">
       <div className="logo">PaperQA Discovery</div>
-      
-      {/* Backend Status */}
-      <div style={{ fontSize: '12px', color: backendStatus === 'Connected' ? 'green' : 'red', marginBottom: '10px' }}>
-        Backend Status: {backendStatus}
-      </div>
 
       {/* Simple Chat Interface */}
       <div className="chat-container" style={{ maxWidth: '800px', margin: '0 auto' }}>
@@ -131,6 +190,19 @@ function Query() {
           </label>
         </div>
 
+        {/* Streaming Toggle */}
+        <div className="streaming-toggle" style={{ marginBottom: '20px', textAlign: 'center' }}>
+          <label style={{ fontSize: '14px', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={useStreaming}
+              onChange={(e) => setUseStreaming(e.target.checked)}
+              style={{ marginRight: '5px' }}
+            />
+            🚀 Enable Real-time Streaming (See AI thinking process)
+          </label>
+        </div>
+
         {/* Query Form */}
         <form onSubmit={handleSubmit} style={{ marginBottom: '20px' }}>
           <div style={{ display: 'flex', gap: '10px' }}>
@@ -167,6 +239,35 @@ function Query() {
             <div style={{ fontSize: '18px', marginBottom: '10px' }}>🤔 Thinking...</div>
             <div style={{ fontSize: '14px', color: '#666' }}>
               This may take 30-60 seconds for complex queries
+            </div>
+          </div>
+        )}
+
+        {/* Streaming Updates */}
+        {useStreaming && streamingUpdates.length > 0 && (
+          <div className="streaming-updates" style={{
+            marginTop: '20px',
+            padding: '15px',
+            backgroundColor: '#f0f8ff',
+            borderRadius: '8px',
+            border: '1px solid #b3d9ff',
+            maxHeight: '300px',
+            overflowY: 'auto'
+          }}>
+            <h4 style={{ margin: '0 0 10px 0', color: '#0066cc' }}>🔄 Real-time Updates:</h4>
+            <div style={{
+              fontSize: '14px',
+              lineHeight: '1.4'
+            }}>
+              {streamingUpdates.map((update, index) => (
+                <div key={index} style={{
+                  marginBottom: '8px',
+                  padding: '4px 0',
+                  borderBottom: index < streamingUpdates.length - 1 ? '1px solid #e6f3ff' : 'none'
+                }}>
+                  {update}
+                </div>
+              ))}
             </div>
           </div>
         )}
