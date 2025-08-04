@@ -18,7 +18,9 @@ help:
 	@echo "  run-local  - Run query on local papers only"
 	@echo "  run-public - Run query on public sources only"
 	@echo "  run-combined - Run query on both local and public sources"
-	@echo "  clean      - Clean up generated files"
+	@echo "  clean      - Clean up generated files and data"
+	@echo "  clean-indexes - Clean up indexes only (when corrupted)"
+	@echo "  clean-data - Clean up data files only (indexes, papers, results)"
 	@echo "  setup      - Setup environment and install dependencies"
 	@echo "  check-env  - Check environment status"
 	@echo "  test-rate-limits - Test rate limit handling"
@@ -126,9 +128,33 @@ clean:
 	@rm -rf src/*.egg-info/
 	@rm -rf .mypy_cache/
 	@rm -rf .ruff_cache/
+	@rm -rf indexes/
+	@rm -rf results/
+	@rm -rf papers/
+	@rm -rf .gradio/
+	@rm -rf .streamlit/
+	@rm -f .env.local
+	@rm -f .env.backup
 	@find . -type f -name "*.pyc" -delete
 	@find . -type d -name "__pycache__" -delete
+	@find . -type f -name "*.log" -delete
+	@find . -type f -name "*.tmp" -delete
+	@find . -type f -name "*.cache" -delete
 	@echo "✅ Cleanup complete"
+
+# Clean indexes only (useful when indexes get corrupted)
+clean-indexes:
+	@echo "🗂️  Cleaning indexes..."
+	@rm -rf indexes/
+	@echo "✅ Index cleanup complete"
+
+# Clean data files only (indexes, papers, results)
+clean-data:
+	@echo "🗂️  Cleaning data files..."
+	@rm -rf indexes/
+	@rm -rf results/
+	@rm -rf papers/
+	@echo "✅ Data cleanup complete"
 
 # Deep clean (includes virtual environment)
 clean-all: clean
@@ -136,7 +162,10 @@ clean-all: clean
 	@rm -rf .venv/
 	@rm -rf indexes/
 	@rm -rf results/
+	@rm -rf papers/
 	@rm -f .env
+	@rm -f .env.local
+	@rm -f .env.backup
 	@echo "✅ Deep cleanup complete"
 
 # Install development dependencies
