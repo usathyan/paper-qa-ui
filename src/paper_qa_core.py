@@ -583,9 +583,7 @@ class PaperQACore:
             print(
                 f"🔍 DEBUG: Settings agent_llm_config: {getattr(self.settings.agent, 'agent_llm_config', 'Not set')}"
             )
-            result = await agent_query(
-                query=enhanced_question, settings=self.settings, callbacks=all_callbacks
-            )
+            result = await agent_query(query=enhanced_question, settings=self.settings)
 
             # Check if we got a meaningful answer
             if (

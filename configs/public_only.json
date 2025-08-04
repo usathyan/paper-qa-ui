@@ -1,15 +1,11 @@
 {
   "llm": "openrouter/anthropic/claude-3.5-sonnet",
   "summary_llm": "openrouter/anthropic/claude-3.5-sonnet",
-  "embedding": "ollama/nomic-embed-text",
+  "embedding": "text-embedding-3-small",
   "temperature": 0.1,
   "verbosity": 3,
   "agent": {
     "agent_llm": "openrouter/anthropic/claude-3.5-sonnet",
-    "agent_llm_config": {
-      "api_key": "${OPENROUTER_API_KEY}",
-      "base_url": "https://openrouter.ai/api/v1"
-    },
     "agent_type": "ToolSelector",
     "search_count": 15,
     "timeout": 600.0,
@@ -18,8 +14,10 @@
     "agent_evidence_n": 10,
     "return_paper_metadata": true,
     "tool_names": [
-      "gather_evidence",
+      "paper_search",
+      "gather_evidence", 
       "gen_answer",
+      "reset",
       "complete"
     ],
     "index": {

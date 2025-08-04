@@ -1,7 +1,7 @@
 {
   "llm": "openrouter/anthropic/claude-3.5-sonnet",
   "summary_llm": "openrouter/anthropic/claude-3.5-sonnet",
-  "embedding": "ollama/nomic-embed-text",
+  "embedding": "text-embedding-3-small",
   "temperature": 0.1,
   "verbosity": 3,
   "agent": {
@@ -18,9 +18,11 @@
     "agent_evidence_n": 2,
     "return_paper_metadata": true,
     "tool_names": [
+      "paper_search",
       "gather_evidence",
       "gen_answer",
       "clinical_trials_search",
+      "reset", 
       "complete"
     ],
     "index": {
