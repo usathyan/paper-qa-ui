@@ -253,14 +253,36 @@ async def process_question_async(question: str, config_name: str = "optimized_ol
             
             app_state["processing_status"] = "🔍 Searching documents..."
             
-            # Use the stored Docs object for querying
-            docs = app_state["docs"]
+            # Create a fresh Docs object for each query to avoid connection issues
             settings = app_state.get("settings")
             if not settings:
                 settings = initialize_settings(config_name)
                 app_state["settings"] = settings
             
-            # Query using the stored Docs object
+            # Initialize a new Docs object with the same settings
+            docs = Docs(
+                llm=settings.llm,
+                llm_config=settings.llm_config,
+                embedding=settings.embedding,
+                embedding_config=settings.embedding_config,
+                temperature=settings.temperature,
+                verbosity=settings.verbosity,
+                answer=settings.answer,
+                parsing=settings.parsing,
+                prompts=settings.prompts
+            )
+            
+            # Add the indexed documents to the new Docs object
+            for doc_info in app_state["uploaded_docs"]:
+                doc_path = doc_info["path"]
+                if Path(doc_path).exists():
+                    try:
+                        await docs.aadd(doc_path, settings=settings)
+                        logger.info(f"Added document to query: {doc_path}")
+                    except Exception as e:
+                        logger.warning(f"Failed to add document {doc_path} to query: {e}")
+            
+            # Query using the fresh Docs object
             answer_response = await docs.aquery(question, settings=settings)
             
             processing_time = time.time() - start_time
