@@ -105,7 +105,7 @@ def initialize_settings(config_name: str = "optimized_ollama") -> Settings:
 
 
 async def process_uploaded_files_async(files: List[str]) -> Tuple[str, str]:
-    """Process uploaded files by copying them to papers directory and adding to paper-qa index."""
+    """Process uploaded files by copying them to papers directory."""
     if not files:
         return "", "No files uploaded."
     
@@ -117,12 +117,9 @@ async def process_uploaded_files_async(files: List[str]) -> Tuple[str, str]:
     failed_files = []
     
     try:
-        # Initialize paper-qa Docs object for indexing
+        # Initialize settings if needed
         if not app_state["settings"]:
             app_state["settings"] = initialize_settings()
-        
-        settings = app_state["settings"]
-        docs = Docs()  # Create Docs without parameters
         
         # Update status tracker
         if "status_tracker" in app_state:
@@ -158,26 +155,21 @@ async def process_uploaded_files_async(files: List[str]) -> Tuple[str, str]:
                         # For string paths, use the path
                         shutil.copy2(source_path, dest_path)
                 
-                # Add to paper-qa index with settings
-                logger.info(f"Adding {source_path.name} to paper-qa index...")
+                logger.info(f"Successfully copied: {source_path.name}")
                 if "status_tracker" in app_state:
-                    app_state["status_tracker"].add_status(f"🔍 Indexing {source_path.name}...")
-                
-                await docs.aadd(dest_path, settings=settings)
+                    app_state["status_tracker"].add_status(f"✅ Copied {source_path.name}")
                 
                 # Update app state
                 doc_info = {
                     "filename": source_path.name,
                     "size": dest_path.stat().st_size if dest_path.exists() else 0,
-                    "status": "Indexed",
+                    "status": "Ready",
                     "path": str(dest_path)
                 }
                 app_state["uploaded_docs"].append(doc_info)
                 processed_files.append(source_path.name)
                 
-                logger.info(f"Successfully processed and indexed: {source_path.name}")
-                if "status_tracker" in app_state:
-                    app_state["status_tracker"].add_status(f"✅ Indexed {source_path.name}")
+                logger.info(f"Successfully processed: {source_path.name}")
                 
             except Exception as e:
                 logger.error(f"Failed to process {source_path.name}: {e}")
@@ -185,16 +177,13 @@ async def process_uploaded_files_async(files: List[str]) -> Tuple[str, str]:
                 if "status_tracker" in app_state:
                     app_state["status_tracker"].add_status(f"❌ Failed to process {source_path.name}")
         
-        # Store the Docs object for later use
-        app_state["docs"] = docs
-        
         # Update final status
         if "status_tracker" in app_state:
             app_state["status_tracker"].add_status(f"🎉 Processing complete! {len(processed_files)} documents ready for questions.")
         
         # Prepare status message
         if processed_files:
-            status_msg = f"✅ Successfully processed and indexed {len(processed_files)} documents:\n"
+            status_msg = f"✅ Successfully processed {len(processed_files)} documents:\n"
             status_msg += "\n".join([f"  • {f}" for f in processed_files])
             status_msg += f"\n\n📚 You can now ask questions about these documents!"
         else:
@@ -235,10 +224,6 @@ async def process_question_async(question: str, config_name: str = "optimized_ol
             if not app_state.get("uploaded_docs"):
                 return "", "", "", "📚 Please upload documents first. Documents will be automatically processed when uploaded."
             
-            # Check if documents have been indexed (Docs object exists)
-            if not app_state.get("docs"):
-                return "", "", "", "⏳ Documents are still being processed. Please wait for the processing to complete before asking questions."
-            
             # Check if Ollama is running (for local configurations)
             if "ollama" in config_name.lower() and not check_ollama_status():
                 return "", "", "", "❌ Ollama is not running. Please start Ollama with 'ollama serve' and try again."
@@ -253,41 +238,25 @@ async def process_question_async(question: str, config_name: str = "optimized_ol
             
             app_state["processing_status"] = "🔍 Searching documents..."
             
-            # Create a fresh Docs object for each query to avoid connection issues
+            # Get settings
             settings = app_state.get("settings")
             if not settings:
                 settings = initialize_settings(config_name)
                 app_state["settings"] = settings
             
-            # Initialize a new Docs object with the same settings
-            docs = Docs(
-                llm=settings.llm,
-                llm_config=settings.llm_config,
-                embedding=settings.embedding,
-                embedding_config=settings.embedding_config,
-                temperature=settings.temperature,
-                verbosity=settings.verbosity,
-                answer=settings.answer,
-                parsing=settings.parsing,
-                prompts=settings.prompts
-            )
+            # Use agent_query like the working test scripts
+            from paperqa import agent_query
             
-            # Add the indexed documents to the new Docs object
-            for doc_info in app_state["uploaded_docs"]:
-                doc_path = doc_info["path"]
-                if Path(doc_path).exists():
-                    try:
-                        await docs.aadd(doc_path, settings=settings)
-                        logger.info(f"Added document to query: {doc_path}")
-                    except Exception as e:
-                        logger.warning(f"Failed to add document {doc_path} to query: {e}")
+            # Get the paper directory from uploaded docs
+            papers_dir = Path("./papers")
             
-            # Query using the fresh Docs object
-            answer_response = await docs.aquery(question, settings=settings)
+            # Query using agent_query with settings
+            answer_response = await agent_query(question, settings=settings)
             
             processing_time = time.time() - start_time
-            logger.info(f"Docs query completed in {processing_time:.2f} seconds")
+            logger.info(f"Agent query completed in {processing_time:.2f} seconds")
             
+            # Extract answer and contexts from the response
             answer = answer_response.answer
             contexts = answer_response.contexts if hasattr(answer_response, 'contexts') else []
             
@@ -396,7 +365,6 @@ def format_metadata_html(metadata: dict) -> str:
 def clear_all():
     """Clear all uploaded documents and reset the interface."""
     app_state["uploaded_docs"] = []
-    app_state["docs"] = None  # Clear the Docs object
     app_state["processing_status"] = ""
     
     if "status_tracker" in app_state:
