@@ -244,18 +244,23 @@ async def process_question_async(question: str, config_name: str = "optimized_ol
                 settings = initialize_settings(config_name)
                 app_state["settings"] = settings
             
-            # Use ask function like the working test scripts
-            from paperqa import ask
+            # Use async query function to avoid event loop conflicts
+            from paperqa import aask
             
-            # Query using ask with settings
-            answer_response = ask(question, settings=settings)
+            # Query using aask with settings
+            answer_response = await aask(question, settings=settings)
             
             processing_time = time.time() - start_time
-            logger.info(f"Ask query completed in {processing_time:.2f} seconds")
+            logger.info(f"Async ask query completed in {processing_time:.2f} seconds")
             
             # Extract answer and contexts from the response
-            answer = answer_response.session.answer
-            contexts = answer_response.session.contexts if hasattr(answer_response.session, 'contexts') else []
+            # Handle both possible response structures
+            if hasattr(answer_response, 'session'):
+                answer = answer_response.session.answer
+                contexts = answer_response.session.contexts if hasattr(answer_response.session, 'contexts') else []
+            else:
+                answer = answer_response.answer if hasattr(answer_response, 'answer') else str(answer_response)
+                contexts = answer_response.contexts if hasattr(answer_response, 'contexts') else []
             
             if answer and "insufficient information" not in answer.lower():
                 if "status_tracker" in app_state:
