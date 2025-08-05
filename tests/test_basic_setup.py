@@ -12,8 +12,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from config_manager import setup_environment, validate_environment
-from paper_qa_core import (
-    PaperQACore,
+from paperqa2_core import (
+    PaperQA2Core,
 )
 from streaming import ConsoleStreamingCallback, create_multi_callback
 from utils import create_picalm_questions, print_system_status, save_questions

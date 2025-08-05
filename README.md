@@ -1,147 +1,215 @@
-# Paper-QA: Scientific Paper Question Answering
+# Paper-QA UI
 
-## What is Paper-QA?
-[Paper-QA](https://github.com/Future-House/paper-qa) is an AI research assistant that helps you find answers to scientific questions with proper citations. It searches both your own PDF papers and millions of published papers from databases like Semantic Scholar, Crossref, and OpenAlex.
+A modern Gradio web interface for [Paper-QA](https://github.com/Future-House/paper-qa), enabling high-accuracy Retrieval Augmented Generation (RAG) on scientific documents with citations.
 
-**Perfect for:** Literature reviews, grant writing, staying current with research, and exploring new fields.
+## 🚀 Features
 
-This is a Web based Front end for the already great paper-qa. I built this UI for self education.
+- **📚 Document Upload**: Upload PDF papers and automatically index them
+- **❓ Question Interface**: Ask questions about uploaded documents
+- **📝 Answer Display**: Get formatted answers with proper citations
+- **📚 Evidence Sources**: See which parts of documents were used
+- **⚙️ Configuration**: Choose between different model configurations
+- **🔄 Real-time Status**: Live updates during processing
+- **🧹 Clear Functionality**: Reset and start fresh
 
----
+## 🎯 Quick Start
 
-## A Visual Guide for how this works
+### Prerequisites
 
-```mermaid
-graph LR
-    A[📝 Research Query] --> B[⚙️ Choose Configuration]
-    
-    B --> C[🔍 Search Sources]
-    C --> D[🤖 AI Processing]
-    D --> E[📊 Cited Answer]
-    
-    subgraph "Configuration Options"
-        F[public_only<br/>📚 Literature Review]
-        G[local_only<br/>📁 Your PDFs]
-        H[combined<br/>🔄 Both Sources]
-        I[clinical_trials<br/>🏥 Medical Research]
-    end
-    
-    subgraph "Key Parameters"
-        J[Search Count: 15-50]
-        K[Evidence K: 10-30]
-        L[Temperature: 0.0-0.5]
-    end
-    
-    B -.-> F
-    B -.-> G
-    B -.-> H
-    B -.-> I
-    
-    style A fill:#e3f2fd
-    style B fill:#1976d2,color:#fff
-    style C fill:#ff9800,color:#fff
-    style D fill:#ff9800,color:#fff
-    style E fill:#4caf50,color:#fff
+- Python 3.11+
+- [Ollama](https://ollama.com/) installed and running
+- Optional: OpenRouter API key for cloud LLMs
+
+### Installation
+
+1. **Clone and setup**:
+   ```bash
+   git clone <repository-url>
+   cd paper-qa-ui
+   make setup
+   ```
+
+2. **Configure environment** (optional):
+   ```bash
+   # Edit .env file to add your OpenRouter API key
+   cp env.template .env
+   # Edit .env and add: OPENROUTER_API_KEY=your_key_here
+   ```
+
+3. **Start the UI**:
+   ```bash
+   make ui
+   ```
+
+4. **Access the interface**:
+   - Open your browser to: http://localhost:7860
+   - Upload PDF documents
+   - Ask questions about the documents
+
+## 🛠️ Usage
+
+### Web Interface
+
+1. **Upload Documents**: Use the file upload to add PDF papers
+2. **Process Documents**: Click "Process Documents" to index them
+3. **Ask Questions**: Enter questions about the uploaded papers
+4. **View Results**: See answers, sources, and processing information
+
+### Configuration Options
+
+The UI supports multiple configurations:
+
+- **`optimized_ollama`** (Default): Local Ollama with performance tuning
+- **`openrouter_ollama`**: OpenRouter LLM + Ollama embeddings
+- **`ollama`**: Pure local Ollama setup
+- **`clinical_trials`**: Includes clinical trials search capability
+
+### CLI Usage
+
+For command-line usage:
+
+```bash
+# Test CLI functionality
+make test-cli
+
+# Run CLI example
+make cli-example
+
+# Direct CLI usage
+python scripts/paper_qa_cli.py "What is this paper about?"
 ```
 
----
+## 🧪 Testing
 
-## 🚀 Getting Started
+Run comprehensive tests:
 
-**New to Paper-QA?** Just want to start asking research questions? Here's all you need:
+```bash
+# Test UI functionality
+make test-ui-functionality
 
-### ⚡ Quick Start (3 Steps)
-1. **Get the system running** see Developer notes below for how to run it.
-2. **Open your browser** to http://localhost:7860 
-3. **Start asking questions!** 
+# Test file upload
+make test-file-upload
 
-That's it! No folders to create, no PDFs to upload unless you want to search your own papers.
+# Test complete workflow
+make test-complete-workflow
 
-### 🔍 What You Can Do Right Away
-- **Ask any research question** and get cited answers from millions of published papers
-- **Search public literature** - no setup needed, works immediately  
-- **Upload your own PDFs** later if you want to search your personal collection
-- **Try different search methods** to get the best answers for your questions
+# Test CLI
+make test-cli
+```
 
-### 📚 Example Questions to Try
-- "What are the latest treatments for Alzheimer's disease?"
-- "How does CRISPR gene editing work?"
-- "What are the side effects of statins?"
-- "What is the current understanding of long COVID?"
+## 📁 Project Structure
 
-> **🔧 Need to set this up yourself?** See the [Developer Guide](DEVELOPER.md) for full installation instructions.
+```
+paper-qa-ui/
+├── src/
+│   ├── paperqa2_ui.py      # Main Gradio UI application
+│   ├── config_manager.py   # Configuration management
+│   └── __init__.py
+├── configs/                 # Configuration files
+│   ├── optimized_ollama.json
+│   ├── openrouter_ollama.json
+│   ├── ollama.json
+│   └── clinical_trials.json
+├── scripts/                # Utility scripts
+│   ├── run_gradio_ui.py
+│   ├── paper_qa_cli.py
+│   └── test_*.py
+├── papers/                 # Uploaded documents
+├── indexes/                # Paper-QA indexes
+└── Makefile               # Build and management commands
+```
 
----
+## ⚙️ Configuration
 
-## 📖 Documentation
+### Optimized Ollama Configuration
 
-- **[🔧 Developer Guide](DEVELOPER.md)** - Installation, technical details, and system architecture
+The default configuration (`optimized_ollama`) is tuned for performance:
 
-## 🌐 Using Paper-QA
+- **LLM**: `ollama/llama3.2`
+- **Embedding**: `ollama/nomic-embed-text`
+- **Evidence K**: 20
+- **Max Sources**: 7
+- **Concurrent Requests**: 1
+- **Temperature**: 0.2
 
-### 🎯 Main Interface Features
-- **🔍 Ask Questions**: Type any research question in plain English
-- **⚙️ Choose Search Type**: Public literature, your PDFs, or both
-- **🤖 Watch AI Think**: See how the AI finds and analyzes papers
-- **📚 Get Cited Answers**: Receive detailed answers with proper citations
-- **🔧 Adjust Settings**: Fine-tune search depth and answer style
+### Environment Variables
 
-### 🔍 Search Options
+- `OPENROUTER_API_KEY`: Your OpenRouter API key (optional)
 
-#### 🌐 Public Literature
-**Best for**: Staying current with published research, exploring new fields
-- Search millions of papers from Semantic Scholar, Crossref, OpenAlex
-- No setup needed - works immediately
-- Great for literature reviews and background research
+## 🔧 Development
 
-#### 📁 Your PDFs  
-**Best for**: Analyzing your own research collection
-- Upload PDFs to search your personal paper library
-- Perfect for manuscript writing and data analysis
-- Ask your IT team to add papers to the system
+### Setup Development Environment
 
-#### 🔄 Combined Search
-**Best for**: Comprehensive research, comparing your work to published literature  
-- Searches both public databases AND your uploaded papers
-- Most thorough results for grant writing and manuscript preparation
+```bash
+make setup
+```
 
-#### 🏥 Clinical Trials
-**Best for**: Treatment options, drug development status, patient recruitment
-- Searches clinicaltrials.gov database
-- Find active trials, completed studies, and trial results
+### Run Tests
 
-### ⚙️ Professional Configuration
+```bash
+make test-ui-functionality
+make test-file-upload
+make test-complete-workflow
+```
 
-#### Configuration Presets
-| Config | Use Case | Search Sources | Agent Tools | Performance |
-|--------|----------|----------------|-------------|-------------|
-| `public_only` | Literature review, staying current | Semantic Scholar, Crossref, OpenAlex | Basic search + answer | Fast |
-| `local_only` | Private research, manuscript writing | Your PDF collection | PDF indexing + search | Medium |
-| `combined` | Comprehensive research | Public APIs + Local PDFs | Multi-source synthesis | Medium |
-| `clinical_trials` | Medical research, drug development | ClinicalTrials.gov + Public APIs | Clinical data focus | Medium |
-| `comprehensive` | Deep research, grant writing | All sources + advanced strategies | Full agent toolkit | Slow |
-| `agent_optimized` | Complex queries, multi-step reasoning | All sources | Advanced reasoning tools | Slowest |
+### Clean Up
 
-#### Key Parameters for Optimization
-- **Search Count** (1-100): Papers to retrieve per query
-  - 15-20: Quick answers, current literature
-  - 25-40: Comprehensive reviews  
-  - 50+: Exhaustive research
-- **Evidence K** (1-100): Evidence pieces for answer generation
-  - 10-15: Focused, concise answers
-  - 20-30: Detailed analysis
-  - 40+: Comprehensive synthesis
-- **Temperature** (0.0-2.0): LLM creativity/consistency
-  - 0.0-0.1: Factual, reproducible answers
-  - 0.2-0.5: Balanced responses
-  - 0.6+: Creative interpretations
-- **Max Sources** (1-50): Citations in final answer
-- **Timeout** (30-3600s): Query processing time limit
+```bash
+make clean-data      # Clean session data
+make clean-all-data  # Clean all data including papers
+make kill-server     # Kill hanging server processes
+```
 
-### 💻 For Developers & Automation
-Need to integrate Paper-QA into scripts or applications? See the [Developer Guide](DEVELOPER.md) for:
-- Command line interface
-- Python API
-- Advanced configuration
+## 🐛 Troubleshooting
 
----
+### Common Issues
+
+1. **Port 7860 in use**:
+   ```bash
+   make kill-server
+   make ui
+   ```
+
+2. **Ollama not running**:
+   ```bash
+   ollama serve
+   ```
+
+3. **Missing models**:
+   ```bash
+   ollama pull llama3.2
+   ollama pull nomic-embed-text
+   ```
+
+4. **File upload errors**: The UI now properly handles Gradio file objects and duplicate files.
+
+### Logs
+
+Check the terminal output for detailed logs. The UI provides real-time status updates during processing.
+
+## 📊 Performance
+
+The optimized configuration provides:
+- **Fast indexing**: Efficient document processing
+- **Accurate retrieval**: 20 evidence sources with relevance scoring
+- **Local processing**: No external API calls required (with Ollama)
+- **Real-time feedback**: Live status updates
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Run tests: `make test-ui-functionality`
+5. Submit a pull request
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- [Paper-QA](https://github.com/Future-House/paper-qa) - The core RAG engine
+- [Ollama](https://ollama.com/) - Local LLM runner
+- [Gradio](https://gradio.app/) - Web interface framework
+- [LiteLLM](https://github.com/BerriAI/litellm) - LLM abstraction layer

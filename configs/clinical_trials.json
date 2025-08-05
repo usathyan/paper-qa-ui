@@ -17,12 +17,7 @@
     "wipe_context_on_answer_failure": true,
     "agent_evidence_n": 8,
     "return_paper_metadata": true,
-    "tool_names": [
-      "gather_evidence",
-      "gen_answer",
-      "clinical_trials_search",
-      "complete"
-    ],
+    "tool_names": ["gather_evidence", "gen_answer", "clinical_trials_search", "complete"],
     "index": {
       "paper_directory": "./papers",
       "index_directory": "./indexes",
@@ -60,4 +55,4 @@
     "select": "Select papers that may help answer the question below. Papers are listed as $KEY: $PAPER_INFO. Return a list of keys, separated by commas. Return \"None\", if no papers are applicable. Choose papers that are relevant, from reputable sources, and timely (if the question requires timely information).\n\nQuestion: {question}\n\nPapers: {papers}\n\nSelected keys:",
     "system": "Answer in a direct and concise tone. Your audience is an expert, so be highly specific. If there are ambiguous terms or acronyms, first define them."
   }
-}
+} 

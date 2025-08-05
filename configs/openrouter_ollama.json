@@ -1,54 +1,31 @@
 {
-  "llm": "openrouter/anthropic/claude-3.5-sonnet",
-  "summary_llm": "openrouter/anthropic/claude-3.5-sonnet",
-  "embedding": "text-embedding-3-small",
-  "temperature": 0.1,
-  "verbosity": 3,
-  "agent": {
-    "agent_llm": "openrouter/anthropic/claude-3.5-sonnet",
-    "agent_llm_config": {
-      "api_key": "${OPENROUTER_API_KEY}",
-      "base_url": "https://openrouter.ai/api/v1"
-    },
-    "agent_type": "ToolSelector",
-    "search_count": 10,
-    "timeout": 600.0,
-    "should_pre_search": false,
-    "wipe_context_on_answer_failure": true,
-    "agent_evidence_n": 2,
-    "return_paper_metadata": true,
-    "tool_names": [
-      "paper_search",
-      "gather_evidence",
-      "gen_answer",
-      "clinical_trials_search",
-      "reset", 
-      "complete"
-    ],
-    "index": {
-      "paper_directory": "./papers",
-      "index_directory": "./indexes",
-      "recurse_subdirectories": true,
-      "concurrency": 5,
-      "sync_with_paper_directory": true
-    }
+  "llm": "openrouter/google/gemini-2.5-flash-lite",
+  "summary_llm": "openrouter/google/gemini-2.5-flash-lite",
+  "embedding": "ollama/nomic-embed-text",
+  "embedding_config": {
+    "api_base": "http://localhost:11434"
   },
+  "temperature": 0.0,
+  "verbosity": 3,
   "answer": {
-    "evidence_k": 15,
+    "evidence_k": 20,
     "evidence_detailed_citations": true,
     "evidence_retrieval": true,
+    "evidence_relevance_score_cutoff": 1,
     "evidence_summary_length": "about 150 words",
     "evidence_skip_summary": false,
-    "answer_max_sources": 10,
+    "answer_max_sources": 15,
     "max_answer_attempts": 3,
-    "answer_length": "about 400 words",
-    "max_concurrent_requests": 4,
+    "answer_length": "about 500 words",
+    "max_concurrent_requests": 3,
     "answer_filter_extra_background": false,
-    "get_evidence_if_no_contexts": true
+    "get_evidence_if_no_contexts": true,
+    "group_contexts_by_question": false
   },
   "parsing": {
     "chunk_size": 5000,
     "page_size_limit": 1280000,
+    "pdfs_use_block_parsing": false,
     "use_doc_details": true,
     "overlap": 250,
     "disable_doc_valid_check": false,
@@ -61,5 +38,27 @@
     "qa": "Answer the question '{question}'\nUse the context below if helpful. You can cite the context using the key like (pqac-abcd1234). If there is insufficient context, say so.\n\nContext: {context}",
     "select": "Select the most relevant papers for answering the question: {question}\n\nPapers: {papers}\n\nSelected papers:",
     "system": "You are a helpful AI assistant that answers questions based on scientific papers. Always cite your sources using the provided citation keys."
+  },
+  "agent": {
+    "agent_llm": "openrouter/google/gemini-2.5-flash-lite",
+    "agent_llm_config": {
+      "api_key": "${OPENROUTER_API_KEY}",
+      "base_url": "https://openrouter.ai/api/v1"
+    },
+    "agent_type": "ToolSelector",
+    "search_count": 20,
+    "timeout": 600.0,
+    "should_pre_search": true,
+    "wipe_context_on_answer_failure": true,
+    "agent_evidence_n": 5,
+    "return_paper_metadata": true,
+    "tool_names": ["gather_evidence", "gen_answer", "complete"],
+    "index": {
+      "paper_directory": "./papers",
+      "index_directory": "./indexes",
+      "recurse_subdirectories": true,
+      "concurrency": 3,
+      "sync_with_paper_directory": false
+    }
   }
-}
+} 

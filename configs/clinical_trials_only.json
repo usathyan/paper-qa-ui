@@ -17,12 +17,7 @@
     "wipe_context_on_answer_failure": true,
     "agent_evidence_n": 10,
     "return_paper_metadata": true,
-    "tool_names": [
-      "gather_evidence",
-      "gen_answer",
-      "clinical_trials_search",
-      "complete"
-    ],
+    "tool_names": ["gather_evidence", "gen_answer", "clinical_trials_search", "complete"],
     "index": {
       "paper_directory": "./papers",
       "index_directory": "./indexes",
@@ -60,4 +55,4 @@
     "select": "Select clinical trials that may help answer the question below. Trials are listed as $KEY: $TRIAL_INFO. Return a list of keys, separated by commas. Return \"None\", if no trials are applicable. Choose trials that are relevant, from reputable sources, and have completed or significant results.\n\nQuestion: {question}\n\nTrials: {papers}\n\nSelected keys:",
     "system": "Answer in a direct and concise tone suitable for medical professionals. Be highly specific about clinical outcomes, efficacy data, and safety information. If there are ambiguous terms or acronyms, first define them."
   }
-}
+} 

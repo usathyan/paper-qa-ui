@@ -36,14 +36,14 @@
     "max_answer_attempts": 3,
     "answer_length": "about 500 words",
     "max_concurrent_requests": 1,
-    "answer_filter_extra_background": false,
+    "answer_filter_extra_background": true,
     "get_evidence_if_no_contexts": true
   },
   "parsing": {
-    "chunk_size": 5000,
+    "chunk_size": 7000,
     "page_size_limit": 1280000,
     "use_doc_details": true,
-    "overlap": 250,
+    "overlap": 750,
     "disable_doc_valid_check": false,
     "defer_embedding": false,
     "chunking_algorithm": "simple_overlap"
@@ -97,4 +97,4 @@
       "sync_with_paper_directory": false
     }
   }
-}
+} 

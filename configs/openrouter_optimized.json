@@ -1,8 +1,8 @@
 {
-  "llm": "openrouter/openai/gpt-4-turbo",
-  "summary_llm": "openrouter/openai/gpt-4-turbo",
-  "agent_llm": "openrouter/openai/gpt-4-turbo",
-  "embedding": "ollama/nomic-embed-text",
+  "llm": "openrouter/anthropic/claude-3.5-sonnet",
+  "summary_llm": "openrouter/openai/gpt-4o-mini",
+  "agent_llm": "openrouter/anthropic/claude-3.5-sonnet", 
+  "embedding": "openrouter/openai/text-embedding-3-large",
   "temperature": 0,
   "verbosity": 3,
   "answer": {
@@ -21,7 +21,7 @@
   "parsing": {
     "chunk_size": 3000,
     "page_size_limit": 1280000,
-    "use_doc_details": false,
+    "use_doc_details": true,
     "overlap": 200,
     "disable_doc_valid_check": false,
     "defer_embedding": false,
