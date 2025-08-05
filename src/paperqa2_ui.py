@@ -244,21 +244,18 @@ async def process_question_async(question: str, config_name: str = "optimized_ol
                 settings = initialize_settings(config_name)
                 app_state["settings"] = settings
             
-            # Use agent_query like the working test scripts
-            from paperqa import agent_query
+            # Use ask function like the working test scripts
+            from paperqa import ask
             
-            # Get the paper directory from uploaded docs
-            papers_dir = Path("./papers")
-            
-            # Query using agent_query with settings
-            answer_response = await agent_query(question, settings=settings)
+            # Query using ask with settings
+            answer_response = ask(question, settings=settings)
             
             processing_time = time.time() - start_time
-            logger.info(f"Agent query completed in {processing_time:.2f} seconds")
+            logger.info(f"Ask query completed in {processing_time:.2f} seconds")
             
             # Extract answer and contexts from the response
-            answer = answer_response.answer
-            contexts = answer_response.contexts if hasattr(answer_response, 'contexts') else []
+            answer = answer_response.session.answer
+            contexts = answer_response.session.contexts if hasattr(answer_response.session, 'contexts') else []
             
             if answer and "insufficient information" not in answer.lower():
                 if "status_tracker" in app_state:

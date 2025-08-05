@@ -34,24 +34,17 @@ Open http://localhost:7860
 ### Document Processing Workflow
 
 1. **Upload Documents**: Upload PDF files using the file upload
-2. **Automatic Processing**: Documents are automatically processed and indexed
-3. **Status Updates**: Real-time progress shows processing status
-4. **Ask Questions**: Once processing is complete, you can ask questions
+2. **Automatic Processing**: Documents are automatically copied to the papers directory
+3. **Ask Questions**: Use the question interface to query your documents
 
 ### User Flow
 
 ```
 📁 Upload PDF documents
     ↓ (automatic processing)
-📄 Processing file1.pdf (1/2)...
+✅ Documents copied to papers directory
     ↓
-🔍 Indexing file1.pdf...
-    ↓
-✅ Indexed file1.pdf
-    ↓
-🎉 Processing complete! 2 documents ready for questions.
-    ↓
-❓ Ask questions (now enabled)
+❓ Ask questions (immediately available)
 ```
 
 ### Example Questions

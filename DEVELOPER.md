@@ -43,20 +43,18 @@ sequenceDiagram
     participant I as Index
     
     U->>G: Upload PDF
-    G->>P: Process Document
-    P->>E: Generate Embeddings
-    E->>I: Store Vectors
-    P->>G: Document Indexed
+    G->>P: Copy to papers directory
+    P->>G: Document ready
     
     U->>G: Ask Question
-    G->>P: Query Documents
-    P->>E: Query Embeddings
-    E->>I: Search Vectors
-    I->>P: Return Evidence
-    P->>L: Generate Answer
-    L->>P: Return Answer
-    P->>G: Display Results
-    G->>U: Show Answer + Sources
+    G->>P: Query with ask() function
+    P->>E: Generate embeddings
+    E->>I: Search vectors
+    I->>P: Return evidence
+    P->>L: Generate answer
+    L->>P: Return answer
+    P->>G: Display results
+    G->>U: Show answer + sources
 ```
 
 ### Component Architecture
@@ -77,9 +75,9 @@ graph LR
     end
     
     subgraph "Core Engine"
-        H[Paper-QA Docs]
-        I[Document Indexer]
-        J[Query Processor]
+        H[Paper-QA ask()]
+        I[Document Storage]
+        J[Query Processing]
     end
     
     subgraph "Provider Layer"
@@ -107,8 +105,8 @@ graph LR
 #### 1. Gradio UI (`src/paperqa2_ui.py`)
 - **Purpose**: Web interface for document upload and question answering
 - **Key Functions**:
-  - `process_uploaded_files_async()`: Handle file uploads and indexing
-  - `process_question_async()`: Process questions and generate answers
+  - `process_uploaded_files_async()`: Handle file uploads and copy to papers directory
+  - `process_question_async()`: Process questions using paper-qa ask() function
   - `initialize_settings()`: Load and configure Paper-QA settings
 
 #### 2. Configuration Manager (`src/config_manager.py`)
@@ -119,9 +117,9 @@ graph LR
   - `list_configs()`: List available configurations
 
 #### 3. Paper-QA Integration
-- **Docs Object**: Main interface for document processing and querying
+- **ask() Function**: Main interface for querying documents (synchronous)
 - **Settings Object**: Configuration for LLM, embeddings, and processing parameters
-- **Async Operations**: All document and query operations are asynchronous
+- **Document Storage**: Files stored in `./papers/` directory
 
 ### Configuration System
 
@@ -140,6 +138,11 @@ graph LR
   "answer": {
     "evidence_k": 20,
     "answer_max_sources": 7
+  },
+  "agent": {
+    "index": {
+      "paper_directory": "./papers"
+    }
   }
 }
 ```
@@ -158,11 +161,8 @@ graph LR
 flowchart TD
     A[PDF Upload] --> B[File Validation]
     B --> C[Copy to Papers Directory]
-    C --> D[Initialize Docs Object]
-    D --> E[Add Document to Index]
-    E --> F[Generate Embeddings]
-    F --> G[Store in Vector Index]
-    G --> H[Update UI Status]
+    C --> D[Update UI Status]
+    D --> E[Ready for Queries]
 ```
 
 ### Query Processing Pipeline
@@ -170,12 +170,11 @@ flowchart TD
 ```mermaid
 flowchart TD
     A[Question Input] --> B[Load Settings]
-    B --> C[Initialize Docs Object]
-    C --> D[Query Vector Index]
-    D --> E[Retrieve Evidence]
-    E --> F[Generate Answer]
-    F --> G[Format Response]
-    G --> H[Display Results]
+    B --> C[Call ask() Function]
+    C --> D[Paper-QA Processing]
+    D --> E[Generate Answer]
+    E --> F[Format Response]
+    F --> G[Display Results]
 ```
 
 ## Development Setup
@@ -200,23 +199,19 @@ make setup
 make ui
 
 # Run tests
-make test-ui-functionality
-make test-file-upload
+make test
 ```
 
 ### Testing
 ```bash
-# Test UI functionality
-make test-ui-functionality
-
-# Test file upload
-make test-file-upload
-
-# Test complete workflow
-make test-complete-workflow
+# Test basic functionality
+make test
 
 # Test CLI
 make test-cli
+
+# Run CLI example
+make cli-example
 ```
 
 ## Debugging
@@ -270,8 +265,7 @@ logging.getLogger("litellm").setLevel(logging.WARNING)
 ### Debug Tools
 ```bash
 # Test specific components
-python scripts/test_ui_simple.py
-python scripts/test_optimized_config.py
+python scripts/test_complete_workflow.py
 
 # Check environment
 make check-env
@@ -282,8 +276,11 @@ make check-env
 ### Key Files
 - `src/paperqa2_ui.py`: Main Gradio UI application
 - `src/config_manager.py`: Configuration management
+- `src/paper_qa_core.py`: CLI functionality
 - `configs/*.json`: Configuration profiles
-- `scripts/test_*.py`: Test scripts
+- `scripts/test_complete_workflow.py`: Main test script
+- `scripts/paper_qa_cli.py`: CLI interface
+- `scripts/kill_server.py`: Process management
 - `Makefile`: Build and management commands
 
 ### Configuration Files
@@ -291,12 +288,8 @@ make check-env
 - `azure_openai.json`: Azure OpenAI integration
 - `amazon_bedrock.json`: AWS Bedrock integration
 - `openrouter_ollama.json`: OpenRouter integration
-
-### Test Files
-- `test_ui_functionality.py`: UI accessibility testing
-- `test_file_upload.py`: File upload testing
-- `test_complete_workflow.py`: End-to-end testing
-- `test_optimized_config.py`: Configuration testing
+- `clinical_trials.json`: Clinical trials search
+- `ollama.json`: Basic Ollama setup
 
 ## Performance Optimization
 
