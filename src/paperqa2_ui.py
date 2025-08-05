@@ -124,7 +124,11 @@ async def process_uploaded_files_async(files: List[str]) -> Tuple[str, str]:
         settings = app_state["settings"]
         docs = Docs()  # Create Docs without parameters
         
-        for file_obj in files:
+        # Update status tracker
+        if "status_tracker" in app_state:
+            app_state["status_tracker"].add_status("📁 Starting document processing...")
+        
+        for i, file_obj in enumerate(files):
             # Handle Gradio file object - extract the actual file path
             if hasattr(file_obj, 'name'):
                 # Newer Gradio versions return file objects with .name attribute
@@ -136,6 +140,10 @@ async def process_uploaded_files_async(files: List[str]) -> Tuple[str, str]:
             dest_path = papers_dir / source_path.name
             
             try:
+                # Update status for current file
+                if "status_tracker" in app_state:
+                    app_state["status_tracker"].add_status(f"📄 Processing {source_path.name} ({i+1}/{len(files)})...")
+                
                 # Check if file is already in the target location
                 if source_path.resolve() == dest_path.resolve():
                     # File is already in the target location, skip copying
@@ -152,6 +160,9 @@ async def process_uploaded_files_async(files: List[str]) -> Tuple[str, str]:
                 
                 # Add to paper-qa index with settings
                 logger.info(f"Adding {source_path.name} to paper-qa index...")
+                if "status_tracker" in app_state:
+                    app_state["status_tracker"].add_status(f"🔍 Indexing {source_path.name}...")
+                
                 await docs.aadd(dest_path, settings=settings)
                 
                 # Update app state
@@ -165,28 +176,41 @@ async def process_uploaded_files_async(files: List[str]) -> Tuple[str, str]:
                 processed_files.append(source_path.name)
                 
                 logger.info(f"Successfully processed and indexed: {source_path.name}")
+                if "status_tracker" in app_state:
+                    app_state["status_tracker"].add_status(f"✅ Indexed {source_path.name}")
                 
             except Exception as e:
                 logger.error(f"Failed to process {source_path.name}: {e}")
                 failed_files.append(f"{source_path.name}: {str(e)}")
+                if "status_tracker" in app_state:
+                    app_state["status_tracker"].add_status(f"❌ Failed to process {source_path.name}")
         
         # Store the Docs object for later use
         app_state["docs"] = docs
         
-        # Prepare status message
-        status_msg = f"✅ Successfully processed {len(processed_files)} files"
-        if failed_files:
-            status_msg += f"\n❌ Failed to process {len(failed_files)} files: {', '.join(failed_files)}"
-        
-        # Update status tracker
+        # Update final status
         if "status_tracker" in app_state:
-            app_state["status_tracker"].add_status(f"📚 Indexed {len(processed_files)} documents")
+            app_state["status_tracker"].add_status(f"🎉 Processing complete! {len(processed_files)} documents ready for questions.")
+        
+        # Prepare status message
+        if processed_files:
+            status_msg = f"✅ Successfully processed and indexed {len(processed_files)} documents:\n"
+            status_msg += "\n".join([f"  • {f}" for f in processed_files])
+            status_msg += f"\n\n📚 You can now ask questions about these documents!"
+        else:
+            status_msg = "❌ No documents were successfully processed."
+            
+        if failed_files:
+            status_msg += f"\n\n❌ Failed to process {len(failed_files)} files:\n"
+            status_msg += "\n".join([f"  • {f}" for f in failed_files])
         
         return f"Processed: {', '.join(processed_files)}", status_msg
         
     except Exception as e:
         error_msg = f"❌ Processing failed: {str(e)}"
         logger.error(f"Exception in process_uploaded_files: {e}", exc_info=True)
+        if "status_tracker" in app_state:
+            app_state["status_tracker"].add_status(f"❌ Processing failed: {str(e)}")
         return "", error_msg
 
 
@@ -207,9 +231,13 @@ async def process_question_async(question: str, config_name: str = "optimized_ol
             if not question.strip():
                 return "", "", "", "Please enter a question."
             
-            # Check if documents have been uploaded
+            # Check if documents have been uploaded and processed
             if not app_state.get("uploaded_docs"):
-                return "", "", "", "Please upload documents before asking questions."
+                return "", "", "", "📚 Please upload documents first. Documents will be automatically processed when uploaded."
+            
+            # Check if documents have been indexed (Docs object exists)
+            if not app_state.get("docs"):
+                return "", "", "", "⏳ Documents are still being processed. Please wait for the processing to complete before asking questions."
             
             # Check if Ollama is running (for local configurations)
             if "ollama" in config_name.lower() and not check_ollama_status():
@@ -225,36 +253,14 @@ async def process_question_async(question: str, config_name: str = "optimized_ol
             
             app_state["processing_status"] = "🔍 Searching documents..."
             
-            # Create a fresh Docs object for each query to avoid connection issues
+            # Use the stored Docs object for querying
+            docs = app_state["docs"]
             settings = app_state.get("settings")
             if not settings:
                 settings = initialize_settings(config_name)
                 app_state["settings"] = settings
             
-            # Initialize a new Docs object with the same settings
-            docs = Docs(
-                llm=settings.llm,
-                llm_config=settings.llm_config,
-                embedding=settings.embedding,
-                embedding_config=settings.embedding_config,
-                temperature=settings.temperature,
-                verbosity=settings.verbosity,
-                answer=settings.answer,
-                parsing=settings.parsing,
-                prompts=settings.prompts
-            )
-            
-            # Add the indexed documents to the new Docs object
-            for doc_info in app_state["uploaded_docs"]:
-                doc_path = doc_info["path"]
-                if Path(doc_path).exists():
-                    try:
-                        await docs.aadd(doc_path, settings=settings)
-                        logger.info(f"Added document to query: {doc_path}")
-                    except Exception as e:
-                        logger.warning(f"Failed to add document {doc_path} to query: {e}")
-            
-            # Query using the fresh Docs object
+            # Query using the stored Docs object
             answer_response = await docs.aquery(question, settings=settings)
             
             processing_time = time.time() - start_time
@@ -366,11 +372,16 @@ def format_metadata_html(metadata: dict) -> str:
 
 
 def clear_all():
-    """Clear all uploaded documents and reset state."""
+    """Clear all uploaded documents and reset the interface."""
     app_state["uploaded_docs"] = []
-    app_state["docs"] = None
+    app_state["docs"] = None  # Clear the Docs object
+    app_state["processing_status"] = ""
+    
     if "status_tracker" in app_state:
         app_state["status_tracker"].clear()
+        app_state["status_tracker"].add_status("🧹 All documents and data cleared")
+    
+    logger.info("Cleared all documents and reset interface")
     return "", "", "", "", "", ""
 
 
@@ -394,8 +405,7 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
                 file_types=[".pdf"],
                 label="Upload PDF Documents"
             )
-            upload_button = gr.Button("📤 Process Documents", variant="primary")
-            upload_status = gr.Textbox(label="Upload Status", interactive=False)
+            upload_status = gr.Textbox(label="Upload & Processing Status", interactive=False)
             
             gr.Markdown("### ⚙️ Configuration")
             config_dropdown = gr.Dropdown(
@@ -433,8 +443,8 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
             
             error_display = gr.Textbox(label="Errors", interactive=False, visible=False)
     
-    # Event handlers
-    upload_button.click(
+    # Event handlers - automatically process documents on upload
+    file_upload.change(
         fn=process_uploaded_files,
         inputs=[file_upload],
         outputs=[upload_status, error_display]
