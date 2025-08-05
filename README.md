@@ -31,10 +31,28 @@ make ui
 ```
 Open http://localhost:7860
 
-### Upload Documents
-1. Upload PDF files using the file upload
-2. Click "Process Documents" to index them
-3. Ask questions about the documents
+### Document Processing Workflow
+
+1. **Upload Documents**: Upload PDF files using the file upload
+2. **Automatic Processing**: Documents are automatically processed and indexed
+3. **Status Updates**: Real-time progress shows processing status
+4. **Ask Questions**: Once processing is complete, you can ask questions
+
+### User Flow
+
+```
+📁 Upload PDF documents
+    ↓ (automatic processing)
+📄 Processing file1.pdf (1/2)...
+    ↓
+🔍 Indexing file1.pdf...
+    ↓
+✅ Indexed file1.pdf
+    ↓
+🎉 Processing complete! 2 documents ready for questions.
+    ↓
+❓ Ask questions (now enabled)
+```
 
 ### Example Questions
 - "What is the main finding of this research?"
@@ -113,3 +131,8 @@ ollama pull nomic-embed-text
 ollama list  # Check available models
 ollama pull <model_name>  # Download missing models
 ```
+
+### Document Processing Issues
+- **Documents not processing**: Check if Ollama is running
+- **Processing stuck**: Try refreshing the page and re-uploading
+- **Connection errors**: Restart Ollama with `ollama serve`
