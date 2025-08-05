@@ -12,7 +12,8 @@ from pathlib import Path
 from typing import List, Tuple
 
 import gradio as gr
-from paperqa import Settings, Docs
+import httpx
+from paperqa import Docs, Settings
 from paperqa.agents.tools import DEFAULT_TOOL_NAMES
 
 from config_manager import ConfigManager
@@ -34,6 +35,18 @@ app_state = {
     "status_tracker": None,
     "processing_status": ""
 }
+
+# Disable Gradio analytics
+os.environ["GRADIO_ANALYTICS_ENABLED"] = "False"
+
+
+def check_ollama_status() -> bool:
+    """Check if Ollama is running and accessible."""
+    try:
+        response = httpx.get("http://localhost:11434/api/tags", timeout=5.0)
+        return response.status_code == 200
+    except Exception:
+        return False
 
 
 class StatusTracker:
@@ -183,73 +196,112 @@ def process_uploaded_files(files: List[str]) -> Tuple[str, str]:
 
 
 async def process_question_async(question: str, config_name: str = "optimized_ollama") -> Tuple[str, str, str, str]:
-    """Process a question using paper-qa with the specified configuration."""
-    if not question.strip():
-        return "", "", "", "Please enter a question."
+    """Process a question asynchronously using the stored documents."""
+    max_retries = 3
+    retry_delay = 2.0
     
-    if not app_state["uploaded_docs"]:
-        return "", "", "", "Please upload documents before asking questions."
-    
-    start_time = time.time()
-    
-    try:
-        # Initialize settings if needed
-        if not app_state["settings"] or config_name != "optimized_ollama":
-            app_state["settings"] = initialize_settings(config_name)
-        
-        if "status_tracker" in app_state:
-            app_state["status_tracker"].clear()
-            app_state["status_tracker"].add_status("🔍 Initializing and searching documents...")
-        
-        app_state["processing_status"] = "🔍 Initializing and searching documents..."
-        logger.info(f"Processing question: {question}")
-        logger.info(f"Using config: {config_name}")
-        logger.info(f"Number of uploaded docs: {len(app_state['uploaded_docs'])}")
-        
-        if "status_tracker" in app_state:
-            app_state["status_tracker"].add_status("🤖 Initializing...")
-            app_state["status_tracker"].add_status("🔍 Searching documents...")
-        
-        app_state["processing_status"] = "🔍 Searching documents..."
-        
-        # Use the stored Docs object for querying
-        if "docs" not in app_state or not app_state["docs"]:
-            return "", "", "", "No documents have been indexed. Please upload and process documents first."
-        
-        # Query using the Docs object with settings
-        answer_response = await app_state["docs"].aquery(question, settings=app_state["settings"])
-        
-        processing_time = time.time() - start_time
-        logger.info(f"Docs query completed in {processing_time:.2f} seconds")
-        
-        answer = answer_response.answer
-        contexts = answer_response.contexts if hasattr(answer_response, 'contexts') else []
-        
-        if answer and "insufficient information" not in answer.lower():
+    for attempt in range(max_retries):
+        try:
+            start_time = time.time()
+            
+            if not question.strip():
+                return "", "", "", "Please enter a question."
+            
+            # Check if documents have been uploaded
+            if not app_state.get("uploaded_docs"):
+                return "", "", "", "Please upload documents before asking questions."
+            
+            # Check if Ollama is running (for local configurations)
+            if "ollama" in config_name.lower() and not check_ollama_status():
+                return "", "", "", "❌ Ollama is not running. Please start Ollama with 'ollama serve' and try again."
+            
+            logger.info(f"Processing question: {question} (attempt {attempt + 1}/{max_retries})")
+            logger.info(f"Number of uploaded docs: {len(app_state['uploaded_docs'])}")
+            
+            # Update status
             if "status_tracker" in app_state:
-                app_state["status_tracker"].add_status("✅ Answer generated successfully!")
-            app_state["processing_status"] = "✅ Answer generated successfully!"
-        else:
-            if "status_tracker" in app_state:
-                app_state["status_tracker"].add_status("⚠️ Limited information found - try a more general question")
-            app_state["processing_status"] = "⚠️ Limited information found - try a more general question"
-        
-        answer_html = format_answer_html(answer, contexts)
-        sources_html = format_sources_html(contexts)
-        metadata_html = format_metadata_html({
-            "processing_time": processing_time,
-            "documents_searched": len(app_state["uploaded_docs"]),
-            "evidence_sources": len(contexts),
-            "confidence": 0.85 if contexts else 0.3
-        })
-        
-        return answer_html, sources_html, metadata_html, ""
-        
-    except Exception as e:
-        app_state["processing_status"] = "❌ Error occurred during processing"
-        error_msg = f"❌ Processing failed: {str(e)}"
-        logger.error(f"Exception in process_question: {e}", exc_info=True)
-        return "", "", "", error_msg
+                app_state["status_tracker"].add_status("🤖 Initializing...")
+                app_state["status_tracker"].add_status("🔍 Searching documents...")
+            
+            app_state["processing_status"] = "🔍 Searching documents..."
+            
+            # Create a fresh Docs object for each query to avoid connection issues
+            settings = app_state.get("settings")
+            if not settings:
+                settings = initialize_settings(config_name)
+                app_state["settings"] = settings
+            
+            # Initialize a new Docs object with the same settings
+            docs = Docs(
+                llm=settings.llm,
+                llm_config=settings.llm_config,
+                embedding=settings.embedding,
+                embedding_config=settings.embedding_config,
+                temperature=settings.temperature,
+                verbosity=settings.verbosity,
+                answer=settings.answer,
+                parsing=settings.parsing,
+                prompts=settings.prompts
+            )
+            
+            # Add the indexed documents to the new Docs object
+            for doc_info in app_state["uploaded_docs"]:
+                doc_path = doc_info["path"]
+                if Path(doc_path).exists():
+                    try:
+                        await docs.aadd(doc_path, settings=settings)
+                        logger.info(f"Added document to query: {doc_path}")
+                    except Exception as e:
+                        logger.warning(f"Failed to add document {doc_path} to query: {e}")
+            
+            # Query using the fresh Docs object
+            answer_response = await docs.aquery(question, settings=settings)
+            
+            processing_time = time.time() - start_time
+            logger.info(f"Docs query completed in {processing_time:.2f} seconds")
+            
+            answer = answer_response.answer
+            contexts = answer_response.contexts if hasattr(answer_response, 'contexts') else []
+            
+            if answer and "insufficient information" not in answer.lower():
+                if "status_tracker" in app_state:
+                    app_state["status_tracker"].add_status("✅ Answer generated successfully!")
+                app_state["processing_status"] = "✅ Answer generated successfully!"
+            else:
+                if "status_tracker" in app_state:
+                    app_state["status_tracker"].add_status("⚠️ Limited information found - try a more general question")
+                app_state["processing_status"] = "⚠️ Limited information found - try a more general question"
+            
+            answer_html = format_answer_html(answer, contexts)
+            sources_html = format_sources_html(contexts)
+            metadata_html = format_metadata_html({
+                "processing_time": processing_time,
+                "documents_searched": len(app_state["uploaded_docs"]),
+                "evidence_sources": len(contexts),
+                "confidence": 0.85 if contexts else 0.3
+            })
+            
+            return answer_html, sources_html, metadata_html, ""
+            
+        except Exception as e:
+            logger.error(f"Exception in process_question (attempt {attempt + 1}): {e}", exc_info=True)
+            
+            # Check if it's an Ollama connection issue
+            if "TCPTransport closed" in str(e) or "APIConnectionError" in str(e):
+                if attempt < max_retries - 1:
+                    logger.info(f"Connection issue detected, retrying in {retry_delay} seconds...")
+                    await asyncio.sleep(retry_delay)
+                    retry_delay *= 2  # Exponential backoff
+                    continue
+                else:
+                    error_msg = "❌ Connection to Ollama failed after multiple attempts. Please ensure Ollama is running and try again."
+                    logger.error("Ollama connection issue detected after all retries")
+            else:
+                # For non-connection errors, don't retry
+                error_msg = f"❌ Processing failed: {str(e)}"
+            
+            app_state["processing_status"] = "❌ Error occurred during processing"
+            return "", "", "", error_msg
 
 
 def process_question(question: str, config_name: str = "optimized_ollama") -> Tuple[str, str, str, str, str, str]:
