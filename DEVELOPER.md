@@ -1,354 +1,363 @@
 # Developer Documentation
 
-## System Architecture
+## Architecture Overview
+
+### System Architecture
 
 ```mermaid
 graph TB
-    UI[Gradio Web Interface]
-    CORE[PaperQA2 Core]
-    CONFIG[Config Manager]
-    PAPERQA[PaperQA Library]
-    LITELLM[LiteLLM Router]
+    A[Gradio UI] --> B[Paper-QA Engine]
+    B --> C[Document Processor]
+    B --> D[Query Processor]
+    B --> E[Evidence Retriever]
     
-    LLM[OpenRouter GPT-4]
-    EMB[Ollama Embeddings]
+    C --> F[PDF Parser]
+    C --> G[Text Chunker]
+    C --> H[Embedding Generator]
     
-    PAPERS[(PDF Documents)]
-    INDEXES[(Vector Indexes)]
+    D --> I[Question Analyzer]
+    D --> J[Answer Generator]
     
-    UI --> CORE
-    CORE --> CONFIG
-    CORE --> PAPERQA
-    CORE --> PAPERS
-    CORE --> INDEXES
+    E --> K[Vector Search]
+    E --> L[Relevance Scoring]
     
-    CONFIG --> LITELLM
-    PAPERQA --> LITELLM
+    H --> M[Ollama Embeddings]
+    J --> N[LLM Provider]
+    K --> O[Vector Index]
     
-    LITELLM --> LLM
-    LITELLM --> EMB
+    N --> P[Local Ollama]
+    N --> Q[Azure OpenAI]
+    N --> R[AWS Bedrock]
+    N --> S[OpenRouter]
 ```
 
-## Data Flow
+### Data Flow
 
 ```mermaid
 sequenceDiagram
-    User->>UI: Upload PDF
-    UI->>Core: add_document_sync()
-    Core->>Storage: Copy to session directory
-    Core->>PQA: docs.aadd(file_path)
-    PQA->>Ollama: Generate embeddings
-    Ollama-->>PQA: Embedding vectors
-    PQA->>Storage: Store vector index
-    PQA-->>Core: Success response
-    Core-->>UI: Document added
-    UI-->>User: Upload complete
+    participant U as User
+    participant G as Gradio UI
+    participant P as Paper-QA
+    participant E as Embeddings
+    participant L as LLM
+    participant I as Index
     
-    User->>UI: Ask question
-    UI->>Core: ask_question_sync()
-    Core->>PQA: docs.aquery(question)
-    PQA->>Ollama: Embed question
-    Ollama-->>PQA: Question embedding
-    PQA->>Storage: Vector similarity search
-    Storage-->>PQA: Relevant text chunks
-    PQA->>OpenRouter: Generate answer + citations
-    OpenRouter-->>PQA: Generated response
-    PQA-->>Core: Answer with citations
-    Core-->>UI: Formatted response
-    UI-->>User: Display answer
+    U->>G: Upload PDF
+    G->>P: Process Document
+    P->>E: Generate Embeddings
+    E->>I: Store Vectors
+    P->>G: Document Indexed
+    
+    U->>G: Ask Question
+    G->>P: Query Documents
+    P->>E: Query Embeddings
+    E->>I: Search Vectors
+    I->>P: Return Evidence
+    P->>L: Generate Answer
+    L->>P: Return Answer
+    P->>G: Display Results
+    G->>U: Show Answer + Sources
 ```
 
-## Component Details
+### Component Architecture
 
-### paperqa2_ui.py
-Gradio web interface implementation.
+```mermaid
+graph LR
+    subgraph "Frontend Layer"
+        A[Gradio Interface]
+        B[File Upload]
+        C[Question Input]
+        D[Results Display]
+    end
+    
+    subgraph "Application Layer"
+        E[Config Manager]
+        F[Settings Handler]
+        G[Status Tracker]
+    end
+    
+    subgraph "Core Engine"
+        H[Paper-QA Docs]
+        I[Document Indexer]
+        J[Query Processor]
+    end
+    
+    subgraph "Provider Layer"
+        K[Ollama Provider]
+        L[Azure Provider]
+        M[Bedrock Provider]
+        N[OpenRouter Provider]
+    end
+    
+    A --> E
+    B --> I
+    C --> J
+    E --> F
+    F --> H
+    H --> K
+    H --> L
+    H --> M
+    H --> N
+```
 
-**Key Functions:**
-- `initialize_paperqa_core()` - Creates core instance with configuration
-- `process_uploaded_files()` - Handles PDF uploads via sync wrapper
-- `ask_question()` - Processes questions via sync wrapper
-- `update_config()` - Switches AI model configurations
+## Technical Implementation
 
-**Threading Model:**
-Uses synchronous wrappers around async core methods to avoid Gradio event loop conflicts.
+### Core Components
 
-### paperqa2_core.py
-Core business logic and PaperQA integration.
+#### 1. Gradio UI (`src/paperqa2_ui.py`)
+- **Purpose**: Web interface for document upload and question answering
+- **Key Functions**:
+  - `process_uploaded_files_async()`: Handle file uploads and indexing
+  - `process_question_async()`: Process questions and generate answers
+  - `initialize_settings()`: Load and configure Paper-QA settings
 
-**Key Classes:**
-- `PaperQA2Core` - Main processing class
-- `PaperQACore` - Backward compatibility wrapper
+#### 2. Configuration Manager (`src/config_manager.py`)
+- **Purpose**: Manage different LLM/embedding configurations
+- **Key Functions**:
+  - `load_config()`: Load JSON configuration files
+  - `get_settings()`: Convert config to Paper-QA Settings object
+  - `list_configs()`: List available configurations
 
-**Async Methods:**
-- `add_document()` - Process and index PDF files
-- `ask_question()` - Query documents and generate answers
+#### 3. Paper-QA Integration
+- **Docs Object**: Main interface for document processing and querying
+- **Settings Object**: Configuration for LLM, embeddings, and processing parameters
+- **Async Operations**: All document and query operations are asynchronous
 
-**Sync Wrappers:**
-- `add_document_sync()` - Thread-safe document processing
-- `ask_question_sync()` - Thread-safe question processing
+### Configuration System
 
-**Session Management:**
-- Each instance creates unique session directories
-- Documents stored in `papers/session_<timestamp>/`
-- Indexes stored in `indexes/session_<timestamp>/`
-
-### config_manager.py
-Configuration loading and validation.
-
-**Configuration Structure:**
+#### Configuration Structure
 ```json
 {
-  "llm": "openrouter/openai/gpt-4-turbo",
-  "summary_llm": "openrouter/openai/gpt-4-turbo", 
-  "agent_llm": "openrouter/openai/gpt-4-turbo",
-  "embedding": "ollama/nomic-embed-text",
-  "temperature": 0,
-  "verbosity": 3,
-  "answer": { ... },
-  "parsing": { ... },
-  "prompts": { ... },
-  "agent": { ... }
+  "llm": "provider/model",
+  "embedding": "provider/model",
+  "llm_config": {
+    "api_key": "${ENV_VAR}",
+    "api_base": "endpoint_url"
+  },
+  "embedding_config": {
+    "api_base": "endpoint_url"
+  },
+  "answer": {
+    "evidence_k": 20,
+    "answer_max_sources": 7
+  }
 }
 ```
 
-## Processing Pipeline
+#### Environment Variables
+- `AZURE_OPENAI_API_KEY`: Azure OpenAI API key
+- `AZURE_OPENAI_ENDPOINT`: Azure OpenAI endpoint URL
+- `AWS_ACCESS_KEY_ID`: AWS access key
+- `AWS_SECRET_ACCESS_KEY`: AWS secret key
+- `AWS_REGION`: AWS region
+- `OPENROUTER_API_KEY`: OpenRouter API key
+
+### File Processing Pipeline
 
 ```mermaid
-graph TD
-    subgraph UPLOAD["Document Upload"]
-        A[PDF Upload]
-        B[Text Extraction]
-        C[Text Chunking]
-        A --> B --> C
-    end
-    
-    subgraph EMBED["Embedding Generation"]
-        D[Generate Embeddings]
-        E[Store Vector Index]
-        C --> D --> E
-    end
-    
-    subgraph QUERY["Query Processing"]
-        F[User Question]
-        G[Question Embedding]
-        F --> G
-    end
-    
-    subgraph SEARCH["Vector Search"]
-        H[Vector Similarity Search]
-        I[Retrieve Top-K Chunks]
-        G --> H --> I
-        E --> H
-    end
-    
-    subgraph ANSWER["Answer Generation"]
-        J[Summarize Evidence]
-        K[Generate Answer]
-        L[Format Citations]
-        M[Return Response]
-        I --> J --> K --> L --> M
-    end
+flowchart TD
+    A[PDF Upload] --> B[File Validation]
+    B --> C[Copy to Papers Directory]
+    C --> D[Initialize Docs Object]
+    D --> E[Add Document to Index]
+    E --> F[Generate Embeddings]
+    F --> G[Store in Vector Index]
+    G --> H[Update UI Status]
 ```
 
-## Configuration Parameters
-
-### Core Settings
-- `chunk_size`: 3000 characters per chunk
-- `overlap`: 200 character overlap between chunks
-- `evidence_k`: 15 top chunks retrieved for answering
-- `answer_max_sources`: 15 maximum sources cited
-- `temperature`: 0 (deterministic responses)
-
-### Document Processing
-- `use_doc_details`: false (disables Semantic Scholar metadata)
-- `disable_doc_valid_check`: false (validates PDF structure)
-- `defer_embedding`: false (immediate embedding generation)
-- `page_size_limit`: 1,280,000 characters maximum per page
-
-### Answer Generation
-- `evidence_detailed_citations`: true (include page numbers)
-- `answer_length`: "about 300 words, but can be longer"
-- `max_concurrent_requests`: 3 (parallel processing limit)
-
-## File Structure
-
-```
-├── src/
-│   ├── paperqa2_ui.py          # Gradio interface (457 lines)
-│   ├── paperqa2_core.py        # Core logic (339 lines)  
-│   ├── config_manager.py       # Configuration (100+ lines)
-│   ├── config_ui.py            # Config UI components
-│   ├── streaming.py            # Streaming utilities
-│   └── utils.py                # Utility functions
-├── configs/
-│   ├── default.json            # OpenRouter + Ollama setup
-│   ├── ollama.json             # Local-only processing
-│   ├── free_local.json         # Free tier models
-│   ├── huggingface_free.json   # HuggingFace models
-│   └── openrouter_optimized.json
-├── scripts/
-│   ├── kill_server.py          # Process management
-│   ├── download_demo_papers.py # Sample data
-│   ├── create_demo_dataset.py  # Demo content
-│   └── paper_qa_cli.py         # CLI interface
-├── papers/                     # Document storage (auto-created)
-├── indexes/                    # Vector indexes (auto-created)
-└── tests/                      # Test suite
-```
-
-## Dependencies
-
-### Core Libraries
-- `paperqa` - Document processing and Q&A engine
-- `gradio` - Web interface framework
-- `litellm` - Unified LLM access
-- `asyncio` - Async processing
-- `concurrent.futures` - Thread management
-
-### AI Services
-- OpenRouter API (GPT-4 Turbo)
-- Ollama (nomic-embed-text embedding model)
-
-### System Requirements
-- Python 3.11+
-- 8GB+ RAM (embedding model)
-- Internet access (OpenRouter API)
-- Local Ollama installation
-
-## Error Handling
-
-### Document Processing Errors
-- File size validation (100MB limit)
-- PDF corruption detection
-- Text extraction failures
-- Embedding generation timeouts
-
-### API Errors
-- OpenRouter rate limiting (HTTP 429)
-- Ollama connection failures
-- Network timeouts (300s default)
-- Invalid API keys
-
-### Session Management
-- Automatic session directory creation
-- File path validation
-- Graceful cleanup on errors
-- Event loop isolation in threading
-
-## Performance Characteristics
-
-### Document Processing
-- PDF parsing: ~10-30 seconds per document
-- Embedding generation: ~2-5 seconds per chunk
-- Index storage: <1 second per document
-
-### Question Answering  
-- Vector search: <1 second
-- Evidence summarization: ~5-15 seconds
-- Answer generation: ~10-30 seconds
-- Total response time: ~15-45 seconds
-
-### Memory Usage
-- Base system: ~500MB
-- Per document: ~10-50MB (depending on size)
-- Embedding model: ~2GB (nomic-embed-text)
-- Vector indexes: ~5-20MB per document
-
-## Threading Model
+### Query Processing Pipeline
 
 ```mermaid
-graph TD
-    subgraph MAIN["Main Thread"]
-        A[Gradio Event Loop]
-    end
-    
-    subgraph WORKER["Worker Thread"]
-        C[AsyncIO Event Loop]
-        D[PaperQA Operations]
-    end
-    
-    subgraph CLIENTS["External APIs"]
-        E[Ollama Client]
-        F[OpenRouter Client]
-    end
-    
-    A --> C
-    C --> D
-    D --> E
-    D --> F
+flowchart TD
+    A[Question Input] --> B[Load Settings]
+    B --> C[Initialize Docs Object]
+    C --> D[Query Vector Index]
+    D --> E[Retrieve Evidence]
+    E --> F[Generate Answer]
+    F --> G[Format Response]
+    G --> H[Display Results]
 ```
-
-**Key Implementation Details:**
-- Gradio runs in main thread with its own event loop
-- PaperQA operations run in isolated worker threads
-- Each worker thread creates new AsyncIO event loop
-- HTTP clients properly closed after operations
-- Timeout protection prevents hanging operations
-
-## API Integration
-
-### OpenRouter Configuration
-```python
-{
-  "llm": "openrouter/openai/gpt-4-turbo",
-  "summary_llm": "openrouter/openai/gpt-4-turbo",
-  "agent_llm": "openrouter/openai/gpt-4-turbo"
-}
-```
-
-### Ollama Configuration  
-```python
-{
-  "embedding": "ollama/nomic-embed-text"
-}
-```
-
-### LiteLLM Routing
-All model calls routed through LiteLLM for unified interface and error handling.
 
 ## Development Setup
 
-1. **Environment Setup:**
-   ```bash
-   make setup
-   make install-dev
-   ```
-
-2. **Testing:**
-   ```bash
-   make test
-   ```
-
-3. **Code Formatting:**
-   ```bash
-   make format
-   ```
-
-4. **Code Linting:**
-   ```bash
-   make lint
-   ```
-
-## Known Issues
-
-1. **Event Loop Closure:** Occasional "Event loop is closed" errors in test environments (not production UI)
-2. **Memory Growth:** Vector indexes accumulate over sessions (cleared by restarting)
-3. **API Rate Limits:** OpenRouter free tier has usage limits
-4. **PDF Processing:** Some complex PDFs may fail text extraction
-
-## Deployment Considerations
-
-- Session directories grow over time (use `make clean-data` for cleanup)
-- Ollama must be running before application start
-- OpenRouter API key required for LLM operations
-- Port 7860 must be available (configurable in code)
-- File upload size limited by server configuration
-
-## Maintenance Commands
-
+### Prerequisites
 ```bash
-make clean-data      # Clean session data (preserves papers/)
-make clean-all-data  # Complete data reset (removes papers/)
-make kill-server     # Stop hanging processes
-make status          # Check system status
+# Install Python 3.11+
+# Install Ollama
+# Install uv package manager
 ```
+
+### Local Development
+```bash
+# Clone repository
+git clone <repository-url>
+cd paper-qa-ui
+
+# Setup environment
+make setup
+
+# Start development server
+make ui
+
+# Run tests
+make test-ui-functionality
+make test-file-upload
+```
+
+### Testing
+```bash
+# Test UI functionality
+make test-ui-functionality
+
+# Test file upload
+make test-file-upload
+
+# Test complete workflow
+make test-complete-workflow
+
+# Test CLI
+make test-cli
+```
+
+## Debugging
+
+### Common Issues
+
+#### 1. File Upload Errors
+```python
+# Check Gradio file object handling
+if hasattr(file_obj, 'name'):
+    source_path = Path(file_obj.name)
+else:
+    source_path = Path(file_obj)
+```
+
+#### 2. Configuration Loading
+```python
+# Verify configuration loading
+config_manager = ConfigManager()
+config_dict = config_manager.load_config("config_name")
+settings = Settings(**config_dict)
+```
+
+#### 3. Ollama Connection
+```bash
+# Check Ollama status
+ollama list
+ollama serve
+
+# Test connection
+curl http://localhost:11434/api/tags
+```
+
+#### 4. Port Conflicts
+```bash
+# Kill existing processes
+make kill-server
+
+# Check port usage
+lsof -i :7860
+```
+
+### Logging
+```python
+import logging
+logging.basicConfig(level=logging.INFO)
+logging.getLogger("paperqa").setLevel(logging.INFO)
+logging.getLogger("litellm").setLevel(logging.WARNING)
+```
+
+### Debug Tools
+```bash
+# Test specific components
+python scripts/test_ui_simple.py
+python scripts/test_optimized_config.py
+
+# Check environment
+make check-env
+```
+
+## Code Structure
+
+### Key Files
+- `src/paperqa2_ui.py`: Main Gradio UI application
+- `src/config_manager.py`: Configuration management
+- `configs/*.json`: Configuration profiles
+- `scripts/test_*.py`: Test scripts
+- `Makefile`: Build and management commands
+
+### Configuration Files
+- `optimized_ollama.json`: Local processing (default)
+- `azure_openai.json`: Azure OpenAI integration
+- `amazon_bedrock.json`: AWS Bedrock integration
+- `openrouter_ollama.json`: OpenRouter integration
+
+### Test Files
+- `test_ui_functionality.py`: UI accessibility testing
+- `test_file_upload.py`: File upload testing
+- `test_complete_workflow.py`: End-to-end testing
+- `test_optimized_config.py`: Configuration testing
+
+## Performance Optimization
+
+### Local Processing
+- Use Ollama for both LLM and embeddings
+- Optimize chunk size and overlap settings
+- Configure evidence retrieval parameters
+
+### Cloud Processing
+- Use local embeddings with cloud LLMs
+- Configure API timeouts and retries
+- Monitor API usage and costs
+
+### Memory Management
+- Process documents in batches
+- Clean up temporary resources
+- Monitor memory usage during indexing
+
+## Security Considerations
+
+### Local Processing
+- No data leaves local machine
+- Secure API key management
+- Input validation for uploaded files
+
+### Cloud Processing
+- Secure API key storage
+- Network security for API calls
+- Data privacy compliance
+
+## Deployment
+
+### Local Deployment
+```bash
+make ui
+# Access at http://localhost:7860
+```
+
+### Production Considerations
+- Resource requirements (RAM, CPU)
+- Storage for documents and indexes
+- Network access for cloud providers
+- Security and access control
+
+## Contributing
+
+### Development Workflow
+1. Fork repository
+2. Create feature branch
+3. Make changes
+4. Run tests
+5. Submit pull request
+
+### Code Standards
+- Follow Python PEP 8
+- Add type hints
+- Include docstrings
+- Write tests for new features
+
+### Testing Requirements
+- All new features must have tests
+- UI functionality must be tested
+- Configuration changes must be validated
+- Performance impact must be assessed

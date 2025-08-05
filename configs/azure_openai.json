@@ -1,0 +1,73 @@
+{
+  "llm": "azure/gpt-4",
+  "summary_llm": "azure/gpt-4",
+  "embedding": "ollama/nomic-embed-text",
+  "embedding_config": {
+    "api_base": "http://localhost:11434"
+  },
+  "llm_config": {
+    "api_key": "${AZURE_OPENAI_API_KEY}",
+    "api_base": "${AZURE_OPENAI_ENDPOINT}",
+    "api_version": "2024-02-15-preview"
+  },
+  "temperature": 0.0,
+  "verbosity": 3,
+  "answer": {
+    "evidence_k": 20,
+    "evidence_detailed_citations": true,
+    "evidence_retrieval": true,
+    "evidence_summary_length": "about 150 words",
+    "evidence_skip_summary": false,
+    "answer_max_sources": 7,
+    "max_answer_attempts": 3,
+    "answer_length": "about 500 words",
+    "max_concurrent_requests": 1,
+    "answer_filter_extra_background": true,
+    "get_evidence_if_no_contexts": true
+  },
+  "parsing": {
+    "chunk_size": 7000,
+    "page_size_limit": 1280000,
+    "use_doc_details": true,
+    "overlap": 750,
+    "disable_doc_valid_check": false,
+    "defer_embedding": false,
+    "chunking_algorithm": "simple_overlap"
+  },
+  "prompts": {
+    "use_json": false,
+    "summary": "Summarize the following text in a concise way that is helpful for answering the user's question. Do not include information that is not relevant to the question. Do not include information that is not in the text.\n\nText: {text}\n\nSummary:",
+    "qa": "Answer the question '{question}'\nUse the context below if helpful. You can cite the context using the key like (pqac-abcd1234). If there is insufficient context, say so.\n\nContext: {context}",
+    "select": "Select the most relevant papers for answering the question: {question}\n\nPapers: {papers}\n\nSelected papers:",
+    "system": "You are a helpful AI assistant that answers questions based on scientific papers. Always cite your sources using the provided citation keys."
+  },
+  "agent": {
+    "agent_llm": "azure/gpt-4",
+    "agent_llm_config": {
+      "api_key": "${AZURE_OPENAI_API_KEY}",
+      "api_base": "${AZURE_OPENAI_ENDPOINT}",
+      "api_version": "2024-02-15-preview"
+    },
+    "agent_type": "ToolSelector",
+    "search_count": 20,
+    "timeout": 600.0,
+    "should_pre_search": false,
+    "wipe_context_on_answer_failure": true,
+    "agent_evidence_n": 5,
+    "return_paper_metadata": true,
+    "tool_names": [
+      "paper_search",
+      "gather_evidence",
+      "gen_answer",
+      "reset",
+      "complete"
+    ],
+    "index": {
+      "paper_directory": "./papers",
+      "index_directory": "./indexes",
+      "recurse_subdirectories": true,
+      "concurrency": 1,
+      "sync_with_paper_directory": false
+    }
+  }
+} 
