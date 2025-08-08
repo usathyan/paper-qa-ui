@@ -101,7 +101,7 @@ make test-cli
 make cli-example
 
 # Direct usage
-python scripts/paper_qa_cli.py "What is this paper about?"
+python -m src.cli.paper_qa_cli "What is this paper about?"
 ```
 
 ## Troubleshooting

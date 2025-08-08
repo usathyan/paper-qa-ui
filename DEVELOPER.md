@@ -102,7 +102,7 @@ graph LR
 
 ### Core Components
 
-#### 1. Gradio UI (`src/paperqa2_ui.py`)
+#### 1. Gradio UI (`src/ui/paperqa2_ui.py`)
 - **Purpose**: Web interface for document upload and question answering
 - **Key Functions**:
   - `process_uploaded_files_async()`: Handle file uploads and copy to papers directory
@@ -274,12 +274,12 @@ make check-env
 ## Code Structure
 
 ### Key Files
-- `src/paperqa2_ui.py`: Main Gradio UI application
+- `src/ui/paperqa2_ui.py`: Main Gradio UI application
 - `src/config_manager.py`: Configuration management
 - `src/paper_qa_core.py`: CLI functionality
 - `configs/*.json`: Configuration profiles
 - `scripts/test_complete_workflow.py`: Main test script
-- `scripts/paper_qa_cli.py`: CLI interface
+- `src/cli/paper_qa_cli.py`: CLI interface
 - `scripts/kill_server.py`: Process management
 - `Makefile`: Build and management commands
 

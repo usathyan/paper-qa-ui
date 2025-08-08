@@ -26,7 +26,7 @@ help:
 	@echo "  3. make test     # Test functionality"
 	@echo ""
 	@echo "CLI Usage:"
-	@echo "  python scripts/paper_qa_cli.py 'Your question'"
+	@echo "  python -m src.cli.paper_qa_cli 'Your question'"
 	@echo ""
 	@echo "Troubleshooting:"
 	@echo "  make kill-server # Kill hanging processes"
@@ -103,7 +103,7 @@ ui: check-env
 	@echo "🌐 Starting PaperQA2 Gradio UI..."
 	@echo "📱 Open your browser to: http://localhost:7860"
 	@echo "🛑 Press Ctrl+C to stop"
-	@$(PYTHON) src/paperqa2_ui.py
+	@$(PYTHON) src/ui/paperqa2_ui.py
 
 # Kill hanging server processes
 kill-server:
@@ -153,4 +153,4 @@ test-cli:
 # Run CLI with example query
 cli-example:
 	@echo "🚀 Running CLI example..."
-	@$(PYTHON) scripts/paper_qa_cli.py "What is this paper about?" --method local --paper-dir ./papers
+	@$(PYTHON) -m src.cli.paper_qa_cli "What is this paper about?" --method local --paper-dir ./papers
