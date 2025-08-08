@@ -7,7 +7,7 @@ Simple command-line interface for testing Paper-QA functionality.
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+# running as a module; no manual sys.path modification needed
 
 import argparse
 import asyncio
@@ -93,7 +93,7 @@ Examples:
         return 1
 
     try:
-        from paper_qa_core import PaperQACore
+        from ..paper_qa_core import PaperQACore
         
         print(f"\nQuerying: {args.question}")
         print(f"Method: {args.method}")
