@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 # Add src to path
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+# use package imports from src
 
 from paperqa import Settings
 
@@ -35,7 +35,7 @@ async def test_settings():
             print(f"❌ Settings.from_name('default') failed: {e}")
 
         try:
-            Settings.from_name("configs/default")
+            Settings.from_name("configs/default.json")
             print("✅ Created Settings.from_name('configs/default')")
         except Exception as e:
             print(f"❌ Settings.from_name('configs/default') failed: {e}")

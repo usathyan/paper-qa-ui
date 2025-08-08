@@ -7,9 +7,9 @@ import sys
 from pathlib import Path
 
 # Add src to path
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+# use package imports from src
 
-from config_manager import ConfigManager
+from src.config_manager import ConfigManager
 
 
 async def test_config_loading():
