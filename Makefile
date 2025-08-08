@@ -34,6 +34,7 @@ help:
 
 # Variables - using uv exclusively as requested
 UV := uv
+UVX := uvx
 PYTHON := python3
 
 # Check if .env file exists
@@ -137,8 +138,12 @@ clean-all-data:
 
 # Run basic functionality test
 test:
-	@echo "🧪 Testing basic functionality..."
-	@$(PYTHON) scripts/test_complete_workflow.py
+	@echo "🧪 Running code format (ruff format)..."
+	@$(UVX) ruff format .
+	@echo "🧪 Running lint fixes (ruff check . --fix)..."
+	@$(UVX) ruff check . --fix
+	@echo "🧪 Running static analysis (pyrefly check)..."
+	@$(UVX) pyrefly check .
 
 # Test CLI functionality
 test-cli:

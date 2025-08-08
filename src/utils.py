@@ -120,7 +120,7 @@ def save_results(results: List[Dict[str, Any]], output_dir: Union[str, Path]) ->
 
     # Save individual results
     for i, result in enumerate(cleaned_results):
-        result_file = output_dir / f"result_{i+1}_{timestamp}.json"
+        result_file = output_dir / f"result_{i + 1}_{timestamp}.json"
         save_json(result, result_file)
 
     # Save combined results
