@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 
 # Add src to path
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+# use package imports from src
 
 from src.utils import create_picalm_questions, print_system_status, save_questions
 
