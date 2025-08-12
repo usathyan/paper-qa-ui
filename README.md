@@ -34,17 +34,17 @@ Open http://localhost:7860
 ### Document Processing Workflow
 
 1. **Upload Documents**: Upload PDF files using the file upload
-2. **Automatic Processing**: Documents are automatically copied to the papers directory
-3. **Ask Questions**: Use the question interface to query your documents
+2. **Automatic Processing & Indexing**: Documents are copied to the `papers/` directory and immediately indexed into an in-memory `Docs` corpus
+3. **Ask Questions**: Use the question interface to query your documents via the in-memory corpus (same path as CLI)
 
 ### User Flow
 
 ```
 📁 Upload PDF documents
-    ↓ (automatic processing)
-✅ Documents copied to papers directory
+    ↓ (auto copy + indexing)
+✅ Documents copied and indexed
     ↓
-❓ Ask questions (immediately available)
+❓ Ask questions (runs Docs.aquery over your corpus)
 ```
 
 ### Example Questions
@@ -101,8 +101,22 @@ make test-cli
 make cli-example
 
 # Direct usage
+python -m src.cli.simple_local_qa "What is this paper about?" --files papers/your.pdf --verbosity 2 --stream
+# Alternative CLI (agent-style)
 python -m src.cli.paper_qa_cli "What is this paper about?"
 ```
+
+## Research-Intelligence Defaults (Enabled)
+
+These defaults are applied in both the UI and CLI to surface richer, better-organized evidence and reduce low-signal answers:
+
+- **Pre-search and metadata**: agent pre-search enabled; return paper metadata
+- **More evidence**: `evidence_k ≥ 15`, `answer_max_sources ≥ 10`, retries enabled
+- **Better organization**: `group_contexts_by_question` on; extra background filtered
+- **Grounded retrieval**: `get_evidence_if_no_contexts` on; low relevance cutoff (`0`)
+- **Local-first**: external metadata providers disabled by default for speed and determinism
+
+Tip: On very small machines, you can lower `evidence_k` and set `max_concurrent_requests: 1` in your config for latency.
 
 ## Troubleshooting
 

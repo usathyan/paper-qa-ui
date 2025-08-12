@@ -25,8 +25,8 @@ Paper-QA UI is a modern web interface built on top of the [Paper-QA](https://git
 ### Data Flow
 
 1. **Document Upload**: PDF files uploaded via Gradio interface
-2. **Document Processing**: Files copied to `papers/` directory and indexed
-3. **Question Processing**: User questions processed through Paper-QA pipeline
+2. **Document Processing**: Files copied to `papers/` directory and indexed into an in-memory `Docs` corpus
+3. **Question Processing**: User questions processed by querying the in-memory corpus (`Docs.aquery`)
 4. **Evidence Retrieval**: Relevant document sections retrieved using embeddings
 5. **Answer Generation**: LLM generates answers with citations
 6. **Response Display**: Formatted results shown in web interface
@@ -71,9 +71,9 @@ async def process_uploaded_files_async(files: List[str]) -> Tuple[str, str]:
 ```python
 # Question answering pipeline
 async def process_question_async(question: str, config_name: str) -> Tuple[str, str, str, str]:
-    # Initialize settings
-    # Query indexed documents
-    # Generate answer with evidence
+    # Initialize settings with research-intelligence defaults
+    # Query in-memory Docs corpus (Docs.aquery)
+    # Generate answer with evidence and metadata
     # Format response
 ```
 
@@ -97,9 +97,12 @@ def initialize_settings(config_name: str = "optimized_ollama") -> Settings:
   "llm": "ollama/llama3.2",
   "embedding": "ollama/nomic-embed-text",
   "answer": {
-    "evidence_k": 20,
-    "answer_max_sources": 7,
-    "max_concurrent_requests": 1
+    "evidence_k": 15,
+    "answer_max_sources": 10,
+    "max_concurrent_requests": 2,
+    "get_evidence_if_no_contexts": true,
+    "group_contexts_by_question": true,
+    "answer_filter_extra_background": true
   },
   "temperature": 0.2
 }

@@ -97,9 +97,31 @@ async def main_async(
     # Ensure we don't filter away all contexts due to low scores
     try:
         settings.answer.evidence_relevance_score_cutoff = 0
-        settings.answer.answer_max_sources = max(5, settings.answer.answer_max_sources)
-        settings.answer.evidence_k = max(10, settings.answer.evidence_k)
+        settings.answer.answer_max_sources = max(10, settings.answer.answer_max_sources)
+        settings.answer.evidence_k = max(15, settings.answer.evidence_k)
         settings.answer.get_evidence_if_no_contexts = True
+        settings.answer.group_contexts_by_question = True
+        settings.answer.answer_filter_extra_background = True
+        if getattr(settings.answer, 'max_answer_attempts', None) in (None, 0):
+            settings.answer.max_answer_attempts = 3
+        try:
+            settings.answer.max_concurrent_requests = max(2, settings.answer.max_concurrent_requests)
+        except Exception:
+            pass
+    except Exception:
+        pass
+    # Agent-side defaults for richer research behavior
+    try:
+        settings.agent.should_pre_search = True
+        settings.agent.return_paper_metadata = True
+        try:
+            settings.agent.agent_evidence_n = max(5, settings.agent.agent_evidence_n)
+        except Exception:
+            pass
+        try:
+            settings.agent.search_count = max(20, settings.agent.search_count)
+        except Exception:
+            pass
     except Exception:
         pass
 

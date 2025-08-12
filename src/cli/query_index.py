@@ -126,7 +126,7 @@ async def main_async(
     cfg_index.setdefault("sync_with_paper_directory", False)
 
     settings = Settings(**cfg)
-    # Optional tuning for evidence
+    # Optional tuning for evidence and research-intelligence defaults
     if evidence_k is not None:
         try:
             settings.answer.evidence_k = int(evidence_k)
@@ -134,6 +134,30 @@ async def main_async(
             pass
     try:
         settings.answer.evidence_detailed_citations = bool(include_citations)
+        settings.answer.evidence_relevance_score_cutoff = 0
+        settings.answer.answer_max_sources = max(10, settings.answer.answer_max_sources)
+        settings.answer.get_evidence_if_no_contexts = True
+        settings.answer.group_contexts_by_question = True
+        settings.answer.answer_filter_extra_background = True
+        if getattr(settings.answer, 'max_answer_attempts', None) in (None, 0):
+            settings.answer.max_answer_attempts = 3
+        try:
+            settings.answer.max_concurrent_requests = max(2, settings.answer.max_concurrent_requests)
+        except Exception:
+            pass
+    except Exception:
+        pass
+    try:
+        settings.agent.should_pre_search = True
+        settings.agent.return_paper_metadata = True
+        try:
+            settings.agent.agent_evidence_n = max(5, settings.agent.agent_evidence_n)
+        except Exception:
+            pass
+        try:
+            settings.agent.search_count = max(20, settings.agent.search_count)
+        except Exception:
+            pass
     except Exception:
         pass
 

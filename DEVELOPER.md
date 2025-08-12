@@ -47,7 +47,7 @@ sequenceDiagram
     P->>G: Document ready
     
     U->>G: Ask Question
-    G->>P: Query with ask() function
+    G->>P: Query with Docs.aquery() over in-memory corpus
     P->>E: Generate embeddings
     E->>I: Search vectors
     I->>P: Return evidence
@@ -75,7 +75,7 @@ graph LR
     end
     
     subgraph "Core Engine"
-        H[Paper-QA ask()]
+        H[Paper-QA Docs.aquery()]
         I[Document Storage]
         J[Query Processing]
     end
@@ -105,9 +105,9 @@ graph LR
 #### 1. Gradio UI (`src/ui/paperqa2_ui.py`)
 - **Purpose**: Web interface for document upload and question answering
 - **Key Functions**:
-  - `process_uploaded_files_async()`: Handle file uploads and copy to papers directory
-  - `process_question_async()`: Process questions using paper-qa ask() function
-  - `initialize_settings()`: Load and configure Paper-QA settings
+  - `process_uploaded_files_async()`: Handle file uploads, copy to `papers/`, and index into an in-memory `Docs` corpus
+  - `process_question_async()`: Query the in-memory corpus with `Docs.aquery(...)` (aligned with CLI behavior)
+  - `initialize_settings()`: Load and configure Paper-QA settings; applies research-intelligence defaults
 
 #### 2. Configuration Manager (`src/config_manager.py`)
 - **Purpose**: Manage different LLM/embedding configurations
@@ -170,8 +170,8 @@ flowchart TD
 ```mermaid
 flowchart TD
     A[Question Input] --> B[Load Settings]
-    B --> C[Call ask() Function]
-    C --> D[Paper-QA Processing]
+    B --> C[Query in-memory Docs corpus]
+    C --> D[Paper-QA Retrieval + Answer]
     D --> E[Generate Answer]
     E --> F[Format Response]
     F --> G[Display Results]
@@ -296,7 +296,7 @@ make check-env
 ### Local Processing
 - Use Ollama for both LLM and embeddings
 - Optimize chunk size and overlap settings
-- Configure evidence retrieval parameters
+- Configure evidence retrieval parameters (defaults enable pre-search, higher evidence_k, grouping, retries)
 
 ### Cloud Processing
 - Use local embeddings with cloud LLMs
