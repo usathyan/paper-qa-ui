@@ -1161,6 +1161,11 @@ def stream_analysis_progress(
                     if original_question
                     else ""
                 )
+                + (
+                    f"<div><small><strong>Rewritten query</strong>: {html.escape(question)}</small></div>"
+                    if original_question
+                    else ""
+                )
                 + "</div>"
             ),
             (
@@ -1325,14 +1330,14 @@ def stream_analysis_progress(
                         bh2 = (
                             0 if maxc == 0 else int(((c2 / maxc) * (height - 2 * pad)))
                         )
-                        x = int(pad + i * bw)
+                        xpos = int(pad + i * bw)
                         y1 = height - pad - bh1
                         y2 = height - pad - bh2
                         bars.append(
-                            f"<rect x='{x}' y='{y1}' width='{max(1, int(bw - 1))}' height='{bh1}' fill='#93c5fd' />"
+                            f"<rect x='{xpos}' y='{y1}' width='{max(1, int(bw - 1))}' height='{bh1}' fill='#93c5fd' />"
                         )
                         bars.append(
-                            f"<rect x='{x}' y='{y2}' width='{max(1, int(bw - 1))}' height='{bh2}' fill='#3b82f6' />"
+                            f"<rect x='{xpos}' y='{y2}' width='{max(1, int(bw - 1))}' height='{bh2}' fill='#3b82f6' />"
                         )
                     axis = (
                         f"<text x='{pad}' y='{height - 2}' font-size='9' fill='#9ca3af'>{smin:.2f}</text>"
