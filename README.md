@@ -82,10 +82,15 @@ Open http://localhost:7860
 - Metadata
   - Processing time, documents searched, evidence count, a coarse confidence proxy
 
-- Dark mode
-  - All custom sections use dark‑mode‑safe styling. The UI adapts to system/browser dark mode
 
-### Interpreting metrics (for scientists)
+### Screenshot
+<p align="center">
+  <img src="./screenshot.png" alt="Paper-QA UI screenshot" width="900" />
+  <br/>
+  <em>Inline Live Analysis Progress with chevron phases, transparency metrics, and dark‑mode‑safe panels.</em>
+</p>
+
+### Interpreting metrics 
 - Score min/mean/max: Distribution of retrieval scores for selected excerpts. Higher min/mean suggest stronger alignment
 - Per‑document counts: A quick guide to contribution. Skews can reveal over‑representation; drill into lower‑represented but high‑score sources for diversity
 - Prompt size (approximate): Indicator of context packed into the model prompt; very large prompts can increase latency
