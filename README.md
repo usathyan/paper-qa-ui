@@ -1,251 +1,109 @@
-# Paper-QA UI
+# Paper-QA UI: User Guide (Data Scientists)
 
-Drug-discovery friendly question answering over your PDFs, with transparent retrieval, rich evidence, and scientist-ready summaries.
+This document describes exactly how to operate the UI, what each control does, how outputs are computed, and what to expect. It assumes familiarity with literature review workflows and scientific evaluation.
 
-## Setup
+## 1. Launch
+- Start: `make ui`
+- Access: http://localhost:7860
+- Requirements: Python 3.11+, Ollama running for local models (default). Optional cloud LLMs via OpenRouter/others if configured.
 
-### Prerequisites
-- Python 3.11+
-- [Ollama](https://ollama.com/) installed and running
+## 2. Document intake
+- Upload PDFs via the left panel.
+- The app copies files to `./papers/` and indexes them into an in-memory `Docs` corpus.
+- Indexing runs immediately after upload; status appears in the left panel. No separate build step is required.
 
-### Installation
-```bash
-git clone <repository-url>
-cd paper-qa-ui
-make setup
-```
+## 3. Query path
+- The UI queries the in-memory `Docs` corpus using `Docs.aquery(question, settings)`. This is the same retrieval/answer path used by the CLI.
+- All LLM/embedding calls run on a dedicated asyncio loop (background thread) to avoid event loop conflicts.
 
-### Environment Configuration
+## 4. Configuration (left panel)
 
-Copy the template and configure your API keys:
-```bash
-cp env.template .env
-# Edit .env with your API keys
-```
+### 4.1 Configuration dropdown
+- Selects a configuration profile for LLM and embeddings. Defaults to a local Ollama setup.
+- Changes reinitialize settings.
 
-## Usage
+### 4.2 Run Critique (checkbox)
+- Adds a post-answer critique block.
+- Implementation: heuristic + optional LLM-based critique; non-blocking.
+- Output: short list of potential issues (unsupported claims, strong language). Does not alter the answer.
 
-### Start the UI
-```bash
-make ui
-```
-Open http://localhost:7860
+### 4.3 Query Options
+- Rewrite query (experimental):
+  - Rewrites the question prior to retrieval.
+  - When enabled, “Rewritten query” and “Rewritten from” (original) appear above the Analysis Progress.
+- Use LLM rewrite (advanced):
+  - Invokes an LLM to return `{ rewritten, filters: { years, venues, fields } }`.
+  - Filters are displayed inline (e.g., `years 2018-2024; venues Nature, PNAS; fields neurodegeneration`).
+- Bias retrieval using filters:
+  - Appends filter hints to the rewritten text. This biases retrieval without changing internal ranking logic.
 
-### Document Processing Workflow
+### 4.4 Evidence Curation (beta)
+- Relevance score cutoff (slider):
+  - Sets `answer.evidence_relevance_score_cutoff`.
+  - Values below cutoff are discarded during evidence selection.
+- Per-document evidence cap (number):
+  - After retrieval, caps the number of excerpts per source to this value.
+  - If 0, no cap is applied post-retrieval.
+- Max sources included (number):
+  - Sets `answer.answer_max_sources` when > 0.
 
-1. **Upload Documents**: Upload PDF files using the file upload
-2. **Automatic Processing & Indexing**: Documents are copied to the `papers/` directory and immediately indexed into an in-memory `Docs` corpus
-3. **Ask Questions**: Use the question interface to query your documents via the in-memory corpus (same path as CLI)
+### 4.5 Display Toggles
+- Show source flags (Preprint/Retracted?):
+  - When enabled, source badges are shown for excerpts with heuristic flags (preprint servers; likely retraction markers in titles).
+- Show evidence conflicts:
+  - When enabled, a clustered conflicts list appears under Research Intelligence.
 
-### User Flow
+### 4.6 Export
+- Export JSON: dumps session data `{question, answer, contexts, metrics, rewrite?, curation?}`.
+- Export CSV: contexts (doc/page/score/text).
+- Export Trace (JSONL): event stream when available.
+- Export Bundle (ZIP): all of the above together.
 
-```
-📁 Upload PDF documents
-    ↓ (auto copy + indexing)
-✅ Documents copied and indexed
-    ↓
-❓ Ask questions (runs Docs.aquery over your corpus)
-```
+## 5. Ask Questions (right panel)
 
-### Example Questions
-- "What is the main finding of this research?"
-- "What methodology was used?"
-- "What are the limitations mentioned?"
-- "What conclusions were drawn?"
+### 5.1 Analysis Progress
+- Header shows elapsed seconds and spinner while running.
+- “Rewritten from” and “Rewritten query” appear if rewriting is enabled.
+- Chevron phases: Retrieval, Summaries, Answer. Phases mark completion.
+- Retrieval progress bar: `contexts_selected / evidence_k`. Indeterminate until counts arrive.
+- Curation preview: shows current curation settings and estimated contexts after per-doc cap.
+- Transparency block reports: embed latency, candidate count (if logged), MMR lambda (if logged), selection stats (min/mean/max), per-doc counts, prompt metrics, answer timing/attempts.
+- MMR block: histogram of candidate vs selected scores; selected diversity share; counts.
 
-## What you’ll see in the UI
+### 5.2 Answer
+- Markdown answer produced by the model from selected evidence.
 
-- Live Analysis Progress (inline, under the question)
-  - Chevron phases: Retrieval → Summaries → Answer. Each turns green when done.
-  - Retrieval progress bar: contexts_selected / evidence_k (updates live; indeterminate stripes before counts arrive)
-  - Transparency panel (scientist‑oriented quick facts):
-    - Retrieval: embedding latency (sec), candidate/evidence collection
-    - Evidence selection: how many excerpts were selected, cutoff, score min/mean/max
-    - Per‑document evidence counts with mini bars (top 5 sources by excerpts)
-    - Prompt building: number of sources included, approximate prompt size (characters)
-    - Answer generation: elapsed time and attempts used
+### 5.3 Evidence Sources
+- Table of excerpts: citation/title, page, score, snippet.
+- Heuristic flags:
+  - Preprint: arXiv/bioRxiv/medRxiv detected in source string.
+  - Retracted?: the source string contains a retraction marker.
 
-- Answer
-  - Natural language answer composed from the selected evidence
-  - Tip: Look for precise claims tied to strong evidence; re‑ask to narrow/expand scope
+### 5.4 Research Intelligence
+- Potential contradictions (heuristic + polarity clustering): cross-document antonyms and simple claim polarity agreement/disagreement.
+- Evidence conflicts (clustered): list of entities with the number of sources exhibiting mixed polarity; shows up to 4 source names per entity. Controlled by the display toggle.
+- Key insights: salient statements from the answer or first snippets.
+- Evidence summary: excerpts per document.
+- Top evidence (by score): tabular top contexts.
 
-- Evidence Sources (by excerpt)
-  - For each excerpt: source (citation/title), page, score (higher = closer match), and snippet
-  - Interpretation: Multiple excerpts from different sources suggest convergence; mixed scores can indicate nuance
+### 5.5 Metadata
+- Processing time, number of documents included, evidence sources count, and a coarse confidence proxy.
 
-- Research Intelligence
-  - Potential contradictions (heuristic): quick flags where sources appear to disagree
-  - Key insights: salient statements/summaries pulled from answer/evidence
-  - Evidence summary: number of excerpts per document
-  - Top evidence (by score): compact table of the strongest excerpts
-  - Optional Critique: post‑answer sanity check highlighting potentially unsupported or overly strong claims (toggle under Configuration)
+## 6. Notes on behavior
+- Rewriting and biasing affect retrieval text; they do not prune documents by themselves; they steer the selection.
+- Score cutoff and max sources are applied in `Settings` before selection.
+- Per-document cap is applied after selection to control over-representation.
+- Flags and conflicts are heuristic, not metadata-backed unless you provide metadata in your sources.
 
-- Metadata
-  - Processing time, documents searched, evidence count, a coarse confidence proxy
+## 7. Session export contents
+- JSON contains: `question`, `answer`, `contexts`, `processing_time`, `documents_searched`, `metrics`, and optionally `rewrite`, `curation`, and `trace`.
 
+## 8. Operational constraints
+- One active query at a time (single-query lock).
+- Local-first by default; external services only if configured.
+- No background streaming of source documents; all processing is local unless otherwise set in configuration.
 
-### Screenshot
-<p align="center">
-  <img src="./screenshot.png" alt="Paper-QA UI screenshot" width="900" />
-  <br/>
-  <em>Inline Live Analysis Progress with chevron phases, transparency metrics, and dark‑mode‑safe panels.</em>
-</p>
-
-### Interpreting metrics 
-- Score min/mean/max: Distribution of retrieval scores for selected excerpts. Higher min/mean suggest stronger alignment
-- Per‑document counts: A quick guide to contribution. Skews can reveal over‑representation; drill into lower‑represented but high‑score sources for diversity
-- Prompt size (approximate): Indicator of context packed into the model prompt; very large prompts can increase latency
-- Attempts and elapsed: If attempts > 1, the system retried to stabilize quality; elapsed helps anticipate workload scaling
-- Critique: A non-binding diagnostic to guide further reading; it does not alter the answer
-
-## Configuration panel
-
-The left panel includes controls for model configuration and query options:
-
-- Run Critique (checkbox)
-  - What it does: Adds a short, post‑answer “sanity check” that flags potentially unsupported or overly strong claims and suggests evidence areas to verify. It does not change the answer.
-  - When to use: Before sharing or acting on results, to get a quick list of potential issues to review in the sources.
-  - Performance: Negligible additional latency for the heuristic version. When upgraded to an LLM‑based pass (optional), expect a small additional delay.
-
-- Rewrite query (experimental)
-  - What it does: Rephrases your question for retrieval (e.g., removes boilerplate, prefers imperative phrasing). The original question is displayed above the Analysis Progress so you can compare.
-  - When to use: If your initial query is broad or contains fillers, rewriting can improve retrieval precision.
-  - Limitations: Current rewriter is minimal/heuristic. A future version will optionally use an LLM to produce a structured rewrite with filters (e.g., years/venues/fields of study) before retrieval.
-
-- Export (JSON, CSV, JSONL; Bundle ZIP)
-  - JSON: The answer, contexts, and basic metrics (and the trace if available)
-  - CSV: Contexts (doc, page, score, excerpt)
-  - Trace (JSONL): A line‑delimited event log of the analysis (phases/metrics)
-  - Bundle (ZIP): Packages JSON, CSV, and JSONL in one download
-
-## Configurations
-
-### Local Processing (Default)
-- **Config**: `optimized_ollama`
-- **LLM**: Ollama llama3.2
-- **Embedding**: Ollama nomic-embed-text
-- **Setup**: No API keys required
-
-### Azure OpenAI
-- **Config**: `azure_openai`
-- **LLM**: Azure GPT-4
-- **Embedding**: Ollama nomic-embed-text
-- **Setup**: Add to `.env`:
-  ```
-  AZURE_OPENAI_API_KEY=your_key
-  AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
-  ```
-
-### Amazon Bedrock
-- **Config**: `amazon_bedrock`
-- **LLM**: Claude 3 Sonnet
-- **Embedding**: Ollama nomic-embed-text
-- **Setup**: Add to `.env`:
-  ```
-  AWS_ACCESS_KEY_ID=your_key
-  AWS_SECRET_ACCESS_KEY=your_secret
-  AWS_REGION=us-east-1
-  ```
-
-### OpenRouter
-- **Config**: `openrouter_ollama`
-- **LLM**: Various models via OpenRouter
-- **Embedding**: Ollama nomic-embed-text
-- **Setup**: Add to `.env`:
-  ```
-  OPENROUTER_API_KEY=your_key
-  ```
-
-## CLI Usage
-
-```bash
-# Test CLI
-make test-cli
-
-# Run example
-make cli-example
-
-# Direct usage
-python -m src.cli.simple_local_qa "What is this paper about?" --files papers/your.pdf --verbosity 2 --stream
-# Alternative CLI (agent-style)
-python -m src.cli.paper_qa_cli "What is this paper about?"
-```
-
-## Research-Intelligence Defaults (Enabled)
-
-These defaults are applied in both the UI and CLI to surface richer, better-organized evidence and reduce low-signal answers:
-
-- **Pre-search and metadata**: agent pre-search enabled; return paper metadata
-- **More evidence**: `evidence_k ≥ 15`, `answer_max_sources ≥ 10`, retries enabled
-- **Better organization**: `group_contexts_by_question` on; extra background filtered
-- **Grounded retrieval**: `get_evidence_if_no_contexts` on; low relevance cutoff (`0`)
-- **Local-first**: external metadata providers disabled by default for speed and determinism
-
-Tip: On very small machines, you can lower `evidence_k` and set `max_concurrent_requests: 1` in your config for latency.
-
-## Theming and dark mode
-- The app ships with a modern theme and dark‑mode‑aware custom sections
-- You can force a theme via URL: add `?__theme=dark` or `?__theme=light` to the address
-
-## What’s new in this release
-- Inline Live Analysis Progress with chevron phases and a retrieval progress bar
-- Transparency panel with scientist‑relevant metrics (scores, counts, prompt size, timing)
-- Research Intelligence: contradictions (heuristic + clustering), key insights, evidence summary, and Top evidence
-- Critique: optional post‑answer check; now renders basic markdown for readability
-- MMR (Maximum Marginal Relevance): live diversity share and a score histogram; candidate vs selected overlay in progress
-- Query rewrite (advanced):
-  - Use LLM rewrite (advanced): asks the model to rewrite the query and propose filters (years, venues, fields)
-  - Bias retrieval using filters: appends filter hints to the rewritten query for more targeted evidence
-  - Analysis Progress displays: original question, rewritten query, and extracted filters
-- Evidence curation controls:
-  - Relevance score cutoff (slider)
-  - Per‑document evidence cap (number)
-  - Max sources included (number)
-- Robust local‑first execution: a dedicated async loop and single‑query lock for stability
-- Dark‑mode‑safe styling across Analysis, Answer, Sources, Research Intelligence, and Metadata
-
-### Summary of recent changes (for data scientists)
-
-- Query Options
-  - Added “Use LLM rewrite (advanced)” and “Bias retrieval using filters” checkboxes
-  - The panel now shows original, rewritten query, and filters inline under Analysis Progress
-- Evidence Curation (beta)
-  - Added controls: relevance score cutoff (slider), per‑document evidence cap (number), and max sources included (number)
-  - Score cutoff and max sources are applied before the query; per‑document cap is applied after retrieval to keep evidence diverse
-  - Exports now include a `curation` section in the session JSON
-- Critique rendering
-  - Critique bullets now render basic markdown (bold/italics/code/links) for better readability
-- MMR overlay
-  - Candidate vs selected histogram and counts in the progress panel; transparency shows candidate_count and an MMR lambda value when available
-- Build and stability
-  - Changes were tested (format/lint/type checks), committed, and pushed; the UI remains responsive and local‑first
-
-## License and third‑party notices
-
-This project is licensed under the MIT License (see `LICENSE`). It integrates with the Paper‑QA library, which is licensed under the Apache License 2.0. When distributing builds that bundle Paper‑QA, please ensure compliance with the Apache 2.0 terms for that dependency. No changes are made to Paper‑QA within this repository; it is used as a third‑party library.
-
-## Troubleshooting
-
-### Port Issues
-```bash
-make kill-server
-make ui
-```
-
-### Ollama Issues
-```bash
-ollama serve
-ollama pull llama3.2
-ollama pull nomic-embed-text
-```
-
-### Missing Models
-```bash
-ollama list  # Check available models
-ollama pull <model_name>  # Download missing models
-```
-
-### Document Processing Issues
-- **Documents not processing**: Check if Ollama is running
-- **Processing stuck**: Try refreshing the page and re-uploading
-- **Connection errors**: Restart Ollama with `ollama serve`
+## 9. Troubleshooting
+- If Ollama is not running, local configs will fail; start with `ollama serve`.
+- If a port is occupied, run `make kill-server` then `make ui`.
+- If API keys are missing for cloud LLMs, use the default local config or set keys in `.env`.

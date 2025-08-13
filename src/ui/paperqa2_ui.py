@@ -2458,9 +2458,8 @@ async def llm_decompose_query(question: str, settings: Settings) -> Dict[str, An
                 pass
             return ""
 
-        content = _extract(resp)
-        if not isinstance(content, str):
-            content = ""
+        content_res = _extract(resp)
+        content = content_res if isinstance(content_res, str) else ""
 
         # Try to parse JSON from the content (strip code fences if present)
         txt = content.strip()
