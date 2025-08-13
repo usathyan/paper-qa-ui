@@ -6,7 +6,7 @@ Basic functionality test without complex dependencies.
 import asyncio
 
 # Add src to path
-from src.utils import create_picalm_questions, print_system_status, save_questions
+from utils import create_picalm_questions, print_system_status, save_questions
 
 
 async def test_picalm_questions():
@@ -56,7 +56,7 @@ async def test_basic_imports():
 
     try:
         # Test basic imports
-        from src.streaming import ConsoleStreamingCallback
+        from streaming import ConsoleStreamingCallback
 
         print("✅ ConsoleStreamingCallback imported successfully")
 
