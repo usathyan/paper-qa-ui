@@ -139,10 +139,12 @@ async def main_async(
         settings.answer.get_evidence_if_no_contexts = True
         settings.answer.group_contexts_by_question = True
         settings.answer.answer_filter_extra_background = True
-        if getattr(settings.answer, 'max_answer_attempts', None) in (None, 0):
+        if getattr(settings.answer, "max_answer_attempts", None) in (None, 0):
             settings.answer.max_answer_attempts = 3
         try:
-            settings.answer.max_concurrent_requests = max(2, settings.answer.max_concurrent_requests)
+            settings.answer.max_concurrent_requests = max(
+                2, settings.answer.max_concurrent_requests
+            )
         except Exception:
             pass
     except Exception:

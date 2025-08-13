@@ -5,6 +5,7 @@ Based on insights from GitHub discussions and testing.
 """
 
 import asyncio
+import html
 import logging
 import os
 import time
@@ -42,6 +43,8 @@ app_state: Dict[str, Any] = {
     "processing_status": "",
     "query_lock": None,
     "analysis_queue": None,
+    "query_loop": None,
+    "query_loop_thread": None,
 }
 
 # Disable Gradio analytics
@@ -176,6 +179,22 @@ def initialize_settings(config_name: str = "optimized_ollama") -> Settings:
         raise
 
 
+def _ensure_query_loop() -> None:
+    """Start a dedicated asyncio event loop in a background thread for model I/O."""
+    if app_state.get("query_loop") and app_state.get("query_loop_thread"):
+        return
+    loop = asyncio.new_event_loop()
+
+    def _run() -> None:
+        asyncio.set_event_loop(loop)
+        loop.run_forever()
+
+    t = threading.Thread(target=_run, name="pqa-query-loop", daemon=True)
+    t.start()
+    app_state["query_loop"] = loop
+    app_state["query_loop_thread"] = t
+
+
 async def process_uploaded_files_async(files: List[Any]) -> Tuple[str, str]:
     """Process uploaded files by copying them to papers directory."""
     if not files:
@@ -249,10 +268,16 @@ async def process_uploaded_files_async(files: List[Any]) -> Tuple[str, str]:
                             f"📚 Indexing {source_path.name}..."
                         )
                     t0 = time.time()
-                    # Use permanent path in papers directory
-                    added_name = await app_state["docs"].aadd(
-                        str(dest_path), settings=app_state["settings"]
+                    # Use permanent path in papers directory on the dedicated query loop
+                    _ensure_query_loop()
+                    qloop = app_state["query_loop"]
+                    fut = asyncio.run_coroutine_threadsafe(
+                        app_state["docs"].aadd(
+                            str(dest_path), settings=app_state["settings"]
+                        ),
+                        qloop,
                     )
+                    added_name = await asyncio.to_thread(fut.result, timeout=600)
                     logger.info(
                         f"Indexed {added_name or source_path.name} in {time.time() - t0:.2f}s"
                     )
@@ -384,52 +409,28 @@ async def process_question_async(
 
             async with app_state["query_lock"]:
                 # Build Docs corpus from uploaded files if not already available
+                _ensure_query_loop()
+                qloop = app_state["query_loop"]
                 if app_state.get("docs") is None:
                     app_state["docs"] = Docs()
                     for d in app_state.get("uploaded_docs", []):
                         try:
-                            await app_state["docs"].aadd(d["path"], settings=settings)
+                            fut_add = asyncio.run_coroutine_threadsafe(
+                                app_state["docs"].aadd(d["path"], settings=settings),
+                                qloop,
+                            )
+                            await asyncio.to_thread(fut_add.result, timeout=600)
                         except Exception as e:
                             logger.warning(
                                 f"Skipping doc that failed to add: {d.get('filename')}: {e}"
                             )
-
-                # Query the in-memory Docs corpus in an isolated event loop (prevents 'Event loop is closed')
-
-                def _blocking_query() -> object:
-                    loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(loop)
-                    try:
-                        result = loop.run_until_complete(
-                            app_state["docs"].aquery(question, settings=settings)
-                        )
-                        # Drain any pending tasks
-                        try:
-                            pending = [
-                                t for t in asyncio.all_tasks(loop) if not t.done()
-                            ]
-                            if pending:
-                                loop.run_until_complete(
-                                    asyncio.gather(*pending, return_exceptions=True)
-                                )
-                        except Exception:
-                            pass
-                        # Clean up loop executors/generators
-                        try:
-                            loop.run_until_complete(loop.shutdown_asyncgens())
-                            loop.run_until_complete(loop.shutdown_default_executor())
-                        except Exception:
-                            pass
-                        return result
-                    finally:
-                        try:
-                            loop.close()
-                        except Exception:
-                            pass
-
-                session = await asyncio.get_running_loop().run_in_executor(
-                    None, _blocking_query
+                # Query the in-memory Docs corpus on a dedicated long-lived loop
+                # Schedule coroutine on the background loop and wait from current loop
+                fut = asyncio.run_coroutine_threadsafe(
+                    app_state["docs"].aquery(question, settings=settings), qloop
                 )
+                # Wait in a thread to avoid blocking current event loop
+                session = await asyncio.to_thread(fut.result, timeout=600)
 
             processing_time = time.time() - start_time
             logger.info(f"Docs.aquery completed in {processing_time:.2f} seconds")
@@ -539,66 +540,120 @@ def process_question(
     )
 
 
+def ask_with_progress(
+    question: str, config_name: str = "optimized_ollama"
+) -> Generator[Tuple[str, str, str, str, str, str, str], None, None]:
+    """Stream pre-evidence progress inline, then yield final answer outputs.
+
+    Output tuple order:
+    (analysis_progress_html, answer_html, sources_html, metadata_html, intelligence_html, error_msg, status_html)
+    """
+    panel_last = ""
+    try:
+        for panel_html in stream_analysis_progress(question, config_name):
+            panel_last = panel_html
+            status_html = (
+                app_state["status_tracker"].get_status_html()
+                if "status_tracker" in app_state and app_state["status_tracker"]
+                else ""
+            )
+            yield (panel_html, "", "", "", "", "", status_html)
+    except Exception as e:
+        err_panel = (
+            f"<div style='color:#b00'>Pre-evidence error: {html.escape(str(e))}</div>"
+        )
+        panel_last = err_panel
+        yield (err_panel, "", "", "", "", "", "")
+
+    # Now produce the final answer
+    (
+        answer_html,
+        sources_html,
+        metadata_html,
+        intelligence_html,
+        error_msg,
+        _progress_html,
+        status_html,
+    ) = process_question(question, config_name)
+
+    yield (
+        panel_last,
+        answer_html,
+        sources_html,
+        metadata_html,
+        intelligence_html,
+        error_msg,
+        status_html,
+    )
+
+
 def _run_pre_evidence_in_thread(
     question: str, settings: Settings, docs: Docs, q: Queue
 ) -> None:
     """Background worker to run pre-evidence and stream callbacks into queue."""
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
+    _ensure_query_loop()
+    loop = app_state["query_loop"]
+
+    def cb(chunk: str) -> None:
+        try:
+            q.put({"type": "log", "data": chunk}, timeout=0.1)
+        except Exception:
+            pass
+
+    async def _go() -> Any:
+        return await docs.aget_evidence(question, settings=settings, callbacks=[cb])
+
     try:
-        def cb(chunk: str) -> None:
+        fut = asyncio.run_coroutine_threadsafe(_go(), loop)
+        session = fut.result(timeout=600)
+        # Summarize current contexts for table
+        items = []
+        for c in getattr(session, "contexts", [])[:15]:
             try:
-                q.put({"type": "log", "data": chunk}, timeout=0.1)
-            except Exception:
-                pass
-
-        async def _go() -> None:
-            session = await docs.aget_evidence(question, settings=settings, callbacks=[cb])
-            # Summarize current contexts for table
-            items = []
-            for c in getattr(session, "contexts", [])[:15]:
-                try:
-                    score = getattr(c, "score", None)
-                    page = getattr(c, "page", None)
-                    txt_obj = getattr(c, "text", None)
-                    doc = getattr(txt_obj, "doc", None) if txt_obj is not None else None
-                    title = None
-                    citation = None
-                    if doc is not None:
-                        citation = getattr(doc, "formatted_citation", None)
-                        title = getattr(doc, "title", None) or getattr(doc, "docname", None)
-                    raw_text = getattr(txt_obj, "text", None) if txt_obj is not None else None
-                    snippet = raw_text if isinstance(raw_text, str) else (str(txt_obj) if txt_obj is not None else str(c))
-                    if snippet and len(snippet) > 180:
-                        snippet = snippet[:180] + "..."
-                    items.append({
+                score = getattr(c, "score", None)
+                page = getattr(c, "page", None)
+                txt_obj = getattr(c, "text", None)
+                doc = getattr(txt_obj, "doc", None) if txt_obj is not None else None
+                title = None
+                citation = None
+                if doc is not None:
+                    citation = getattr(doc, "formatted_citation", None)
+                    title = getattr(doc, "title", None) or getattr(doc, "docname", None)
+                raw_text = (
+                    getattr(txt_obj, "text", None) if txt_obj is not None else None
+                )
+                snippet = (
+                    raw_text
+                    if isinstance(raw_text, str)
+                    else (str(txt_obj) if txt_obj is not None else str(c))
+                )
+                if snippet and len(snippet) > 180:
+                    snippet = snippet[:180] + "..."
+                items.append(
+                    {
                         "source": citation or title or "Unknown",
-                        "score": f"{score:.3f}" if isinstance(score, (int, float)) else "-",
-                        "page": str(int(page)) if isinstance(page, (int, float)) else "-",
-                        "snippet": snippet or ""
-                    })
-                except Exception:
-                    continue
-            q.put({"type": "table", "data": items})
-
-        loop.run_until_complete(_go())
-    finally:
+                        "score": f"{score:.3f}"
+                        if isinstance(score, (int, float))
+                        else "-",
+                        "page": str(int(page))
+                        if isinstance(page, (int, float))
+                        else "-",
+                        "snippet": snippet or "",
+                    }
+                )
+            except Exception:
+                continue
+        q.put({"type": "table", "data": items})
+    except Exception as e:
         try:
-            # Drain remaining tasks
-            pending = [t for t in asyncio.all_tasks(loop) if not t.done()]
-            if pending:
-                loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+            q.put({"type": "log", "data": f"Error during pre-evidence: {e}"})
         except Exception:
             pass
-        try:
-            loop.run_until_complete(loop.shutdown_asyncgens())
-            loop.run_until_complete(loop.shutdown_default_executor())
-        except Exception:
-            pass
-        loop.close()
 
 
-def stream_analysis_progress(question: str, config_name: str = "optimized_ollama") -> Generator[str, None, None]:
+def stream_analysis_progress(
+    question: str, config_name: str = "optimized_ollama"
+) -> Generator[str, None, None]:
     """Stream live analysis progress (pre-evidence) into an HTML panel."""
     # Initialize queue and settings/docs
     q: Queue = Queue(maxsize=1000)
@@ -610,10 +665,18 @@ def stream_analysis_progress(question: str, config_name: str = "optimized_ollama
 
     if app_state.get("docs") is None:
         app_state["docs"] = Docs()
+        _ensure_query_loop()
+        qloop = app_state["query_loop"]
         for d in app_state.get("uploaded_docs", []):
             try:
-                # Best-effort add; ignore failures
-                asyncio.run(app_state["docs"].aadd(d["path"], settings=settings))
+                fut = asyncio.run_coroutine_threadsafe(
+                    app_state["docs"].aadd(d["path"], settings=settings), qloop
+                )
+                # Best-effort add; ignore failures/timeouts
+                try:
+                    fut.result(timeout=300)
+                except Exception:
+                    pass
             except Exception:
                 pass
 
@@ -626,27 +689,42 @@ def stream_analysis_progress(question: str, config_name: str = "optimized_ollama
     worker.start()
 
     # Initial UI shell
+    start_ts = time.time()
     logs: List[str] = ["Started analysis..."]
     table_rows: List[Dict[str, str]] = []
 
     def render_html() -> str:
+        elapsed = time.time() - start_ts
+        running = worker.is_alive()
         parts = [
             "<div style='background:#fff;padding:12px;border-radius:6px;'>",
-            "<h4>Analysis Progress</h4>",
-            "<div style='max-height:160px;overflow:auto;background:#f7f7f9;padding:8px;border-radius:4px'>",
-            *[f"<div><small>{gr.utils.escape_html(line)}</small></div>" for line in logs[-30:]],
+            "<style>@keyframes pqa-spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}} .pqa-spinner{display:inline-block;width:14px;height:14px;border:2px solid #ccc;border-top-color:#007bff;border-radius:50%;animation:pqa-spin 0.8s linear infinite;margin-right:6px}</style>",
+            (
+                "<div style='display:flex;align-items:center;gap:6px'>"
+                + ("<span class='pqa-spinner'></span>" if running else "")
+                + "<strong>Analysis Progress</strong>"
+                + f" <small style='color:#666'>({elapsed:.1f}s)</small></div>"
+            ),
+            "<div style='background:#f7f7f9;padding:8px;border-radius:4px'>",
+            *[f"<div><small>{html.escape(line)}</small></div>" for line in logs],
             "</div>",
         ]
         if table_rows:
-            parts.append("<div style='margin-top:10px'><strong>Top evidence (live)</strong>")
-            parts.append("<div style='overflow-x:auto'><table style='width:100%;border-collapse:collapse'>")
-            parts.append("<tr><th style='text-align:left;padding:6px;border-bottom:1px solid #ddd'>Source</th><th style='text-align:left;padding:6px;border-bottom:1px solid #ddd'>Score</th><th style='text-align:left;padding:6px;border-bottom:1px solid #ddd'>Page</th><th style='text-align:left;padding:6px;border-bottom:1px solid #ddd'>Snippet</th></tr>")
+            parts.append(
+                "<div style='margin-top:10px'><strong>Top evidence (live)</strong>"
+            )
+            parts.append(
+                "<div style='overflow-x:auto'><table style='width:100%;border-collapse:collapse'>"
+            )
+            parts.append(
+                "<tr><th style='text-align:left;padding:6px;border-bottom:1px solid #ddd'>Source</th><th style='text-align:left;padding:6px;border-bottom:1px solid #ddd'>Score</th><th style='text-align:left;padding:6px;border-bottom:1px solid #ddd'>Page</th><th style='text-align:left;padding:6px;border-bottom:1px solid #ddd'>Snippet</th></tr>"
+            )
             for row in table_rows[:10]:
                 parts.append(
-                    f"<tr><td style='padding:6px;border-bottom:1px solid #f0f0f0'>{gr.utils.escape_html(row.get('source',''))}</td>"
-                    f"<td style='padding:6px;border-bottom:1px solid #f0f0f0'>{row.get('score','')}</td>"
-                    f"<td style='padding:6px;border-bottom:1px solid #f0f0f0'>{row.get('page','')}</td>"
-                    f"<td style='padding:6px;border-bottom:1px solid #f0f0f0'><small>{gr.utils.escape_html(row.get('snippet','')[:300])}</small></td></tr>"
+                    f"<tr><td style='padding:6px;border-bottom:1px solid #f0f0f0'>{html.escape(row.get('source', ''))}</td>"
+                    f"<td style='padding:6px;border-bottom:1px solid #f0f0f0'>{row.get('score', '')}</td>"
+                    f"<td style='padding:6px;border-bottom:1px solid #f0f0f0'>{row.get('page', '')}</td>"
+                    f"<td style='padding:6px;border-bottom:1px solid #f0f0f0'><small>{html.escape(row.get('snippet', '')[:300])}</small></td></tr>"
                 )
             parts.append("</table></div></div>")
         parts.append("</div>")
@@ -654,7 +732,7 @@ def stream_analysis_progress(question: str, config_name: str = "optimized_ollama
 
     # Stream loop
     yield render_html()
-    # Poll queue for up to ~25 seconds or until thread is done and queue drained
+    # Poll queue until thread completes and queue is drained
     idle_cycles = 0
     while worker.is_alive() or not q.empty():
         try:
@@ -667,10 +745,9 @@ def stream_analysis_progress(question: str, config_name: str = "optimized_ollama
             yield render_html()
         except Empty:
             idle_cycles += 1
+            # heartbeat UI refresh every ~2s
             if idle_cycles % 4 == 0:
                 yield render_html()
-            if idle_cycles > 50:
-                break
     logs.append("Analysis complete.")
     yield render_html()
 
@@ -970,7 +1047,7 @@ def build_intelligence_html(answer: str, contexts: List) -> str:
         return "<div style='color:#666'>Research Intelligence unavailable.</div>"
 
 
-def clear_all() -> Tuple[str, str, str, str, str, str]:
+def clear_all() -> Tuple[str, str, str, str, str, str, str]:
     """Clear all uploaded documents and reset the interface."""
     app_state["uploaded_docs"] = []
     app_state["processing_status"] = ""
@@ -980,7 +1057,7 @@ def clear_all() -> Tuple[str, str, str, str, str, str]:
         app_state["status_tracker"].add_status("🧹 All documents and data cleared")
 
     logger.info("Cleared all documents and reset interface")
-    return "", "", "", "", "", ""
+    return "", "", "", "", "", "", ""
 
 
 # Initialize default settings
@@ -1035,6 +1112,9 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
             # Status display
             status_display = gr.HTML(label="Processing Status")
 
+            gr.Markdown("### 🔎 Live Analysis Progress")
+            inline_analysis = gr.HTML(label="Analysis", show_label=False)
+
             gr.Markdown("### 📝 Answer")
             answer_display = gr.HTML(label="Answer")
 
@@ -1049,18 +1129,7 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
 
             error_display = gr.Textbox(label="Errors", interactive=False, visible=False)
 
-    # Analysis Progress tab
-    with gr.Tab("Analysis Progress"):
-        gr.Markdown("### 🔎 Live Analysis Progress")
-        analysis_question = gr.Textbox(label="Question (for analysis)", placeholder="Enter your question to preview retrieval progress")
-        analysis_button = gr.Button("▶️ Run Pre-Evidence Analysis", variant="secondary")
-        analysis_stream = gr.HTML(label="Progress", show_label=False)
-
-        analysis_button.click(
-            fn=stream_analysis_progress,
-            inputs=[analysis_question, config_dropdown],
-            outputs=[analysis_stream],
-        )
+    # Removed separate Analysis Progress tab; progress now streams inline below the question
 
     # Event handlers - automatically process documents on upload
     file_upload.change(
@@ -1070,29 +1139,29 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
     )
 
     ask_button.click(
-        fn=process_question,
+        fn=ask_with_progress,
         inputs=[question_input, config_dropdown],
         outputs=[
+            inline_analysis,
             answer_display,
             sources_display,
             metadata_display,
             intelligence_display,
             error_display,
-            status_display,
             status_display,
         ],
     )
 
     question_input.submit(
-        fn=process_question,
+        fn=ask_with_progress,
         inputs=[question_input, config_dropdown],
         outputs=[
+            inline_analysis,
             answer_display,
             sources_display,
             metadata_display,
             intelligence_display,
             error_display,
-            status_display,
             status_display,
         ],
     )
@@ -1100,12 +1169,12 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
     clear_button.click(
         fn=clear_all,
         outputs=[
+            inline_analysis,
             answer_display,
             sources_display,
             metadata_display,
             intelligence_display,
             error_display,
-            status_display,
             status_display,
         ],
     )

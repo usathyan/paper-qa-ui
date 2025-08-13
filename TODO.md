@@ -33,7 +33,7 @@ This document tracks the work to add rich, live analytics and visualizations for
   - [ ] Agent path (optional) if using `agent_query`
 
 ## UI (Gradio) – Analysis Progress panel
-- [ ] Add a new tab: "Analysis Progress"
+- [x] Embed live Analysis Progress directly under the question (inline), replacing separate tab
 - [ ] Live components:
   - [ ] **Timeline/Stepper**: current phase (Index lookup → Retrieval → Summaries → Answer)
   - [ ] **Progress bar**: contexts retrieved/selected vs. target (`evidence_k`)
@@ -120,6 +120,16 @@ This document tracks the work to add rich, live analytics and visualizations for
 
 5) Polish (0.5 day)
 - Performance tuning; throttling; toggles; doc updates
+
+## Progress
+- [x] Switched tests to mypy (ruff + mypy in `make test`)
+- [x] Fixed typing in `utils`, `config_manager`, `config_ui`, CLI imports
+- [x] Added post-answer Research Intelligence panel (contradictions, insights, evidence summary, top evidence with scores)
+- [x] Inline "Analysis Progress" panel under question with live logs and top-evidence table (Phase 1 MVP)
+- [x] Dedicated background asyncio loop for all LLM/embedding I/O to prevent loop-close/binding errors; single-query lock
+- [x] Replaced deprecated `gr.utils.escape_html` with `html.escape`
+- [x] Spinner + elapsed time heartbeat; dynamic auto-expanding progress panel (no scroll)
+- [ ] Remaining mypy/typing cleanups (tests, UI helpers, CLI return annotations)
 
 ## Acceptance criteria
 - Live panel shows phase/timeline updates while answering
