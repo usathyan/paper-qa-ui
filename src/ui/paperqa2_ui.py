@@ -9,7 +9,9 @@ import logging
 import os
 import time
 from pathlib import Path
-from typing import List, Tuple, Any, Dict
+from typing import List, Tuple, Any, Dict, Generator
+from queue import Queue, Empty
+import threading
 
 import gradio as gr
 import httpx
@@ -39,6 +41,7 @@ app_state: Dict[str, Any] = {
     "status_tracker": None,
     "processing_status": "",
     "query_lock": None,
+    "analysis_queue": None,
 }
 
 # Disable Gradio analytics
@@ -475,6 +478,7 @@ async def process_question_async(
                 # Attempt to reset LiteLLM async client to avoid stale-loop issues, then retry
                 try:
                     import litellm  # runtime-only optional dependency
+
                     importlib.reload(litellm)
                     logger.info(
                         "Reloaded litellm to reset async HTTP client after loop-close error"
@@ -533,6 +537,142 @@ def process_question(
         progress_html,
         status_html,
     )
+
+
+def _run_pre_evidence_in_thread(
+    question: str, settings: Settings, docs: Docs, q: Queue
+) -> None:
+    """Background worker to run pre-evidence and stream callbacks into queue."""
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        def cb(chunk: str) -> None:
+            try:
+                q.put({"type": "log", "data": chunk}, timeout=0.1)
+            except Exception:
+                pass
+
+        async def _go() -> None:
+            session = await docs.aget_evidence(question, settings=settings, callbacks=[cb])
+            # Summarize current contexts for table
+            items = []
+            for c in getattr(session, "contexts", [])[:15]:
+                try:
+                    score = getattr(c, "score", None)
+                    page = getattr(c, "page", None)
+                    txt_obj = getattr(c, "text", None)
+                    doc = getattr(txt_obj, "doc", None) if txt_obj is not None else None
+                    title = None
+                    citation = None
+                    if doc is not None:
+                        citation = getattr(doc, "formatted_citation", None)
+                        title = getattr(doc, "title", None) or getattr(doc, "docname", None)
+                    raw_text = getattr(txt_obj, "text", None) if txt_obj is not None else None
+                    snippet = raw_text if isinstance(raw_text, str) else (str(txt_obj) if txt_obj is not None else str(c))
+                    if snippet and len(snippet) > 180:
+                        snippet = snippet[:180] + "..."
+                    items.append({
+                        "source": citation or title or "Unknown",
+                        "score": f"{score:.3f}" if isinstance(score, (int, float)) else "-",
+                        "page": str(int(page)) if isinstance(page, (int, float)) else "-",
+                        "snippet": snippet or ""
+                    })
+                except Exception:
+                    continue
+            q.put({"type": "table", "data": items})
+
+        loop.run_until_complete(_go())
+    finally:
+        try:
+            # Drain remaining tasks
+            pending = [t for t in asyncio.all_tasks(loop) if not t.done()]
+            if pending:
+                loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+        except Exception:
+            pass
+        try:
+            loop.run_until_complete(loop.shutdown_asyncgens())
+            loop.run_until_complete(loop.shutdown_default_executor())
+        except Exception:
+            pass
+        loop.close()
+
+
+def stream_analysis_progress(question: str, config_name: str = "optimized_ollama") -> Generator[str, None, None]:
+    """Stream live analysis progress (pre-evidence) into an HTML panel."""
+    # Initialize queue and settings/docs
+    q: Queue = Queue(maxsize=1000)
+    app_state["analysis_queue"] = q
+
+    # Ensure settings and docs
+    settings: Settings = app_state.get("settings") or initialize_settings(config_name)
+    app_state["settings"] = settings
+
+    if app_state.get("docs") is None:
+        app_state["docs"] = Docs()
+        for d in app_state.get("uploaded_docs", []):
+            try:
+                # Best-effort add; ignore failures
+                asyncio.run(app_state["docs"].aadd(d["path"], settings=settings))
+            except Exception:
+                pass
+
+    # Kick off background thread
+    worker = threading.Thread(
+        target=_run_pre_evidence_in_thread,
+        args=(question, settings, app_state["docs"], q),
+        daemon=True,
+    )
+    worker.start()
+
+    # Initial UI shell
+    logs: List[str] = ["Started analysis..."]
+    table_rows: List[Dict[str, str]] = []
+
+    def render_html() -> str:
+        parts = [
+            "<div style='background:#fff;padding:12px;border-radius:6px;'>",
+            "<h4>Analysis Progress</h4>",
+            "<div style='max-height:160px;overflow:auto;background:#f7f7f9;padding:8px;border-radius:4px'>",
+            *[f"<div><small>{gr.utils.escape_html(line)}</small></div>" for line in logs[-30:]],
+            "</div>",
+        ]
+        if table_rows:
+            parts.append("<div style='margin-top:10px'><strong>Top evidence (live)</strong>")
+            parts.append("<div style='overflow-x:auto'><table style='width:100%;border-collapse:collapse'>")
+            parts.append("<tr><th style='text-align:left;padding:6px;border-bottom:1px solid #ddd'>Source</th><th style='text-align:left;padding:6px;border-bottom:1px solid #ddd'>Score</th><th style='text-align:left;padding:6px;border-bottom:1px solid #ddd'>Page</th><th style='text-align:left;padding:6px;border-bottom:1px solid #ddd'>Snippet</th></tr>")
+            for row in table_rows[:10]:
+                parts.append(
+                    f"<tr><td style='padding:6px;border-bottom:1px solid #f0f0f0'>{gr.utils.escape_html(row.get('source',''))}</td>"
+                    f"<td style='padding:6px;border-bottom:1px solid #f0f0f0'>{row.get('score','')}</td>"
+                    f"<td style='padding:6px;border-bottom:1px solid #f0f0f0'>{row.get('page','')}</td>"
+                    f"<td style='padding:6px;border-bottom:1px solid #f0f0f0'><small>{gr.utils.escape_html(row.get('snippet','')[:300])}</small></td></tr>"
+                )
+            parts.append("</table></div></div>")
+        parts.append("</div>")
+        return "".join(parts)
+
+    # Stream loop
+    yield render_html()
+    # Poll queue for up to ~25 seconds or until thread is done and queue drained
+    idle_cycles = 0
+    while worker.is_alive() or not q.empty():
+        try:
+            evt = q.get(timeout=0.5)
+            if isinstance(evt, dict) and evt.get("type") == "log":
+                logs.append(str(evt.get("data", "")).strip())
+            elif isinstance(evt, dict) and evt.get("type") == "table":
+                table_rows = evt.get("data", []) or []
+            idle_cycles = 0
+            yield render_html()
+        except Empty:
+            idle_cycles += 1
+            if idle_cycles % 4 == 0:
+                yield render_html()
+            if idle_cycles > 50:
+                break
+    logs.append("Analysis complete.")
+    yield render_html()
 
 
 def format_answer_html(answer: str, contexts: List) -> str:
@@ -908,6 +1048,19 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
             metadata_display = gr.HTML(label="Processing Information")
 
             error_display = gr.Textbox(label="Errors", interactive=False, visible=False)
+
+    # Analysis Progress tab
+    with gr.Tab("Analysis Progress"):
+        gr.Markdown("### 🔎 Live Analysis Progress")
+        analysis_question = gr.Textbox(label="Question (for analysis)", placeholder="Enter your question to preview retrieval progress")
+        analysis_button = gr.Button("▶️ Run Pre-Evidence Analysis", variant="secondary")
+        analysis_stream = gr.HTML(label="Progress", show_label=False)
+
+        analysis_button.click(
+            fn=stream_analysis_progress,
+            inputs=[analysis_question, config_dropdown],
+            outputs=[analysis_stream],
+        )
 
     # Event handlers - automatically process documents on upload
     file_upload.change(
