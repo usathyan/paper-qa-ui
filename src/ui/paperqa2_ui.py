@@ -598,8 +598,17 @@ def ask_with_progress(
         yield (panel_last + synth_block, "", "", "", "", "", "")
         time.sleep(0.75)
 
+    # Attempt to auto-scroll to the answer section after analysis completes
+    scroll_js = (
+        "<script>"
+        "(function(){try{var el=document.getElementById('pqa-answer-anchor');"
+        "if(el){el.scrollIntoView({behavior:'smooth',block:'start'});}"
+        "else{location.hash='#pqa-answer-anchor';}}catch(e){}})();"
+        "</script>"
+    )
+
     yield (
-        panel_last,
+        panel_last + scroll_js,
         result_holder.get("answer_html", ""),
         result_holder.get("sources_html", ""),
         result_holder.get("metadata_html", ""),
@@ -1132,6 +1141,7 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
             inline_analysis = gr.HTML(label="Analysis", show_label=False)
 
             gr.Markdown("### 📝 Answer")
+            answer_anchor = gr.HTML("<div id='pqa-answer-anchor'></div>", show_label=False)
             answer_display = gr.HTML(label="Answer")
 
             gr.Markdown("### 📚 Sources")
