@@ -50,6 +50,7 @@ app_state: Dict[str, Any] = {
     "query_loop": None,
     "query_loop_thread": None,
     "session_data": None,
+    "rewrite_info": None,
 }
 
 # Disable Gradio analytics
@@ -617,6 +618,7 @@ async def process_question_async(
                     "contexts": export_contexts,
                     "processing_time": processing_time,
                     "documents_searched": len(app_state.get("uploaded_docs", [])),
+                    "rewrite": app_state.get("rewrite_info"),
                     "metrics": {
                         "score_min": None,
                         "score_mean": None,
@@ -705,6 +707,8 @@ def ask_with_progress(
     config_name: str = "optimized_ollama",
     run_critique: bool = False,
     rewrite_query_toggle: bool = False,
+    use_llm_rewrite: bool = False,
+    bias_retrieval: bool = False,
 ) -> Generator[Tuple[str, str, str, str, str, str, str], None, None]:
     """Stream pre-evidence progress inline, then yield final answer outputs.
 
@@ -712,14 +716,68 @@ def ask_with_progress(
     (analysis_progress_html, answer_html, sources_html, metadata_html, intelligence_html, error_msg, status_html)
     """
     panel_last = ""
-    # Optionally rewrite query
+    # Optionally rewrite query (heuristic or LLM-based) and optionally bias retrieval
     original_question = question
     if rewrite_query_toggle:
         try:
             settings = app_state.get("settings") or initialize_settings(config_name)
-            question = rewrite_query(question, settings)
+            rewrite_details: Dict[str, Any] = {"original": original_question}
+            if use_llm_rewrite:
+                try:
+                    # Run LLM-based decomposition on dedicated loop
+                    _ensure_query_loop()
+                    loop = app_state["query_loop"]
+
+                    async def _go() -> Dict[str, Any]:
+                        return await llm_decompose_query(original_question, settings)
+
+                    fut = asyncio.run_coroutine_threadsafe(_go(), loop)
+                    decomp = fut.result(timeout=45)
+                    # llm_decompose_query returns Dict[str, Any]
+                    rewrite_details.update(decomp)
+                    rw = str(decomp.get("rewritten") or original_question)
+                    # Apply retrieval bias by appending filter hints
+                    if bias_retrieval:
+                        filters = decomp.get("filters") or {}
+                        hints: List[str] = []
+                        years = filters.get("years")
+                        if isinstance(years, (list, tuple)) and len(years) == 2:
+                            try:
+                                hints.append(f"years {int(years[0])}-{int(years[1])}")
+                            except Exception:
+                                pass
+                        venues = filters.get("venues") or []
+                        if isinstance(venues, list) and venues:
+                            hints.append("venues " + ", ".join(map(str, venues[:5])))
+                        fields = filters.get("fields") or []
+                        if isinstance(fields, list) and fields:
+                            hints.append("fields " + ", ".join(map(str, fields[:5])))
+                        if hints:
+                            augmented = rw + " (" + "; ".join(hints) + ")"
+                            question = augmented
+                            rewrite_details["bias_applied"] = True
+                            rewrite_details["augmented"] = augmented
+                        else:
+                            question = rw
+                            rewrite_details["bias_applied"] = False
+                    else:
+                        question = rw
+                        rewrite_details["bias_applied"] = False
+                except Exception:
+                    # Fallback to heuristic rewriter
+                    question = rewrite_query(original_question, settings)
+                    rewrite_details["rewritten"] = question
+                    rewrite_details["filters"] = {}
+                    rewrite_details["bias_applied"] = False
+            else:
+                question = rewrite_query(original_question, settings)
+                rewrite_details["rewritten"] = question
+                rewrite_details["filters"] = {}
+                rewrite_details["bias_applied"] = False
+
+            app_state["rewrite_info"] = rewrite_details
         except Exception:
-            pass
+            app_state["rewrite_info"] = {"original": original_question}
 
     try:
         for panel_html in stream_analysis_progress(
@@ -1166,6 +1224,7 @@ def stream_analysis_progress(
                     if original_question
                     else ""
                 )
+                + _render_filters_inline(app_state.get("rewrite_info"))
                 + "</div>"
             ),
             (
@@ -2017,6 +2076,56 @@ def build_critique_html(answer: str, contexts: List) -> str:
         return "<div class='pqa-subtle'><small class='pqa-muted'>Critique unavailable.</small></div>"
 
 
+def _render_markdown_inline(text: str) -> str:
+    """Render a minimal subset of Markdown to HTML for inline use.
+
+    Supports: **bold**, *italic*, `code`, and [text](https://url) links.
+    Other HTML is escaped for safety.
+    """
+    try:
+        s = html.escape(text)
+        # Links first
+        s = re.sub(
+            r"\[([^\]]+)\]\((https?://[^)\s]+)\)",
+            r"<a href=\"\\2\" target=\"_blank\" rel=\"noopener noreferrer\">\\1</a>",
+            s,
+        )
+        # Bold
+        s = re.sub(r"\*\*([^*]+)\*\*", r"<strong>\\1</strong>", s)
+        # Italic (avoid bold sequences)
+        s = re.sub(r"(?<!\*)\*([^*]+)\*(?!\*)", r"<em>\\1</em>", s)
+        # Inline code
+        s = re.sub(r"`([^`]+)`", r"<code>\\1</code>", s)
+        return s
+    except Exception:
+        return html.escape(text)
+
+
+def _render_filters_inline(ri: Any) -> str:
+    try:
+        if not isinstance(ri, dict):
+            return ""
+        filters = ri.get("filters")
+        if not isinstance(filters, dict):
+            return ""
+        parts: List[str] = []
+        yrs = filters.get("years")
+        if isinstance(yrs, (list, tuple)) and len(yrs) == 2:
+            parts.append(f"years {yrs[0]}-{yrs[1]}")
+        venues = filters.get("venues")
+        if isinstance(venues, list) and venues:
+            parts.append("venues " + ", ".join(list(map(str, venues[:3]))))
+        fields = filters.get("fields")
+        if isinstance(fields, list) and fields:
+            parts.append("fields " + ", ".join(list(map(str, fields[:3]))))
+        if not parts:
+            return ""
+        bias = " (bias applied)" if ri.get("bias_applied") else ""
+        return f"<div><small class='pqa-muted'>Filters: {', '.join(parts)}{bias}</small></div>"
+    except Exception:
+        return ""
+
+
 async def build_llm_or_heuristic_critique_html(
     question: str, answer: str, contexts: List, settings: Settings
 ) -> str:
@@ -2123,12 +2232,14 @@ async def build_llm_or_heuristic_critique_html(
                 fut = asyncio.run_coroutine_threadsafe(_go(), app_state["query_loop"])
                 content = await asyncio.to_thread(fut.result, timeout=45)
                 if isinstance(content, str) and content.strip():
-                    # Format as HTML list; strip markdown bullets
+                    # Format as HTML list; strip markdown bullets and render minimal markdown
                     items: List[str] = []
                     for line in content.splitlines():
                         s = line.strip().lstrip("-*").strip()
                         if s:
-                            items.append(f"<li><small>{html.escape(s)}</small></li>")
+                            items.append(
+                                f"<li><small>{_render_markdown_inline(s)}</small></li>"
+                            )
                     if items:
                         return (
                             "<div class='pqa-subtle' style='margin-top:6px'><ul>"
@@ -2142,6 +2253,122 @@ async def build_llm_or_heuristic_critique_html(
         return build_critique_html(answer, contexts)
     except Exception:
         return "<div class='pqa-subtle'><small class='pqa-muted'>Critique unavailable.</small></div>"
+
+
+async def llm_decompose_query(question: str, settings: Settings) -> Dict[str, Any]:
+    """Use the configured LLM to rewrite the query and produce lightweight filters.
+
+    Returns a dict: {"rewritten": str, "filters": {"years": [start, end], "venues": [..], "fields": [..]}}
+    """
+    try:
+        import litellm
+
+        model_name = str(getattr(settings, "llm", "") or "").strip()
+        if not model_name:
+            return {"rewritten": question, "filters": {}}
+
+        system = (
+            "You are a query rewriting assistant for scientific literature retrieval. "
+            "Rewrite the user's question to be concise and retrieval-friendly. "
+            "Also propose optional filters as a JSON object with: years [start,end], venues [strings], fields [strings]. "
+            "If unknown, use null or empty arrays. Respond with JSON only."
+        )
+        user = (
+            "Question: " + question + "\n\n"
+            "Return strictly this JSON schema: "
+            '{"rewritten": string, "filters": {"years": [number, number] | null, "venues": string[], "fields": string[]}}'
+        )
+        messages: List[Dict[str, str]] = [
+            {"role": "system", "content": system},
+            {"role": "user", "content": user},
+        ]
+
+        async def _go() -> Any:
+            kwargs: Dict[str, Any] = {
+                "model": model_name,
+                "messages": messages,
+                "timeout": 20,
+            }
+            api_key = os.getenv("OPENROUTER_API_KEY", "").strip()
+            if api_key and model_name.startswith("openrouter/"):
+                kwargs["api_key"] = api_key
+            return await litellm.acompletion(**kwargs)
+
+        _ensure_query_loop()
+        fut = asyncio.run_coroutine_threadsafe(_go(), app_state["query_loop"])
+        resp = fut.result(timeout=45)
+
+        def _extract(resp_obj: Any) -> str:
+            try:
+                choices = getattr(resp_obj, "choices", None)
+                if isinstance(choices, list) and choices:
+                    m = getattr(choices[0], "message", None)
+                    if isinstance(m, dict):
+                        mc = m.get("content")
+                        if isinstance(mc, str):
+                            return mc
+                    c2 = getattr(m, "content", None)
+                    if isinstance(c2, str):
+                        return c2
+                c3 = getattr(resp_obj, "content", None)
+                if isinstance(c3, str):
+                    return c3
+            except Exception:
+                pass
+            return ""
+
+        content = _extract(resp)
+        if not isinstance(content, str):
+            content = ""
+
+        # Try to parse JSON from the content (strip code fences if present)
+        txt = content.strip()
+        if txt.startswith("```"):
+            # remove leading/trailing fences
+            try:
+                txt = re.sub(r"^```[a-zA-Z0-9]*\n?|```$", "", txt).strip()
+            except Exception:
+                pass
+        data: Dict[str, Any]
+        try:
+            data = json.loads(txt)
+        except Exception:
+            # attempt to find JSON substring
+            try:
+                m = re.search(r"\{[\s\S]*\}$", txt)
+                if m:
+                    data = json.loads(m.group(0))
+                else:
+                    data = {}
+            except Exception:
+                data = {}
+        rewritten = str(data.get("rewritten") or question)
+        filters = data.get("filters") or {}
+        # Normalize filters
+        norm: Dict[str, Any] = {"venues": [], "fields": []}
+        # years
+        yrs = filters.get("years") if isinstance(filters, dict) else None
+        if isinstance(yrs, (list, tuple)) and len(yrs) == 2:
+            try:
+                y0 = int(yrs[0])
+                y1 = int(yrs[1])
+                norm["years"] = [y0, y1]
+            except Exception:
+                norm["years"] = None
+        else:
+            norm["years"] = None
+        # venues, fields
+        for key in ("venues", "fields"):
+            val = filters.get(key) if isinstance(filters, dict) else None
+            if isinstance(val, list):
+                norm[key] = [str(x) for x in val if isinstance(x, (str, int, float))][
+                    :10
+                ]
+            else:
+                norm[key] = []
+        return {"rewritten": rewritten, "filters": norm}
+    except Exception:
+        return {"rewritten": question, "filters": {}}
 
 
 def rewrite_query(question: str, settings: Settings) -> str:
