@@ -96,7 +96,27 @@ Open http://localhost:7860
 - Per‑document counts: A quick guide to contribution. Skews can reveal over‑representation; drill into lower‑represented but high‑score sources for diversity
 - Prompt size (approximate): Indicator of context packed into the model prompt; very large prompts can increase latency
 - Attempts and elapsed: If attempts > 1, the system retried to stabilize quality; elapsed helps anticipate workload scaling
- - Critique: A non-binding diagnostic to guide further reading; it does not alter the answer
+- Critique: A non-binding diagnostic to guide further reading; it does not alter the answer
+
+## Configuration panel
+
+The left panel includes controls for model configuration and query options:
+
+- Run Critique (checkbox)
+  - What it does: Adds a short, post‑answer “sanity check” that flags potentially unsupported or overly strong claims and suggests evidence areas to verify. It does not change the answer.
+  - When to use: Before sharing or acting on results, to get a quick list of potential issues to review in the sources.
+  - Performance: Negligible additional latency for the heuristic version. When upgraded to an LLM‑based pass (optional), expect a small additional delay.
+
+- Rewrite query (experimental)
+  - What it does: Rephrases your question for retrieval (e.g., removes boilerplate, prefers imperative phrasing). The original question is displayed above the Analysis Progress so you can compare.
+  - When to use: If your initial query is broad or contains fillers, rewriting can improve retrieval precision.
+  - Limitations: Current rewriter is minimal/heuristic. A future version will optionally use an LLM to produce a structured rewrite with filters (e.g., years/venues/fields of study) before retrieval.
+
+- Export (JSON, CSV, JSONL; Bundle ZIP)
+  - JSON: The answer, contexts, and basic metrics (and the trace if available)
+  - CSV: Contexts (doc, page, score, excerpt)
+  - Trace (JSONL): A line‑delimited event log of the analysis (phases/metrics)
+  - Bundle (ZIP): Packages JSON, CSV, and JSONL in one download
 
 ## Configurations
 
@@ -172,7 +192,7 @@ Tip: On very small machines, you can lower `evidence_k` and set `max_concurrent_
 - Transparency panel with scientist‑relevant metrics (scores, counts, prompt size, timing)
 - Research Intelligence section with contradictions, insights, evidence summary, and Top evidence
 - Robust local‑first execution: a dedicated async loop and single‑query lock for stability
-- Dark‑mode‑safe styling across Status, Analysis, Answer, Sources, Research Intelligence, and Metadata
+- Dark‑mode‑safe styling across Analysis, Answer, Sources, Research Intelligence, and Metadata
 
 ## License and third‑party notices
 
