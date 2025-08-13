@@ -235,7 +235,11 @@ async def process_uploaded_files_async(files: List[Any]) -> Tuple[str, str]:
                 else:
                     # If raw bytes provided, write to papers dir with original name
                     data = file_obj.get("data")
-                    orig_name = file_obj.get("orig_name") or file_obj.get("filename") or "upload.pdf"
+                    orig_name = (
+                        file_obj.get("orig_name")
+                        or file_obj.get("filename")
+                        or "upload.pdf"
+                    )
                     if isinstance(data, (bytes, bytearray)):
                         source_path = Path("./papers") / Path(str(orig_name)).name
                         try:
@@ -1657,6 +1661,9 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
             )
             cfg_status = gr.Markdown(visible=False)
 
+            # Critique toggle (moved here under configuration)
+            critique_toggle = gr.Checkbox(label="Run Critique", value=False)
+
             gr.Markdown("### 🧹 Actions")
             clear_button = gr.Button("🗑️ Clear All", variant="secondary")
 
@@ -1670,7 +1677,6 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
 
             with gr.Row():
                 ask_button = gr.Button("🤖 Ask Question", variant="primary", size="lg")
-                critique_toggle = gr.Checkbox(label="Run Critique", value=False)
 
             # Status display
             status_display = gr.HTML(label="Processing Status")
@@ -1698,11 +1704,11 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
     # Removed separate Analysis Progress tab; progress now streams inline below the question
 
     # Event handlers - automatically process documents on upload
-    def _pre_upload_disable() -> Dict[str, Any]:
-        return {"interactive": False}
+    def _pre_upload_disable() -> Any:
+        return gr.Button.update(value="⏳ Wait…", interactive=False)
 
-    def _post_upload_enable() -> Dict[str, Any]:
-        return {"interactive": True}
+    def _post_upload_enable() -> Any:
+        return gr.Button.update(value="🤖 Ask Question", interactive=True)
 
     file_upload.change(
         fn=process_uploaded_files,
@@ -1716,8 +1722,8 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
     file_upload.change(fn=_pre_upload_disable, outputs=[ask_button])
     upload_status.change(fn=_post_upload_enable, outputs=[ask_button])
 
-    def _enable_ask(is_ready: bool) -> Dict[str, Any]:
-        return {"interactive": bool(is_ready)}
+    def _enable_ask(is_ready: bool) -> Any:
+        return gr.Button.update(interactive=bool(is_ready))
 
     config_dropdown.change(
         fn=_on_config_change, inputs=[config_dropdown], outputs=[cfg_status]
