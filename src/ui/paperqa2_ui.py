@@ -722,34 +722,28 @@ def stream_analysis_progress(
         running = worker.is_alive()
         latest = logs[-1] if logs else ""
         parts = [
-            "<div style='background:#fff;padding:12px;border-radius:6px;'>",
-            "<style>@keyframes pqa-spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}} .pqa-spinner{display:inline-block;width:14px;height:14px;border:2px solid #ccc;border-top-color:#007bff;border-radius:50%;animation:pqa-spin 0.8s linear infinite;margin-right:6px}</style>",
+            "<div class='pqa-panel'>",
+            "<style>@keyframes pqa-spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}} .pqa-spinner{display:inline-block;width:14px;height:14px;border:2px solid #9ca3af;border-top-color:#3b82f6;border-radius:50%;animation:pqa-spin 0.8s linear infinite;margin-right:6px}</style>",
             (
                 "<div style='display:flex;align-items:center;gap:6px'>"
                 + ("<span class='pqa-spinner'></span>" if running else "")
                 + "<strong>Analysis Progress</strong>"
-                + f" <small style='color:#666'>({elapsed:.1f}s)</small></div>"
+                + f" <small class='pqa-muted'>({elapsed:.1f}s)</small></div>"
             ),
-            "<div style='background:#f7f7f9;padding:8px;border-radius:4px'>",
+            "<div class='pqa-subtle'>",
             f"<div><small>{html.escape(latest)}</small></div>",
             "</div>",
         ]
         if table_rows:
-            parts.append(
-                "<div style='margin-top:10px'><strong>Top evidence (live)</strong>"
-            )
-            parts.append(
-                "<div style='overflow-x:auto'><table style='width:100%;border-collapse:collapse'>"
-            )
-            parts.append(
-                "<tr><th style='text-align:left;padding:6px;border-bottom:1px solid #ddd'>Source</th><th style='text-align:left;padding:6px;border-bottom:1px solid #ddd'>Score</th><th style='text-align:left;padding:6px;border-bottom:1px solid #ddd'>Page</th><th style='text-align:left;padding:6px;border-bottom:1px solid #ddd'>Snippet</th></tr>"
-            )
+            parts.append("<div style='margin-top:10px'><strong>Top evidence (live)</strong>")
+            parts.append("<div style='overflow-x:auto'><table class='pqa-table'>")
+            parts.append("<tr><th>Source</th><th>Score</th><th>Page</th><th>Snippet</th></tr>")
             for row in table_rows[:10]:
                 parts.append(
-                    f"<tr><td style='padding:6px;border-bottom:1px solid #f0f0f0'>{html.escape(row.get('source', ''))}</td>"
-                    f"<td style='padding:6px;border-bottom:1px solid #f0f0f0'>{row.get('score', '')}</td>"
-                    f"<td style='padding:6px;border-bottom:1px solid #f0f0f0'>{row.get('page', '')}</td>"
-                    f"<td style='padding:6px;border-bottom:1px solid #f0f0f0'><small>{html.escape(row.get('snippet', '')[:300])}</small></td></tr>"
+                    f"<tr><td>{html.escape(row.get('source', ''))}</td>"
+                    f"<td>{row.get('score', '')}</td>"
+                    f"<td>{row.get('page', '')}</td>"
+                    f"<td><small>{html.escape(row.get('snippet', '')[:300])}</small></td></tr>"
                 )
             parts.append("</table></div></div>")
         parts.append("</div>")
@@ -1074,6 +1068,23 @@ except Exception as e:
 with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
     gr.Markdown("# 📚 Paper-QA UI")
     gr.Markdown("Upload PDF documents and ask questions using local Ollama models.")
+    gr.HTML(
+        """
+        <style>
+        .pqa-panel { background: #ffffff; color: #111827; padding: 12px; border-radius: 6px; }
+        .pqa-subtle { background: #f3f4f6; color: inherit; padding: 10px; border-radius: 5px; }
+        .pqa-muted { color: #6b7280; }
+        .pqa-table { width: 100%; border-collapse: collapse; }
+        .pqa-table th, .pqa-table td { padding: 6px; border-bottom: 1px solid #e5e7eb; text-align: left; }
+        @media (prefers-color-scheme: dark) {
+          .pqa-panel { background: #1f2937; color: #e5e7eb; }
+          .pqa-subtle { background: #111827; color: #e5e7eb; }
+          .pqa-muted { color: #9ca3af; }
+          .pqa-table th, .pqa-table td { border-bottom-color: #374151; }
+        }
+        </style>
+        """
+    )
 
     with gr.Row():
         with gr.Column(scale=1):
