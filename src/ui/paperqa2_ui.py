@@ -1000,6 +1000,9 @@ def stream_analysis_progress(
     score_mean: float | None = None
     score_max: float | None = None
     per_doc_counts: Dict[str, int] = {}
+    mmr_items_state: List[
+        Dict[str, Any]
+    ] = []  # [{'doc': str, 'score': Optional[float]}]
     embed_latency_s: float | None = None
     # Answer-phase metrics
     answer_elapsed_s: float | None = None
@@ -1204,6 +1207,66 @@ def stream_analysis_progress(
             "</ul>",
             "</div>",
         ]
+        # Basic MMR visualization (selected set only): score histogram and diversity summary
+        if mmr_items_state:
+            try:
+                # Extract scores ignoring None
+                scs = [
+                    float(x["score"])
+                    for x in mmr_items_state
+                    if isinstance(x.get("score"), (int, float))
+                ]
+                unique_docs = len(
+                    {str(x.get("doc", "Unknown")) for x in mmr_items_state}
+                )
+                total_sel = len(mmr_items_state)
+                diversity_share = (unique_docs / total_sel) if total_sel > 0 else 0.0
+
+                # Build histogram with up to 10 bins over score range
+                hist_svg = ""
+                if scs:
+                    smin = min(scs)
+                    smax = max(scs)
+                    bins = 10
+                    if smax <= smin:
+                        smax = smin + 1e-6
+                    width, height, pad = 320, 64, 4
+                    bucket_counts = [0] * bins
+                    for s in scs:
+                        idx = int((s - smin) / (smax - smin) * (bins - 1) + 1e-9)
+                        idx = max(0, min(bins - 1, idx))
+                        bucket_counts[idx] += 1
+                    maxc = max(bucket_counts) if bucket_counts else 1
+                    bw = (width - 2 * pad) / bins
+                    bars = []
+                    for i, c in enumerate(bucket_counts):
+                        bh = 0 if maxc == 0 else int(((c / maxc) * (height - 2 * pad)))
+                        x = pad + int(i * bw)
+                        y = height - pad - bh
+                        bars.append(
+                            f"<rect x='{x}' y='{y}' width='{max(1, int(bw - 1))}' height='{bh}' fill='#3b82f6' />"
+                        )
+                    axis = (
+                        f"<text x='{pad}' y='{height - 2}' font-size='9' fill='#9ca3af'>{smin:.2f}</text>"
+                        f"<text x='{width - pad - 20}' y='{height - 2}' font-size='9' fill='#9ca3af' text-anchor='end'>{smax:.2f}</text>"
+                    )
+                    hist_svg = (
+                        f"<svg width='{width}' height='{height}' viewBox='0 0 {width} {height}' "
+                        + "xmlns='http://www.w3.org/2000/svg'>"
+                        + "".join(bars)
+                        + axis
+                        + "</svg>"
+                    )
+                parts.append("<div class='pqa-panel' style='margin-top:8px'>")
+                parts.append("<strong>MMR selection</strong>")
+                parts.append(
+                    f"<div style='margin-top:4px'><small class='pqa-muted'>Selected={total_sel}, Unique docs={unique_docs} (share={diversity_share:.0%})</small></div>"
+                )
+                if hist_svg:
+                    parts.append("<div style='margin-top:4px'>" + hist_svg + "</div>")
+                parts.append("</div>")
+            except Exception:
+                pass
         # Compact per-doc bar visualization (top 5)
         if per_doc_counts:
             try:
@@ -1283,6 +1346,26 @@ def stream_analysis_progress(
                         per_doc_counts = tmp
                 except Exception:
                     pass
+            elif isinstance(evt, dict) and evt.get("type") == "mmr":
+                data = evt.get("data", {}) or {}
+                items = data.get("items") or []
+                if isinstance(items, list):
+                    # Shallow copy to avoid mutation issues
+                    mmr_items_state = []
+                    for it in items:
+                        try:
+                            mmr_items_state.append(
+                                {
+                                    "doc": str(it.get("doc", "Unknown")),
+                                    "score": (
+                                        float(it.get("score"))
+                                        if isinstance(it.get("score"), (int, float))
+                                        else None
+                                    ),
+                                }
+                            )
+                        except Exception:
+                            continue
             elif isinstance(evt, dict) and evt.get("type") == "answer_stats":
                 data = evt.get("data", {}) or {}
                 try:
