@@ -174,6 +174,10 @@ Tip: On very small machines, you can lower `evidence_k` and set `max_concurrent_
 - Robust local‑first execution: a dedicated async loop and single‑query lock for stability
 - Dark‑mode‑safe styling across Status, Analysis, Answer, Sources, Research Intelligence, and Metadata
 
+## License and third‑party notices
+
+This project is licensed under the MIT License (see `LICENSE`). It integrates with the Paper‑QA library, which is licensed under the Apache License 2.0. When distributing builds that bundle Paper‑QA, please ensure compliance with the Apache 2.0 terms for that dependency. No changes are made to Paper‑QA within this repository; it is used as a third‑party library.
+
 ## Troubleshooting
 
 ### Port Issues
