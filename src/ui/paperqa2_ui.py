@@ -694,6 +694,41 @@ def _run_pre_evidence_in_thread(
             )
         except Exception:
             pass
+        # Selection stats for transparency
+        try:
+            contexts = getattr(session, "contexts", []) or []
+            scores: List[float] = []
+            per_doc: Dict[str, int] = {}
+            for c in contexts:
+                sc = getattr(c, "score", None)
+                if isinstance(sc, (int, float)):
+                    scores.append(float(sc))
+                txt_obj = getattr(c, "text", None)
+                doc = getattr(txt_obj, "doc", None) if txt_obj is not None else None
+                title = None
+                citation = None
+                if doc is not None:
+                    citation = getattr(doc, "formatted_citation", None)
+                    title = getattr(doc, "title", None) or getattr(doc, "docname", None)
+                name = citation or title or "Unknown"
+                per_doc[name] = per_doc.get(name, 0) + 1
+            score_min = min(scores) if scores else None
+            score_max = max(scores) if scores else None
+            score_mean = (sum(scores) / len(scores)) if scores else None
+            q.put(
+                {
+                    "type": "stats",
+                    "data": {
+                        "score_min": score_min,
+                        "score_mean": score_mean,
+                        "score_max": score_max,
+                        "per_doc": per_doc,
+                    },
+                },
+                timeout=0.1,
+            )
+        except Exception:
+            pass
         # Phase end
         try:
             q.put(
@@ -839,9 +874,9 @@ def stream_analysis_progress(
                 if isinstance(embed_latency_s, (int, float))
                 else "<li><small>Query embedding & retrieval: (running...)</small></li>"
             ),
-            # Evidence selection
+            # Evidence selection (with score stats)
             (
-                f"<li><small>Evidence selection: contexts_selected={contexts_selected}, evidence_k={ev_k}, cutoff={cutoff}, get_if_none={get_if_none}</small></li>"
+                f"<li><small>Evidence selection: contexts_selected={contexts_selected}, evidence_k={ev_k}, cutoff={cutoff}, get_if_none={get_if_none}, score[min/mean/max]=N/A</small></li>"
             ),
             # Summaries
             (
@@ -890,6 +925,19 @@ def stream_analysis_progress(
                     el = data.get("elapsed_s", None)
                     if isinstance(el, (int, float)):
                         embed_latency_s = float(el)
+                except Exception:
+                    pass
+            elif isinstance(evt, dict) and evt.get("type") == "stats":
+                data = evt.get("data", {}) or {}
+                try:
+                    smin = data.get("score_min")
+                    smean = data.get("score_mean")
+                    smax = data.get("score_max")
+                    # Inject a formatted line into logs for now; future: render inline
+                    if all(v is not None for v in (smin, smean, smax)):
+                        logs.append(
+                            f"Scores: min={float(smin):.3f}, mean={float(smean):.3f}, max={float(smax):.3f}"
+                        )
                 except Exception:
                     pass
             idle_cycles = 0
