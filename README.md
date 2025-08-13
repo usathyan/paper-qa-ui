@@ -1,6 +1,6 @@
 # Paper-QA UI
 
-Upload PDF documents and ask questions to get answers with citations from your documents.
+Drug-discovery friendly question answering over your PDFs, with transparent retrieval, rich evidence, and scientist-ready summaries.
 
 ## Setup
 
@@ -52,6 +52,44 @@ Open http://localhost:7860
 - "What methodology was used?"
 - "What are the limitations mentioned?"
 - "What conclusions were drawn?"
+
+## What you’ll see in the UI
+
+- Live Analysis Progress (inline, under the question)
+  - Chevron phases: Retrieval → Summaries → Answer. Each turns green when done.
+  - Retrieval progress bar: contexts_selected / evidence_k
+  - Transparency panel (scientist‑oriented quick facts):
+    - Retrieval: embedding latency (sec), candidate/evidence collection
+    - Evidence selection: how many excerpts were selected, cutoff, score min/mean/max
+    - Per‑document evidence counts with mini bars (top 5 sources by excerpts)
+    - Prompt building: number of sources included, approximate prompt size (characters)
+    - Answer generation: elapsed time and attempts used
+
+- Answer
+  - Natural language answer composed from the selected evidence
+  - Tip: Look for precise claims tied to strong evidence; re‑ask to narrow/expand scope
+
+- Evidence Sources (by excerpt)
+  - For each excerpt: source (citation/title), page, score (higher = closer match), and snippet
+  - Interpretation: Multiple excerpts from different sources suggest convergence; mixed scores can indicate nuance
+
+- Research Intelligence
+  - Potential contradictions (heuristic): quick flags where sources appear to disagree
+  - Key insights: salient statements/summaries pulled from answer/evidence
+  - Evidence summary: number of excerpts per document
+  - Top evidence (by score): compact table of the strongest excerpts
+
+- Metadata
+  - Processing time, documents searched, evidence count, a coarse confidence proxy
+
+- Dark mode
+  - All custom sections use dark‑mode‑safe styling. The UI adapts to system/browser dark mode
+
+### Interpreting metrics (for scientists)
+- Score min/mean/max: Distribution of retrieval scores for selected excerpts. Higher min/mean suggest stronger alignment
+- Per‑document counts: A quick guide to contribution. Skews can reveal over‑representation; drill into lower‑represented but high‑score sources for diversity
+- Prompt size (approximate): Indicator of context packed into the model prompt; very large prompts can increase latency
+- Attempts and elapsed: If attempts > 1, the system retried to stabilize quality; elapsed helps anticipate workload scaling
 
 ## Configurations
 
@@ -117,6 +155,17 @@ These defaults are applied in both the UI and CLI to surface richer, better-orga
 - **Local-first**: external metadata providers disabled by default for speed and determinism
 
 Tip: On very small machines, you can lower `evidence_k` and set `max_concurrent_requests: 1` in your config for latency.
+
+## Theming and dark mode
+- The app ships with a modern theme and dark‑mode‑aware custom sections
+- You can force a theme via URL: add `?__theme=dark` or `?__theme=light` to the address
+
+## What’s new in this release
+- Inline Live Analysis Progress with chevron phases and a retrieval progress bar
+- Transparency panel with scientist‑relevant metrics (scores, counts, prompt size, timing)
+- Research Intelligence section with contradictions, insights, evidence summary, and Top evidence
+- Robust local‑first execution: a dedicated async loop and single‑query lock for stability
+- Dark‑mode‑safe styling across Status, Analysis, Answer, Sources, Research Intelligence, and Metadata
 
 ## Troubleshooting
 

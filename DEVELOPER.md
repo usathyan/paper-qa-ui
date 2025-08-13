@@ -107,6 +107,10 @@ graph LR
 - **Key Functions**:
   - `process_uploaded_files_async()`: Handle file uploads, copy to `papers/`, and index into an in-memory `Docs` corpus
   - `process_question_async()`: Query the in-memory corpus with `Docs.aquery(...)` (aligned with CLI behavior)
+  - Live Analysis Progress: emits retrieval/summary/answer phase events via a background queue and renders:
+    - Chevron phase badges (Retrieval/Summaries/Answer)
+    - Retrieval progress bar (contexts_selected / evidence_k)
+    - Transparency panel (scores min/mean/max, per‑doc counts, prompt size, elapsed, attempts)
   - `initialize_settings()`: Load and configure Paper-QA settings; applies research-intelligence defaults
 
 #### 2. Configuration Manager (`src/config_manager.py`)
@@ -171,10 +175,11 @@ flowchart TD
 flowchart TD
     A[Question Input] --> B[Load Settings]
     B --> C[Query in-memory Docs corpus]
-    C --> D[Paper-QA Retrieval + Answer]
-    D --> E[Generate Answer]
-    E --> F[Format Response]
-    F --> G[Display Results]
+    C --> D[Paper-QA Retrieval]
+    D --> E[Evidence Selection / Summaries]
+    E --> F[Prompt Build + Answer Generation]
+    F --> G[Format Response]
+    G --> H[Display Results]
 ```
 
 ## Development Setup

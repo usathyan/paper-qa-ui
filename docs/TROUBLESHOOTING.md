@@ -31,7 +31,7 @@ This guide addresses common issues when using Paper-QA, especially with local LL
 
 **Solutions**:
 1. Reduce `max_concurrent_requests` to 1
-2. Lower `search_count` in agent settings
+2. Lower `search_count` in agent settings; keep `max_answer_attempts` small (1–2)
 3. Reduce `answer_max_sources` to 5-7
 4. Increase timeout values
 
@@ -97,7 +97,7 @@ This guide addresses common issues when using Paper-QA, especially with local LL
 
 **Optimizations**:
 1. Use smaller models for faster responses
-2. Reduce `evidence_k` to 10–12 (defaults are higher for richer evidence)
+2. Reduce `evidence_k` to 10–12 (defaults are higher for richer evidence). The Live Analysis Progress bar (contexts_selected/evidence_k) will reflect this
 3. Set `max_concurrent_requests: 1` (defaults may be 2+)
 4. Use SSD storage for indexes
 5. Increase system RAM if possible
@@ -216,7 +216,7 @@ make clean-all-data  # Complete reset (removes papers/)
 
 When reporting issues, include:
 1. Configuration file contents
-2. Error messages and stack traces
+2. Error messages and stack traces (include any Live Analysis Progress logs, e.g., phase badges/elapsed)
 3. System specifications (RAM, GPU, OS)
 4. Ollama version and model names
 5. Test results from `make status` and `make check-env`
