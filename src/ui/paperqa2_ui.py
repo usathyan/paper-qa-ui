@@ -45,6 +45,7 @@ app_state: Dict[str, Any] = {
     "analysis_queue": None,
     "query_loop": None,
     "query_loop_thread": None,
+    "session_data": None,
 }
 
 # Disable Gradio analytics
@@ -954,7 +955,7 @@ def stream_analysis_progress(
                 + "</div>"
             ),
             (
-                f"<div class='pqa-subtle' style='height:10px; border-radius:6px; overflow:hidden'><div style='height:100%; width:{pct}%; background:#3b82f6'></div></div>"
+                f"<div class='pqa-subtle pqa-bar'><div class='pqa-bar-fill {'pqa-bar-indet' if not retrieval_done and pct==0 else ''}' style='width:{pct}%'></div></div>"
                 f"<div style='margin-top:4px'><small class='pqa-muted'>{contexts_selected}/{ev_k} contexts</small></div>"
             ),
             "<div class='pqa-subtle'>",
@@ -1465,11 +1466,18 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
         .pqa-table th, .pqa-table td { padding: 6px; border-bottom: 1px solid #e5e7eb; text-align: left; }
         /* Chevron step badges */
         .pqa-steps { display: flex; gap: 6px; align-items: center; margin: 6px 0; flex-wrap: wrap; }
-        .pqa-step { position: relative; display: inline-block; background: #e5e7eb; color: #111827; padding: 4px 10px 4px 10px; border-radius: 4px 0 0 4px; font-size: 12px; line-height: 1; }
+        .pqa-step { position: relative; display: inline-block; background: #e5e7eb; color: #111827; padding: 6px 16px 6px 16px; font-size: 12px; line-height: 1; }
+        .pqa-step::before { content: ""; position: absolute; top: 0; left: -10px; width: 0; height: 0; border-top: 12px solid transparent; border-bottom: 12px solid transparent; border-right: 10px solid #e5e7eb; }
         .pqa-step::after { content: ""; position: absolute; top: 0; right: -10px; width: 0; height: 0; border-top: 12px solid transparent; border-bottom: 12px solid transparent; border-left: 10px solid #e5e7eb; }
         .pqa-step.done { background: #10b981; color: #ffffff; }
         .pqa-step.done::after { border-left-color: #10b981; }
-        .pqa-step + .pqa-step { margin-left: 10px; }
+        .pqa-step.done::before { border-right-color: #10b981; }
+        .pqa-step:first-child::before { display: none; }
+        /* Indeterminate progress bar */
+        .pqa-bar { height: 10px; border-radius: 6px; overflow: hidden; position: relative; }
+        .pqa-bar-fill { height: 100%; background: #3b82f6; }
+        .pqa-bar-indet { background-image: linear-gradient(45deg, rgba(255,255,255,0.15) 25%, transparent 25%, transparent 50%, rgba(255,255,255,0.15) 50%, rgba(255,255,255,0.15) 75%, transparent 75%, transparent); background-size: 20px 20px; animation: pqa-stripes 1s linear infinite; }
+        @keyframes pqa-stripes { 0% { background-position: 0 0; } 100% { background-position: 40px 0; } }
         @media (prefers-color-scheme: dark) {
           .pqa-panel { background: #1f2937; color: #e5e7eb; }
           .pqa-subtle { background: #111827; color: #e5e7eb; }
@@ -1477,8 +1485,10 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
           .pqa-table th, .pqa-table td { border-bottom-color: #374151; }
           .pqa-step { background: #374151; color: #e5e7eb; }
           .pqa-step::after { border-left-color: #374151; }
+          .pqa-step::before { border-right-color: #374151; }
           .pqa-step.done { background: #059669; color: #ffffff; }
           .pqa-step.done::after { border-left-color: #059669; }
+          .pqa-step.done::before { border-right-color: #059669; }
         }
         </style>
         """
@@ -1495,6 +1505,10 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
             )
 
             gr.Markdown("### ⚙️ Configuration")
+            def _on_config_change(cfg: str) -> str:
+                app_state["settings"] = initialize_settings(cfg)
+                return f"Configuration set to: {cfg}"
+
             config_dropdown = gr.Dropdown(
                 choices=[
                     "optimized_ollama",
@@ -1506,6 +1520,7 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
                 label="Select Configuration",
                 info="Choose your preferred model configuration",
             )
+            cfg_status = gr.Markdown(visible=False)
 
             gr.Markdown("### 🧹 Actions")
             clear_button = gr.Button("🗑️ Clear All", variant="secondary")
@@ -1547,11 +1562,28 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
     # Removed separate Analysis Progress tab; progress now streams inline below the question
 
     # Event handlers - automatically process documents on upload
+    def _pre_upload_disable() -> dict:
+        return gr.Button.update(interactive=False)
+
+    def _post_upload_enable() -> dict:
+        return gr.Button.update(interactive=True)
+
     file_upload.change(
         fn=process_uploaded_files,
         inputs=[file_upload],
         outputs=[upload_status, error_display],
+        preprocess=False,
+        postprocess=False,
     )
+
+    # Disable Ask during uploads; enable after status updates
+    file_upload.change(fn=_pre_upload_disable, outputs=[ask_button])
+    upload_status.change(fn=_post_upload_enable, outputs=[ask_button])
+
+    def _enable_ask(is_ready: bool) -> dict:
+        return gr.Button.update(interactive=is_ready)
+
+    config_dropdown.change(fn=_on_config_change, inputs=[config_dropdown], outputs=[cfg_status])
 
     ask_button.click(
         fn=ask_with_progress,
