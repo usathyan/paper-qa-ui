@@ -35,6 +35,11 @@ app.include_router(mcp_router)
 service = PaperQAService()
 
 
+@app.get("/health")  # type: ignore[misc]
+async def health() -> Dict[str, str]:
+    return {"status": "ok"}
+
+
 @app.post("/api/rewrite", response_model=RewriteResponse)  # type: ignore[misc]
 async def api_rewrite(req: RewriteRequest) -> RewriteResponse:
     return rewrite_logic(req)
@@ -79,6 +84,33 @@ async def api_run(req: RunRequest) -> Dict[str, str]:
                 sources.append({"citation": citation, "page": page, "score": score})
         except Exception:
             pass
+        # Build contexts CSV
+        contexts_csv = None
+        try:
+            rows = ["doc,page,score,snippet"]
+            for c in getattr(session, "contexts", []):
+                doc = (
+                    getattr(c.text.doc, "formatted_citation", None)
+                    or getattr(c.text.doc, "title", None)
+                    or getattr(c.text.doc, "docname", "")
+                )
+                page = getattr(c.text, "page", None)
+                score = getattr(c, "score", None)
+                snippet = (
+                    getattr(c.text, "text", "").replace("\n", " ").replace("\r", " ")
+                )
+
+                # naive CSV escaping for commas/quotes
+                def esc(s: str) -> str:
+                    s2 = s.replace('"', '""')
+                    return f'"{s2}"'
+
+                rows.append(
+                    f"{esc(str(doc))},{page if page is not None else ''},{score if isinstance(score, (int, float)) else ''},{esc(snippet[:300])}"
+                )
+            contexts_csv = "\n".join(rows)
+        except Exception:
+            contexts_csv = None
         summary = SessionSummary(
             question=req.question,
             rewritten=(req.rewrite.rewritten if req.rewrite else None),
@@ -86,6 +118,7 @@ async def api_run(req: RunRequest) -> Dict[str, str]:
             curation=req.curation,
             answer_markdown=getattr(session, "answer", None),
             sources=sources,
+            contexts_csv=contexts_csv,
         )
         bus.set_latest_session(summary)
 

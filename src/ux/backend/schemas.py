@@ -90,6 +90,7 @@ class SessionSummary(BaseModel):
     curation: CurationSpec
     answer_markdown: Optional[str] = None
     sources: List[Dict[str, Any]] = Field(default_factory=list)
+    contexts_csv: Optional[str] = None
 
 
 class ExportBundle(BaseModel):
