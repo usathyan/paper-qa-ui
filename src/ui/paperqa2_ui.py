@@ -9,7 +9,7 @@ import logging
 import os
 import time
 from pathlib import Path
-from typing import List, Tuple
+from typing import List, Tuple, Any, Dict
 
 import gradio as gr
 import httpx
@@ -32,7 +32,7 @@ logging.getLogger("lmi").setLevel(logging.WARNING)
 logging.getLogger("httpx").setLevel(logging.WARNING)
 
 # Global state
-app_state = {
+app_state: Dict[str, Any] = {
     "uploaded_docs": [],
     "settings": None,
     "docs": None,
@@ -152,17 +152,16 @@ def initialize_settings(config_name: str = "optimized_ollama") -> Settings:
             pass
 
         # Ensure clinical_trials_search is available if using agent
-        if hasattr(settings, "agent") and hasattr(settings.agent, "tool_names"):
-            if "clinical_trials_search" not in settings.agent.tool_names:
+        try:
+            tool_names = (
+                getattr(getattr(settings, "agent", object()), "tool_names", []) or []
+            )
+            if "clinical_trials_search" not in tool_names:
                 settings.agent.tool_names = DEFAULT_TOOL_NAMES + [
                     "clinical_trials_search"
                 ]
-        else:
-            from paperqa.settings import AgentSettings
-
-            settings.agent = AgentSettings(
-                tool_names=DEFAULT_TOOL_NAMES + ["clinical_trials_search"]
-            )
+        except Exception:
+            pass
 
         status_tracker = StatusTracker()
         app_state["settings"] = settings
@@ -336,11 +335,12 @@ async def process_question_async(
             start_time = time.time()
 
             if not question.strip():
-                return "", "", "", "Please enter a question."
+                return "", "", "", "", "Please enter a question."
 
             # Check if documents have been uploaded and processed
             if not app_state.get("uploaded_docs"):
                 return (
+                    "",
                     "",
                     "",
                     "",
@@ -350,6 +350,7 @@ async def process_question_async(
             # Check if Ollama is running (for local configurations)
             if "ollama" in config_name.lower() and not check_ollama_status():
                 return (
+                    "",
                     "",
                     "",
                     "",
