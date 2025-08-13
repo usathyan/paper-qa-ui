@@ -18,6 +18,11 @@ This roadmap summarizes what is done and prioritizes next steps. It reflects the
   - Quality flags: Preprint and possible Retracted? per source (heuristic)
   - Diversity & recency: unique papers, preprint share, year histogram
   - Optional Critique (LLM‑based) under Configuration; works with any configured model via litellm; falls back to heuristic
+ - Query rewrite (advanced)
+   - LLM‑based decomposition of query (years/venues/fields)
+   - Optional retrieval bias toggle applies filter hints to the rewritten query
+   - Rewritten form and filters exported under `rewrite` in session JSON
+   - UI shows original, rewritten query, and filters inline in Analysis Progress
 - Query Options
   - Rewrite query (experimental) toggle; displays original question above progress
 - Exports
@@ -32,11 +37,7 @@ This roadmap summarizes what is done and prioritizes next steps. It reflects the
 - Docs & license updates
 
 ## Next (high priority)
-1) Query rewrite (advanced)
-   - LLM‑based decomposition inspired by ai2‑scholarqa‑lib (years, venues, fields of study)
-   - Use extracted filters to bias retrieval (toggle)
-   - Include rewritten form and filters in exports/traces
-2) Evidence curation enhancements
+1) Evidence curation enhancements
    - Evidence filtering controls (e.g., per‑doc caps, score cutoff sliders)
    - Source quality indicators (journal metrics proxy, venue reputation, open/retracted status)
    - Evidence conflicts view (cluster excerpts across docs; highlight opposing claims)
