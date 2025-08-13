@@ -584,15 +584,15 @@ def ask_with_progress(
     spinner_css = (
         "<style>@keyframes pqa-spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}"
         " .pqa-spinner{display:inline-block;width:14px;height:14px;border:2px solid #ccc;"
-        " border-top-color:#007bff;border-radius:50%;animation:pqa-spin 0.8s linear infinite;"
+        " border-top-color:#3b82f6;border-radius:50%;animation:pqa-spin 0.8s linear infinite;"
         " margin-right:6px}</style>"
     )
     while t.is_alive():
         elapsed = time.time() - synth_start
         synth_block = (
-            f"{spinner_css}<div style='margin-top:8px;color:#333'>"
+            f"{spinner_css}<div class='pqa-panel' style='margin-top:8px;'>"
             f"<span class='pqa-spinner'></span> Synthesizing answer"
-            f" <small style='color:#666'>({elapsed:.1f}s)</small>"
+            f" <small class='pqa-muted'>({elapsed:.1f}s)</small>"
             f"</div>"
         )
         yield (panel_last + synth_block, "", "", "", "", "", "")
@@ -797,7 +797,7 @@ def format_answer_html(answer: str, contexts: List) -> str:
 def format_sources_html(contexts: List) -> str:
     """Format the sources as HTML."""
     if not contexts:
-        return "<div style='color: #666; text-align: center;'>No sources found.</div>"
+        return "<div class='pqa-subtle' style='text-align:center'><small class='pqa-muted'>No sources found.</small></div>"
 
     html_parts = [
         "<div class='pqa-panel' style='max-height:300px; overflow-y:auto;'>",
@@ -1024,7 +1024,7 @@ def build_intelligence_html(answer: str, contexts: List) -> str:
         )
 
         parts = [
-            "<div style='background:#fff; padding:12px; border-radius:6px;'>",
+            "<div class='pqa-panel'>",
             "<h4>Research Intelligence</h4>",
             "<div><strong>Potential contradictions</strong><ul>",
         ]
@@ -1054,7 +1054,7 @@ def build_intelligence_html(answer: str, contexts: List) -> str:
         return "".join(parts)
     except Exception as e:
         logger.warning(f"Failed to build intelligence panel: {e}")
-        return "<div style='color:#666'>Research Intelligence unavailable.</div>"
+        return "<div class='pqa-subtle'><small class='pqa-muted'>Research Intelligence unavailable.</small></div>"
 
 
 def clear_all() -> Tuple[str, str, str, str, str, str, str]:
