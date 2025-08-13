@@ -220,9 +220,34 @@ async def process_uploaded_files_async(files: List[Any]) -> Tuple[str, str]:
             app_state["docs"] = Docs()
 
         for i, file_obj in enumerate(files):
-            # Handle Gradio file object - extract the actual file path
-            if isinstance(file_obj, dict) and "name" in file_obj:
-                source_path = Path(str(file_obj["name"]))
+            # Handle Gradio file object variations
+            wrote_bytes = False
+            if isinstance(file_obj, dict):
+                # Try common path-like keys first
+                source_str = None
+                for k in ("name", "path", "tmp_path", "file"):
+                    v = file_obj.get(k)
+                    if isinstance(v, str) and v:
+                        source_str = v
+                        break
+                if source_str:
+                    source_path = Path(source_str)
+                else:
+                    # If raw bytes provided, write to papers dir with original name
+                    data = file_obj.get("data")
+                    orig_name = file_obj.get("orig_name") or file_obj.get("filename") or "upload.pdf"
+                    if isinstance(data, (bytes, bytearray)):
+                        source_path = Path("./papers") / Path(str(orig_name)).name
+                        try:
+                            source_path.parent.mkdir(parents=True, exist_ok=True)
+                            with open(source_path, "wb") as f:
+                                f.write(data)
+                            wrote_bytes = True
+                        except Exception:
+                            pass
+                    else:
+                        # Fallback: treat as error
+                        raise TypeError("Unrecognized file object from Gradio")
             elif hasattr(file_obj, "name"):
                 # Newer Gradio versions return file objects with .name attribute
                 source_path = Path(file_obj.name)
@@ -240,7 +265,7 @@ async def process_uploaded_files_async(files: List[Any]) -> Tuple[str, str]:
                     )
 
                 # Check if file is already in the target location
-                if source_path.resolve() == dest_path.resolve():
+                if source_path.resolve() == dest_path.resolve() or wrote_bytes:
                     # File is already in the target location, skip copying
                     logger.info(
                         f"File {source_path.name} is already in papers directory, skipping copy"
