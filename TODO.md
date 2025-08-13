@@ -38,7 +38,7 @@ This document tracks the work to add rich, live analytics and visualizations for
   - [ ] **Timeline/Stepper**: current phase (Index lookup → Retrieval → Summaries → Answer)
   - [ ] **Progress bar**: contexts retrieved/selected vs. target (`evidence_k`)
   - [ ] **Tool calls table**: name, status, duration
-  - [ ] **Top evidence (live table)**: source, score, page, snippet (already implemented for final; extend to live)
+  - [ ] **Top evidence (live table)**: source, score, page, snippet
   - [ ] **Score histogram**: distribution of candidate scores (Plotly or lightweight SVG)
   - [ ] **MMR selection view**: show selected vs. discarded candidates
   - [ ] **Costs/time**: running totals (if `lmi` provides)
@@ -125,7 +125,10 @@ This document tracks the work to add rich, live analytics and visualizations for
 - [x] Switched tests to mypy (ruff + mypy in `make test`)
 - [x] Fixed typing in `utils`, `config_manager`, `config_ui`, CLI imports
 - [x] Added post-answer Research Intelligence panel (contradictions, insights, evidence summary, top evidence with scores)
-- [x] Inline "Analysis Progress" panel under question with live logs and top-evidence table (Phase 1 MVP)
+- [x] Inline "Analysis Progress" panel under question with live logs (Phase 1 MVP)
+- [x] Moved Top evidence table to Research Intelligence (removed from live panel)
+- [x] Auto-scroll to Answer after analysis completes
+- [x] Dark-mode compliance via shared CSS classes across Status, Analysis, Answer, Sources, Metadata, and Research Intelligence
 - [x] Dedicated background asyncio loop for all LLM/embedding I/O to prevent loop-close/binding errors; single-query lock
 - [x] Replaced deprecated `gr.utils.escape_html` with `html.escape`
 - [x] Spinner + elapsed time heartbeat; dynamic auto-expanding progress panel (no scroll)
