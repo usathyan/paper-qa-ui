@@ -2492,6 +2492,36 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
                 value=False,
                 info="Rephrase your question for retrieval; shows original above progress",
             )
+            use_llm_rewrite_toggle = gr.Checkbox(
+                label="Use LLM rewrite (advanced)",
+                value=False,
+                info="Apply LLM-based decomposition (years/venues/fields)",
+            )
+            bias_retrieval_toggle = gr.Checkbox(
+                label="Bias retrieval using filters",
+                value=False,
+                info="Append extracted filters to the rewritten query",
+            )
+
+            gr.Markdown("### 🧪 Evidence Curation (beta)")
+            score_cutoff_slider = gr.Slider(
+                minimum=0.0,
+                maximum=1.0,
+                step=0.01,
+                value=0.0,
+                label="Relevance score cutoff",
+                info="Discard evidence below this score",
+            )
+            per_doc_cap_number = gr.Number(
+                value=0,
+                label="Per-document evidence cap",
+                info="0 = unlimited; limit evidence excerpts per source",
+            )
+            max_sources_number = gr.Number(
+                value=0,
+                label="Max sources included",
+                info="0 = default; hard cap on sources in answer",
+            )
 
             gr.Markdown("### 🧹 Actions")
             clear_button = gr.Button("🗑️ Clear All", variant="secondary")
@@ -2633,7 +2663,17 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
 
     ask_button.click(
         fn=ask_with_progress,
-        inputs=[question_input, config_dropdown, critique_toggle, rewrite_toggle],
+        inputs=[
+            question_input,
+            config_dropdown,
+            critique_toggle,
+            rewrite_toggle,
+            use_llm_rewrite_toggle,
+            bias_retrieval_toggle,
+            score_cutoff_slider,
+            per_doc_cap_number,
+            max_sources_number,
+        ],
         outputs=[
             inline_analysis,
             answer_display,
@@ -2647,7 +2687,17 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
 
     question_input.submit(
         fn=ask_with_progress,
-        inputs=[question_input, config_dropdown, critique_toggle, rewrite_toggle],
+        inputs=[
+            question_input,
+            config_dropdown,
+            critique_toggle,
+            rewrite_toggle,
+            use_llm_rewrite_toggle,
+            bias_retrieval_toggle,
+            score_cutoff_slider,
+            per_doc_cap_number,
+            max_sources_number,
+        ],
         outputs=[
             inline_analysis,
             answer_display,
