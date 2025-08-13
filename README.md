@@ -57,7 +57,7 @@ Open http://localhost:7860
 
 - Live Analysis Progress (inline, under the question)
   - Chevron phases: Retrieval → Summaries → Answer. Each turns green when done.
-  - Retrieval progress bar: contexts_selected / evidence_k
+  - Retrieval progress bar: contexts_selected / evidence_k (updates live; indeterminate stripes before counts arrive)
   - Transparency panel (scientist‑oriented quick facts):
     - Retrieval: embedding latency (sec), candidate/evidence collection
     - Evidence selection: how many excerpts were selected, cutoff, score min/mean/max
@@ -78,6 +78,7 @@ Open http://localhost:7860
   - Key insights: salient statements/summaries pulled from answer/evidence
   - Evidence summary: number of excerpts per document
   - Top evidence (by score): compact table of the strongest excerpts
+  - Optional Critique: post‑answer sanity check highlighting potentially unsupported or overly strong claims (toggle under Configuration)
 
 - Metadata
   - Processing time, documents searched, evidence count, a coarse confidence proxy
@@ -95,6 +96,7 @@ Open http://localhost:7860
 - Per‑document counts: A quick guide to contribution. Skews can reveal over‑representation; drill into lower‑represented but high‑score sources for diversity
 - Prompt size (approximate): Indicator of context packed into the model prompt; very large prompts can increase latency
 - Attempts and elapsed: If attempts > 1, the system retried to stabilize quality; elapsed helps anticipate workload scaling
+ - Critique: A non-binding diagnostic to guide further reading; it does not alter the answer
 
 ## Configurations
 
