@@ -422,6 +422,15 @@ async def process_question_async(
                             logger.warning(
                                 f"Skipping doc that failed to add: {d.get('filename')}: {e}"
                             )
+                # Emit phase events to analysis stream (if active)
+                try:
+                    aq = app_state.get("analysis_queue")
+                    if aq is not None:
+                        aq.put({"type": "phase", "data": {"phase": "summaries", "status": "start"}}, timeout=0.05)
+                        aq.put({"type": "phase", "data": {"phase": "answer", "status": "start"}}, timeout=0.05)
+                except Exception:
+                    pass
+
                 # Query the in-memory Docs corpus on a dedicated long-lived loop
                 # Schedule coroutine on the background loop and wait from current loop
                 fut = asyncio.run_coroutine_threadsafe(
@@ -429,6 +438,15 @@ async def process_question_async(
                 )
                 # Wait in a thread to avoid blocking current event loop
                 session = await asyncio.to_thread(fut.result, timeout=600)
+
+                # Emit phase completion events
+                try:
+                    aq = app_state.get("analysis_queue")
+                    if aq is not None:
+                        aq.put({"type": "phase", "data": {"phase": "summaries", "status": "end"}}, timeout=0.05)
+                        aq.put({"type": "phase", "data": {"phase": "answer", "status": "end"}}, timeout=0.05)
+                except Exception:
+                    pass
 
             processing_time = time.time() - start_time
             logger.info(f"Docs.aquery completed in {processing_time:.2f} seconds")
@@ -589,13 +607,19 @@ def ask_with_progress(
     )
     while t.is_alive():
         elapsed = time.time() - synth_start
+        badges = (
+            "<div style='margin:6px 0'>"
+            "<span class='pqa-subtle' style='border-radius:10px;padding:2px 8px;font-size:12px;margin-right:6px'>Summaries</span>"
+            "<span class='pqa-subtle' style='border-radius:10px;padding:2px 8px;font-size:12px;margin-right:6px'>Answer</span>"
+            "</div>"
+        )
         synth_block = (
             f"{spinner_css}<div class='pqa-panel' style='margin-top:8px;'>"
             f"<span class='pqa-spinner'></span> Synthesizing answer"
             f" <small class='pqa-muted'>({elapsed:.1f}s)</small>"
             f"</div>"
         )
-        yield (panel_last + synth_block, "", "", "", "", "", "")
+        yield (panel_last + badges + synth_block, "", "", "", "", "", "")
         time.sleep(0.75)
 
     # Attempt to auto-scroll to the answer section after analysis completes
@@ -607,8 +631,15 @@ def ask_with_progress(
         "</script>"
     )
 
+    completed_badges = (
+        "<div style='margin:6px 0'>"
+        "<span style='display:inline-block;background:#10b981;color:white;border-radius:10px;padding:2px 8px;font-size:12px;margin-right:6px'>Summaries✓</span>"
+        "<span style='display:inline-block;background:#10b981;color:white;border-radius:10px;padding:2px 8px;font-size:12px;margin-right:6px'>Answer✓</span>"
+        "</div>"
+    )
+
     yield (
-        panel_last + scroll_js,
+        panel_last + completed_badges + scroll_js,
         result_holder.get("answer_html", ""),
         result_holder.get("sources_html", ""),
         result_holder.get("metadata_html", ""),
@@ -635,46 +666,49 @@ def _run_pre_evidence_in_thread(
         return await docs.aget_evidence(question, settings=settings, callbacks=[cb])
 
     try:
+        # Phase start
+        try:
+            q.put(
+                {"type": "phase", "data": {"phase": "retrieval", "status": "start"}},
+                timeout=0.1,
+            )
+        except Exception:
+            pass
+        t0 = time.time()
         fut = asyncio.run_coroutine_threadsafe(_go(), loop)
         session = fut.result(timeout=600)
-        # Summarize current contexts for table
-        items = []
-        for c in getattr(session, "contexts", [])[:15]:
-            try:
-                score = getattr(c, "score", None)
-                page = getattr(c, "page", None)
-                txt_obj = getattr(c, "text", None)
-                doc = getattr(txt_obj, "doc", None) if txt_obj is not None else None
-                title = None
-                citation = None
-                if doc is not None:
-                    citation = getattr(doc, "formatted_citation", None)
-                    title = getattr(doc, "title", None) or getattr(doc, "docname", None)
-                raw_text = (
-                    getattr(txt_obj, "text", None) if txt_obj is not None else None
-                )
-                snippet = (
-                    raw_text
-                    if isinstance(raw_text, str)
-                    else (str(txt_obj) if txt_obj is not None else str(c))
-                )
-                if snippet and len(snippet) > 180:
-                    snippet = snippet[:180] + "..."
-                items.append(
-                    {
-                        "source": citation or title or "Unknown",
-                        "score": f"{score:.3f}"
-                        if isinstance(score, (int, float))
-                        else "-",
-                        "page": str(int(page))
-                        if isinstance(page, (int, float))
-                        else "-",
-                        "snippet": snippet or "",
-                    }
-                )
-            except Exception:
-                continue
-        q.put({"type": "table", "data": items})
+        elapsed = time.time() - t0
+        # Emit simple metrics (contexts selected)
+        try:
+            q.put(
+                {
+                    "type": "metric",
+                    "data": {
+                        "contexts_selected": len(
+                            getattr(session, "contexts", []) or []
+                        ),
+                        "elapsed_s": elapsed,
+                    },
+                },
+                timeout=0.1,
+            )
+        except Exception:
+            pass
+        # Phase end
+        try:
+            q.put(
+                {
+                    "type": "phase",
+                    "data": {
+                        "phase": "retrieval",
+                        "status": "end",
+                        "elapsed_s": elapsed,
+                    },
+                },
+                timeout=0.1,
+            )
+        except Exception:
+            pass
     except Exception as e:
         try:
             q.put({"type": "log", "data": f"Error during pre-evidence: {e}"})
@@ -722,12 +756,52 @@ def stream_analysis_progress(
     # Initial UI shell
     start_ts = time.time()
     logs: List[str] = ["Started analysis..."]
-    table_rows: List[Dict[str, str]] = []
+    # No table rows in live panel; top evidence is rendered later in Research Intelligence
+    retrieval_done = False
+    contexts_selected = 0
+    embed_latency_s: float | None = None
+    # Controls snapshot
+    try:
+        cutoff = getattr(getattr(app_state["settings"], "answer", object()), "evidence_relevance_score_cutoff", None)
+    except Exception:
+        cutoff = None
+    try:
+        get_if_none = bool(getattr(getattr(app_state["settings"], "answer", object()), "get_evidence_if_no_contexts", False))
+    except Exception:
+        get_if_none = False
+    try:
+        group_by_q = bool(getattr(getattr(app_state["settings"], "answer", object()), "group_contexts_by_question", False))
+    except Exception:
+        group_by_q = False
+    try:
+        filter_extra_bg = bool(getattr(getattr(app_state["settings"], "answer", object()), "answer_filter_extra_background", False))
+    except Exception:
+        filter_extra_bg = False
+    try:
+        max_sources = int(getattr(getattr(app_state["settings"], "answer", object()), "answer_max_sources", 10))
+    except Exception:
+        max_sources = 10
+    try:
+        max_attempts = int(getattr(getattr(app_state["settings"], "answer", object()), "max_answer_attempts", 1))
+    except Exception:
+        max_attempts = 1
+    try:
+        ev_k = int(
+            getattr(
+                getattr(app_state["settings"], "answer", object()), "evidence_k", 15
+            )
+        )
+    except Exception:
+        ev_k = 15
 
     def render_html() -> str:
         elapsed = time.time() - start_ts
         running = worker.is_alive()
         latest = logs[-1] if logs else ""
+        # Clamp progress percent 0..100
+        pct = 0
+        if ev_k > 0 and contexts_selected >= 0:
+            pct = int(max(0, min(100, round((contexts_selected / ev_k) * 100))))
         parts = [
             "<div class='pqa-panel'>",
             "<style>@keyframes pqa-spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}} .pqa-spinner{display:inline-block;width:14px;height:14px;border:2px solid #9ca3af;border-top-color:#3b82f6;border-radius:50%;animation:pqa-spin 0.8s linear infinite;margin-right:6px}</style>",
@@ -737,8 +811,55 @@ def stream_analysis_progress(
                 + "<strong>Analysis Progress</strong>"
                 + f" <small class='pqa-muted'>({elapsed:.1f}s)</small></div>"
             ),
+            (
+                "<div style='margin:6px 0'>"
+                + (
+                    "<span style='display:inline-block;background:#10b981;color:white;border-radius:10px;padding:2px 8px;font-size:12px;margin-right:6px'>Retrieval✓</span>"
+                    if retrieval_done
+                    else "<span class='pqa-subtle' style='border-radius:10px;padding:2px 8px;font-size:12px;margin-right:6px'>Retrieval</span>"
+                )
+                + "<span class='pqa-subtle' style='border-radius:10px;padding:2px 8px;font-size:12px;margin-right:6px'>Summaries</span>"
+                + "<span class='pqa-subtle' style='border-radius:10px;padding:2px 8px;font-size:12px;margin-right:6px'>Answer</span>"
+                + "</div>"
+            ),
+            (
+                f"<div class='pqa-subtle' style='height:10px; border-radius:6px; overflow:hidden'><div style='height:100%; width:{pct}%; background:#3b82f6'></div></div>"
+                f"<div style='margin-top:4px'><small class='pqa-muted'>{contexts_selected}/{ev_k} contexts</small></div>"
+            ),
             "<div class='pqa-subtle'>",
             f"<div><small>{html.escape(latest)}</small></div>",
+            "</div>",
+            # Transparency block
+            "<div class='pqa-panel' style='margin-top:8px'>",
+            "<strong>Processing Transparency</strong>",
+            "<ul style='margin:6px 0 0 18px;padding:0'>",
+            # Retrieval
+            (
+                f"<li><small>Query embedding & retrieval: embed_latency={embed_latency_s:.2f}s, candidate_count=N/A, mmr_lambda=N/A</small></li>"
+                if isinstance(embed_latency_s, (int, float))
+                else "<li><small>Query embedding & retrieval: (running...)</small></li>"
+            ),
+            # Evidence selection
+            (
+                f"<li><small>Evidence selection: contexts_selected={contexts_selected}, evidence_k={ev_k}, cutoff={cutoff}, get_if_none={get_if_none}</small></li>"
+            ),
+            # Summaries
+            (
+                f"<li><small>Summaries synthesis: enabled={group_by_q or filter_extra_bg}, metrics=N/A</small></li>"
+            ),
+            # Prompt building
+            (
+                f"<li><small>Prompt building: answer_max_sources={max_sources}, sources_included=N/A, prompt_length=N/A</small></li>"
+            ),
+            # Answer generation
+            (
+                f"<li><small>Answer generation: max_attempts={max_attempts}, retries=N/A, tokens=N/A</small></li>"
+            ),
+            # Post-processing
+            (
+                "<li><small>Post-processing: sources_used=N/A, final_contexts=N/A, postproc_time=N/A</small></li>"
+            ),
+            "</ul>",
             "</div>",
         ]
         # Omit Top evidence table here; it belongs in Research Intelligence
@@ -754,8 +875,23 @@ def stream_analysis_progress(
             evt = q.get(timeout=0.5)
             if isinstance(evt, dict) and evt.get("type") == "log":
                 logs.append(str(evt.get("data", "")).strip())
-            elif isinstance(evt, dict) and evt.get("type") == "table":
-                table_rows = evt.get("data", []) or []
+            elif isinstance(evt, dict) and evt.get("type") == "phase":
+                data = evt.get("data", {}) or {}
+                if data.get("phase") == "retrieval" and data.get("status") == "end":
+                    retrieval_done = True
+            elif isinstance(evt, dict) and evt.get("type") == "metric":
+                data = evt.get("data", {}) or {}
+                try:
+                    cs = int(data.get("contexts_selected", 0))
+                    contexts_selected = max(0, cs)
+                except Exception:
+                    pass
+                try:
+                    el = data.get("elapsed_s", None)
+                    if isinstance(el, (int, float)):
+                        embed_latency_s = float(el)
+                except Exception:
+                    pass
             idle_cycles = 0
             yield render_html()
         except Empty:
@@ -770,9 +906,7 @@ def stream_analysis_progress(
 def format_answer_html(answer: str, contexts: List) -> str:
     """Format the answer as HTML."""
     if not answer:
-        return (
-            "<div class='pqa-subtle' style='text-align: center;'><small class='pqa-muted'>No answer generated.</small></div>"
-        )
+        return "<div class='pqa-subtle' style='text-align: center;'><small class='pqa-muted'>No answer generated.</small></div>"
 
     # Simple formatting - you can enhance this
     formatted_answer = answer.replace("\n", "<br>")
@@ -850,9 +984,7 @@ def format_sources_html(contexts: List) -> str:
 
 def format_metadata_html(metadata: dict) -> str:
     """Format metadata as HTML."""
-    html_parts = [
-        "<div class='pqa-panel' style='font-size:0.9em;'>"
-    ]
+    html_parts = ["<div class='pqa-panel' style='font-size:0.9em;'>"]
     html_parts.append("<h5>Processing Information:</h5>")
     html_parts.append(
         f"<strong>Processing Time:</strong> {metadata.get('processing_time', 0):.2f} seconds<br>"
@@ -1038,9 +1170,7 @@ def build_intelligence_html(answer: str, contexts: List) -> str:
             parts.append(
                 "<div style='margin-top:8px'><strong>Top evidence (by score)</strong>"
             )
-            parts.append(
-                "<div style='overflow-x:auto'><table class='pqa-table'>"
-            )
+            parts.append("<div style='overflow-x:auto'><table class='pqa-table'>")
             parts.append(
                 "<tr><th>Source</th><th>Score</th><th>Page</th><th>Snippet</th></tr>"
             )
@@ -1147,7 +1277,9 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
             inline_analysis = gr.HTML(label="Analysis", show_label=False)
 
             gr.Markdown("### 📝 Answer")
-            answer_anchor = gr.HTML("<div id='pqa-answer-anchor'></div>", show_label=False)
+            answer_anchor = gr.HTML(
+                "<div id='pqa-answer-anchor'></div>", show_label=False
+            )
             answer_display = gr.HTML(label="Answer")
 
             gr.Markdown("### 📚 Sources")
