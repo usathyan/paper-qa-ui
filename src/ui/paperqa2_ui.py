@@ -1200,6 +1200,7 @@ def stream_analysis_progress(
     # No table rows in live panel; top evidence is rendered later in Research Intelligence
     retrieval_done = False
     contexts_selected = 0
+    contexts_selected_filtered: int | None = None
     candidate_count: int | None = None
     mmr_lambda: float | None = None
     score_min: float | None = None
@@ -1340,7 +1341,15 @@ def stream_analysis_progress(
             ),
             (
                 f"<div class='pqa-subtle pqa-bar'><div class='pqa-bar-fill {'pqa-bar-indet' if not retrieval_done and pct == 0 else ''}' style='width:{pct}%'></div></div>"
-                f"<div style='margin-top:4px'><small class='pqa-muted'>{contexts_selected}/{ev_k} contexts</small></div>"
+                + (
+                    f"<div style='margin-top:4px'><small class='pqa-muted'>{contexts_selected}/{ev_k} contexts"
+                    + (
+                        f" (≥cutoff: {contexts_selected_filtered})"
+                        if isinstance(contexts_selected_filtered, int)
+                        else ""
+                    )
+                    + "</small></div>"
+                )
             ),
             "<div class='pqa-subtle'>",
             f"<div><small>{html.escape(latest)}</small></div>",
@@ -1637,6 +1646,28 @@ def stream_analysis_progress(
                             except Exception:
                                 continue
                         per_doc_counts = tmp
+                    # compute filtered contexts count using current cutoff, if scores present
+                    try:
+                        cutoff_val = float(
+                            getattr(
+                                getattr(app_state.get("settings"), "answer", object()),
+                                "evidence_relevance_score_cutoff",
+                                0.0,
+                            )
+                        )
+                    except Exception:
+                        cutoff_val = 0.0
+                    scores_list = data.get("scores_list")
+                    if isinstance(scores_list, list):
+                        try:
+                            contexts_selected_filtered = sum(
+                                1
+                                for v in scores_list
+                                if isinstance(v, (int, float))
+                                and float(v) >= cutoff_val
+                            )
+                        except Exception:
+                            contexts_selected_filtered = None
                 except Exception:
                     pass
             elif isinstance(evt, dict) and evt.get("type") == "mmr":
