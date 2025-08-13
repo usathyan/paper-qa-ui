@@ -741,22 +741,7 @@ def stream_analysis_progress(
             f"<div><small>{html.escape(latest)}</small></div>",
             "</div>",
         ]
-        if table_rows:
-            parts.append(
-                "<div style='margin-top:10px'><strong>Top evidence (live)</strong>"
-            )
-            parts.append("<div style='overflow-x:auto'><table class='pqa-table'>")
-            parts.append(
-                "<tr><th>Source</th><th>Score</th><th>Page</th><th>Snippet</th></tr>"
-            )
-            for row in table_rows[:10]:
-                parts.append(
-                    f"<tr><td>{html.escape(row.get('source', ''))}</td>"
-                    f"<td>{row.get('score', '')}</td>"
-                    f"<td>{row.get('page', '')}</td>"
-                    f"<td><small>{html.escape(row.get('snippet', '')[:300])}</small></td></tr>"
-                )
-            parts.append("</table></div></div>")
+        # Omit Top evidence table here; it belongs in Research Intelligence
         parts.append("</div>")
         return "".join(parts)
 
@@ -1048,8 +1033,27 @@ def build_intelligence_html(answer: str, contexts: List) -> str:
             parts.extend([f"<li>{x}</li>" for x in ev_summary_items])
         parts.append("</ul></div>")
 
-        # Top evidence table intentionally omitted here to avoid duplication with
-        # the live "Analysis Progress" panel shown above.
+        # Render top evidence table under Research Intelligence
+        if scored_items:
+            parts.append(
+                "<div style='margin-top:8px'><strong>Top evidence (by score)</strong>"
+            )
+            parts.append(
+                "<div style='overflow-x:auto'><table class='pqa-table'>"
+            )
+            parts.append(
+                "<tr><th>Source</th><th>Score</th><th>Page</th><th>Snippet</th></tr>"
+            )
+            for score, display, page, snippet in scored_items[:10]:
+                score_str = f"{score:.3f}" if isinstance(score, (int, float)) else "-"
+                page_str = str(int(page)) if isinstance(page, (int, float)) else "-"
+                parts.append(
+                    f"<tr><td>{display}</td>"
+                    f"<td>{score_str}</td>"
+                    f"<td>{page_str}</td>"
+                    f"<td><small>{snippet}</small></td></tr>"
+                )
+            parts.append("</table></div></div>")
         parts.append("</div>")
         return "".join(parts)
     except Exception as e:
