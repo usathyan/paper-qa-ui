@@ -40,8 +40,8 @@ NAME_TO_PROVIDER = {
 
 def select_clients(provider_names: Iterable[str]) -> List[type]:
     if not provider_names or any(n.lower() == "all" for n in provider_names):
-        # ALL_CLIENTS is provided by paperqa; type: ignore for mypy
-        return list(ALL_CLIENTS)  # type: ignore[list-item]
+        # ALL_CLIENTS is provided by paperqa
+        return list(ALL_CLIENTS)
     # Import classes from paperqa.clients.* dynamically
     import importlib
 

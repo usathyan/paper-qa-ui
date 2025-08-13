@@ -507,6 +507,8 @@ async def process_question_async(
 
             app_state["processing_status"] = "❌ Error occurred during processing"
             return "", "", "", "", error_msg
+    # Safety net (should not be reached)
+    return "", "", "", "", "❌ Unknown error"
 
 
 def process_question(
@@ -829,7 +831,7 @@ def build_intelligence_html(answer: str, contexts: List) -> str:
         return "<div style='color:#666'>Research Intelligence unavailable.</div>"
 
 
-def clear_all():
+def clear_all() -> Tuple[str, str, str, str, str, str]:
     """Clear all uploaded documents and reset the interface."""
     app_state["uploaded_docs"] = []
     app_state["processing_status"] = ""

@@ -93,9 +93,9 @@ Examples:
     try:
         # Fallback: use PaperQACore if available, otherwise skip
         try:
-            from ..paperqa2_core import PaperQACore  # type: ignore
+            from ..paperqa2_core import PaperQACore
         except Exception:
-            from ..paper_qa_core import PaperQACore  # type: ignore
+            from ..paper_qa_core import PaperQACore
 
         print(f"\nQuerying: {args.question}")
         print(f"Method: {args.method}")
