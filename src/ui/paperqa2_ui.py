@@ -965,11 +965,20 @@ def _run_pre_evidence_in_thread(
                     # Normalize structure
                     norm: List[Dict[str, Any]] = []
                     for it in trimmed:
-                        norm.append({
-                            "doc": str(it.get("doc", "Candidate")),
-                            "score": (float(it.get("score")) if isinstance(it.get("score"), (int, float)) else None),
-                        })
-                    q.put({"type": "mmr_candidates", "data": {"items": norm}}, timeout=0.1)
+                        score_val = it.get("score")
+                        norm.append(
+                            {
+                                "doc": str(it.get("doc", "Candidate")),
+                                "score": (
+                                    float(score_val)
+                                    if isinstance(score_val, (int, float))
+                                    else None
+                                ),
+                            }
+                        )
+                    q.put(
+                        {"type": "mmr_candidates", "data": {"items": norm}}, timeout=0.1
+                    )
             except Exception:
                 pass
         except Exception:
@@ -1050,6 +1059,7 @@ def stream_analysis_progress(
     mmr_items_state: List[
         Dict[str, Any]
     ] = []  # [{'doc': str, 'score': Optional[float]}]
+    mmr_candidates_state: List[Dict[str, Any]] = []
     embed_latency_s: float | None = None
     # Answer-phase metrics
     answer_elapsed_s: float | None = None
@@ -1186,11 +1196,7 @@ def stream_analysis_progress(
             # Retrieval
             (
                 f"<li><small>Query embedding & retrieval: embed_latency={embed_latency_s:.2f}s, candidate_count="
-                + (
-                    str(candidate_count)
-                    if isinstance(candidate_count, int)
-                    else "N/A"
-                )
+                + (str(candidate_count) if isinstance(candidate_count, int) else "N/A")
                 + ", mmr_lambda="
                 + (
                     f"{mmr_lambda:.2f}"
@@ -1266,60 +1272,84 @@ def stream_analysis_progress(
             "</ul>",
             "</div>",
         ]
-        # Basic MMR visualization (selected set only): score histogram and diversity summary
-        if mmr_items_state:
+        # MMR (Maximum Marginal Relevance) visualization: candidate vs selected
+        if mmr_items_state or mmr_candidates_state:
             try:
-                # Extract scores ignoring None
-                scs = [
+                # Selected summary
+                sel_scores = [
                     float(x["score"])
                     for x in mmr_items_state
                     if isinstance(x.get("score"), (int, float))
                 ]
-                unique_docs = len(
+                sel_unique_docs = len(
                     {str(x.get("doc", "Unknown")) for x in mmr_items_state}
                 )
-                total_sel = len(mmr_items_state)
-                diversity_share = (unique_docs / total_sel) if total_sel > 0 else 0.0
+                sel_total = len(mmr_items_state)
+                sel_div_share = (sel_unique_docs / sel_total) if sel_total > 0 else 0.0
+                # Candidate summary
+                cand_scores = []
+                for x in mmr_candidates_state:
+                    sv = x.get("score")
+                    if isinstance(sv, (int, float)):
+                        cand_scores.append(float(sv))
+                cand_total = len(mmr_candidates_state)
 
-                # Build histogram with up to 10 bins over score range
+                # Overlay histogram (candidates in light blue, selected in blue)
                 hist_svg = ""
-                if scs:
-                    smin = min(scs)
-                    smax = max(scs)
+                if cand_scores or sel_scores:
+                    smin = min((cand_scores + sel_scores) or [0.0])
+                    smax = max((cand_scores + sel_scores) or [1.0])
                     bins = 10
                     if smax <= smin:
                         smax = smin + 1e-6
                     width, height, pad = 320, 64, 4
-                    bucket_counts = [0] * bins
-                    for s in scs:
+                    bucket_c = [0] * bins
+                    bucket_s = [0] * bins
+                    for s in cand_scores:
                         idx = int((s - smin) / (smax - smin) * (bins - 1) + 1e-9)
                         idx = max(0, min(bins - 1, idx))
-                        bucket_counts[idx] += 1
-                    maxc = max(bucket_counts) if bucket_counts else 1
+                        bucket_c[idx] += 1
+                    for s in sel_scores:
+                        idx = int((s - smin) / (smax - smin) * (bins - 1) + 1e-9)
+                        idx = max(0, min(bins - 1, idx))
+                        bucket_s[idx] += 1
+                    maxc = max(bucket_c + bucket_s) if (bucket_c or bucket_s) else 1
                     bw = (width - 2 * pad) / bins
-                    bars = []
-                    for i, c in enumerate(bucket_counts):
-                        bh = 0 if maxc == 0 else int(((c / maxc) * (height - 2 * pad)))
-                        x = pad + int(i * bw)
-                        y = height - pad - bh
+                    bars: List[str] = []
+                    for i in range(bins):
+                        c1 = bucket_c[i]
+                        c2 = bucket_s[i]
+                        bh1 = (
+                            0 if maxc == 0 else int(((c1 / maxc) * (height - 2 * pad)))
+                        )
+                        bh2 = (
+                            0 if maxc == 0 else int(((c2 / maxc) * (height - 2 * pad)))
+                        )
+                        x = int(pad + i * bw)
+                        y1 = height - pad - bh1
+                        y2 = height - pad - bh2
                         bars.append(
-                            f"<rect x='{x}' y='{y}' width='{max(1, int(bw - 1))}' height='{bh}' fill='#3b82f6' />"
+                            f"<rect x='{x}' y='{y1}' width='{max(1, int(bw - 1))}' height='{bh1}' fill='#93c5fd' />"
+                        )
+                        bars.append(
+                            f"<rect x='{x}' y='{y2}' width='{max(1, int(bw - 1))}' height='{bh2}' fill='#3b82f6' />"
                         )
                     axis = (
                         f"<text x='{pad}' y='{height - 2}' font-size='9' fill='#9ca3af'>{smin:.2f}</text>"
                         f"<text x='{width - pad - 20}' y='{height - 2}' font-size='9' fill='#9ca3af' text-anchor='end'>{smax:.2f}</text>"
                     )
                     hist_svg = (
-                        f"<svg width='{width}' height='{height}' viewBox='0 0 {width} {height}' "
-                        + "xmlns='http://www.w3.org/2000/svg'>"
+                        f"<svg width='{width}' height='{height}' viewBox='0 0 {width} {height}' xmlns='http://www.w3.org/2000/svg'>"
                         + "".join(bars)
                         + axis
                         + "</svg>"
                     )
                 parts.append("<div class='pqa-panel' style='margin-top:8px'>")
-                parts.append("<strong>MMR (Maximum Marginal Relevance) selection</strong>")
                 parts.append(
-                    f"<div style='margin-top:4px'><small class='pqa-muted'>Selected={total_sel}, Unique docs={unique_docs} (share={diversity_share:.0%})</small></div>"
+                    "<strong>MMR (Maximum Marginal Relevance) selection</strong>"
+                )
+                parts.append(
+                    f"<div style='margin-top:4px'><small class='pqa-muted'>Candidates={cand_total}; Selected={sel_total}, Unique docs={sel_unique_docs} (share={sel_div_share:.0%})</small></div>"
                 )
                 if hist_svg:
                     parts.append("<div style='margin-top:4px'>" + hist_svg + "</div>")
@@ -1369,7 +1399,9 @@ def stream_analysis_progress(
                 except Exception:
                     pass
                 try:
-                    m_l = re.search(r"mmr[_\s-]*lambda\s*[:=]\s*([0-9]*\.?[0-9]+)", msg, re.I)
+                    m_l = re.search(
+                        r"mmr[_\s-]*lambda\s*[:=]\s*([0-9]*\.?[0-9]+)", msg, re.I
+                    )
                     if m_l:
                         mmr_lambda = float(m_l.group(1))
                 except Exception:
@@ -1430,6 +1462,25 @@ def stream_analysis_progress(
                             mmr_items_state.append(
                                 {
                                     "doc": str(it.get("doc", "Unknown")),
+                                    "score": (
+                                        float(it.get("score"))
+                                        if isinstance(it.get("score"), (int, float))
+                                        else None
+                                    ),
+                                }
+                            )
+                        except Exception:
+                            continue
+            elif isinstance(evt, dict) and evt.get("type") == "mmr_candidates":
+                data = evt.get("data", {}) or {}
+                items = data.get("items") or []
+                if isinstance(items, list):
+                    mmr_candidates_state = []
+                    for it in items:
+                        try:
+                            mmr_candidates_state.append(
+                                {
+                                    "doc": str(it.get("doc", "Candidate")),
                                     "score": (
                                         float(it.get("score"))
                                         if isinstance(it.get("score"), (int, float))
