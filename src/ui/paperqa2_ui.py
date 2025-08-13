@@ -1637,11 +1637,8 @@ async def build_llm_or_heuristic_critique_html(
     Runs any network LLM call on the dedicated background loop to avoid event-loop conflicts.
     """
     try:
-        api_key = os.getenv("OPENROUTER_API_KEY", "").strip()
         model_name = str(getattr(settings, "llm", "") or "").strip()
-        use_openrouter = bool(api_key) and model_name.startswith("openrouter/")
-
-        if use_openrouter:
+        if model_name:
             try:
                 import litellm
 
@@ -1722,12 +1719,16 @@ async def build_llm_or_heuristic_critique_html(
                     return ""
 
                 async def _go() -> str:
-                    resp = await litellm.acompletion(
-                        model=model_name,
-                        messages=messages,
-                        api_key=api_key,
-                        timeout=20,
-                    )
+                    kwargs: Dict[str, Any] = {
+                        "model": model_name,
+                        "messages": messages,
+                        "timeout": 20,
+                    }
+                    # Include OpenRouter API key if applicable; other providers use their own env keys
+                    api_key = os.getenv("OPENROUTER_API_KEY", "").strip()
+                    if api_key and model_name.startswith("openrouter/"):
+                        kwargs["api_key"] = api_key
+                    resp = await litellm.acompletion(**kwargs)
                     return _extract_content(resp)
 
                 _ensure_query_loop()
