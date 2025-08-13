@@ -1393,6 +1393,38 @@ def stream_analysis_progress(
             "</ul>",
             "</div>",
         ]
+        # Curation preview (based on current settings and observed counts)
+        try:
+            cur = app_state.get("curation", {}) or {}
+            cap = int(cur.get("per_doc_cap", 0) or 0)
+            cutoff_disp = cur.get("score_cutoff", None)
+            max_srcs = int(cur.get("max_sources", 0) or 0)
+            if cap > 0 or isinstance(cutoff_disp, (int, float)) or max_srcs > 0:
+                # Estimate post-cap total contexts (using observed per-doc counts)
+                est_total = None
+                if per_doc_counts and cap > 0:
+                    est_total = sum(min(cap, c) for c in per_doc_counts.values())
+                cap_str = f"per_doc_cap={cap}" if cap > 0 else "per_doc_cap=—"
+                cutoff_str = (
+                    f"cutoff={float(cutoff_disp):.2f}"
+                    if isinstance(cutoff_disp, (int, float))
+                    else "cutoff=—"
+                )
+                maxs_str = (
+                    f"max_sources={max_srcs}" if max_srcs > 0 else "max_sources=—"
+                )
+                est_str = (
+                    f"estimated_contexts_after_cap≈{est_total}"
+                    if isinstance(est_total, int)
+                    else "estimated_contexts_after_cap=—"
+                )
+                parts.append(
+                    "<div class='pqa-panel' style='margin-top:8px'><strong>Curation preview</strong>"
+                    + f"<div><small class='pqa-muted'>{cap_str}; {cutoff_str}; {maxs_str}; {est_str}</small></div>"
+                    + "</div>"
+                )
+        except Exception:
+            pass
         # MMR (Maximum Marginal Relevance) visualization: candidate vs selected
         if mmr_items_state or mmr_candidates_state:
             try:
@@ -1697,6 +1729,18 @@ def format_sources_html(contexts: List) -> str:
                 meta_bits.append(f"p. {int(page)}")
             if isinstance(score, (int, float)):
                 meta_bits.append(f"score={score:.3f}")
+            # Flags: preprint / possible retraction (heuristic)
+            flags_bits = []
+            try:
+                dn_low = (display_name or "").lower()
+                if any(
+                    k in dn_low for k in ["arxiv", "biorxiv", "medrxiv", "preprint"]
+                ):
+                    flags_bits.append("Preprint")
+                if "retract" in dn_low:
+                    flags_bits.append("Retracted?")
+            except Exception:
+                pass
             meta = (
                 f" <small class='pqa-muted'>({' | '.join(meta_bits)})</small>"
                 if meta_bits
@@ -1707,6 +1751,15 @@ def format_sources_html(contexts: List) -> str:
                 "<div class='pqa-subtle' style='margin-bottom:10px; padding:10px; border-left: 3px solid #3b82f6;'>"
             )
             html_parts.append(f"<strong>{display_name}</strong>{meta}<br>")
+            if flags_bits:
+                html_parts.append(
+                    "".join(
+                        [
+                            f"<span class='pqa-subtle' style='display:inline-block;padding:2px 6px;margin:2px;border-radius:10px'>{html.escape(flag)}</span>"
+                            for flag in flags_bits
+                        ]
+                    )
+                )
             html_parts.append(f"<small>{snippet}</small>")
             html_parts.append("</div>")
         except Exception as e:
@@ -1994,6 +2047,26 @@ def build_intelligence_html(answer: str, contexts: List) -> str:
         else:
             parts.append("<li>No explicit contradictions detected across sources.</li>")
         parts.append("</ul></div>")
+
+        # Evidence conflicts view (cluster excerpts across docs)
+        try:
+            conflicts_ui: List[str] = []
+            for entity, items in list(claim_map.items())[:6]:
+                docs_for_entity = list({d for _p, _v, d in items})
+                docs_display = ", ".join([html.escape(d) for d in docs_for_entity[:4]])
+                conflicts_ui.append(
+                    f"<li><small><strong>{html.escape(entity)}</strong>: {len(docs_for_entity)} source(s) [{docs_display}{' …' if len(docs_for_entity) > 4 else ''}]</small></li>"
+                )
+            parts.append(
+                "<div style='margin-top:8px'><strong>Evidence conflicts</strong><ul>"
+            )
+            if conflicts_ui:
+                parts.extend(conflicts_ui)
+            else:
+                parts.append("<li><small>No clustered conflicts detected.</small></li>")
+            parts.append("</ul></div>")
+        except Exception:
+            pass
 
         parts.append("<div style='margin-top:8px'><strong>Key insights</strong><ul>")
         if insights:
