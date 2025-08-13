@@ -131,26 +131,6 @@ def initialize_settings(config_name: str = "optimized_ollama") -> Settings:
                     )
             except Exception:
                 pass
-        # MMR visualization (compact)
-        try:
-            mmr_cache = app_state.get("_mmr_items", [])
-            if mmr_cache:
-                parts.append("<div class='pqa-panel' style='margin-top:8px'><strong>MMR selection (by score)</strong>")
-                top = mmr_cache[:10]
-                max_score = max([x.get("score") or 0 for x in top]) if top else 1
-                viz_rows: List[str] = []
-                for it in top:
-                    sc = float(it.get("score") or 0)
-                    pct = int(round((sc / max_score) * 100)) if max_score > 0 else 0
-                    name = str(it.get("doc") or "Unknown")
-                    viz_rows.append(
-                        f"<div style='margin:4px 0'><small>{html.escape(name)}</small>"
-                        f"<div class='pqa-subtle' style='height:8px;border-radius:6px;overflow:hidden'><div style='height:100%;width:{pct}%;background:#3b82f6'></div></div>"
-                        f"<small class='pqa-muted'>{sc:.3f}</small></div>"
-                    )
-                parts.append("".join(viz_rows) + "</div>")
-        except Exception:
-            pass
         except Exception:
             pass
         try:
@@ -241,7 +221,9 @@ async def process_uploaded_files_async(files: List[Any]) -> Tuple[str, str]:
 
         for i, file_obj in enumerate(files):
             # Handle Gradio file object - extract the actual file path
-            if hasattr(file_obj, "name"):
+            if isinstance(file_obj, dict) and "name" in file_obj:
+                source_path = Path(str(file_obj["name"]))
+            elif hasattr(file_obj, "name"):
                 # Newer Gradio versions return file objects with .name attribute
                 source_path = Path(file_obj.name)
             else:
@@ -565,7 +547,11 @@ async def process_question_async(
             )
             intelligence_html = build_intelligence_html(answer, contexts)
             if critique_html:
-                intelligence_html += "<div style='margin-top:8px'><strong>Critique</strong>" + critique_html + "</div>"
+                intelligence_html += (
+                    "<div style='margin-top:8px'><strong>Critique</strong>"
+                    + critique_html
+                    + "</div>"
+                )
 
             # Session data for exports
             try:
@@ -577,13 +563,17 @@ async def process_question_async(
                     citation = None
                     if doc is not None:
                         citation = getattr(doc, "formatted_citation", None)
-                        title = getattr(doc, "title", None) or getattr(doc, "docname", None)
+                        title = getattr(doc, "title", None) or getattr(
+                            doc, "docname", None
+                        )
                     export_contexts.append(
                         {
                             "doc": citation or title or "Unknown",
                             "page": getattr(c, "page", None),
                             "score": getattr(c, "score", None),
-                            "text": getattr(txt_obj, "text", None) if txt_obj is not None else None,
+                            "text": getattr(txt_obj, "text", None)
+                            if txt_obj is not None
+                            else None,
                         }
                     )
                 app_state["session_data"] = {
@@ -832,10 +822,12 @@ def _run_pre_evidence_in_thread(
                     title = getattr(doc, "title", None) or getattr(doc, "docname", None)
                 name = citation or title or "Unknown"
                 per_doc[name] = per_doc.get(name, 0) + 1
-                mmr_items.append({
-                    "doc": name,
-                    "score": float(sc) if isinstance(sc, (int, float)) else None,
-                })
+                mmr_items.append(
+                    {
+                        "doc": name,
+                        "score": float(sc) if isinstance(sc, (int, float)) else None,
+                    }
+                )
             score_min = min(scores) if scores else None
             score_max = max(scores) if scores else None
             score_mean = (sum(scores) / len(scores)) if scores else None
@@ -1023,13 +1015,25 @@ def stream_analysis_progress(
             ),
             (
                 "<div class='pqa-steps'>"
-                + ("<span class='pqa-step done'>Retrieval</span>" if retrieval_done else "<span class='pqa-step'>Retrieval</span>")
-                + ("<span class='pqa-step done'>Summaries</span>" if summaries_done else "<span class='pqa-step'>Summaries</span>")
-                + ("<span class='pqa-step done'>Answer</span>" if answer_done else "<span class='pqa-step'>Answer</span>")
+                + (
+                    "<span class='pqa-step done'>Retrieval</span>"
+                    if retrieval_done
+                    else "<span class='pqa-step'>Retrieval</span>"
+                )
+                + (
+                    "<span class='pqa-step done'>Summaries</span>"
+                    if summaries_done
+                    else "<span class='pqa-step'>Summaries</span>"
+                )
+                + (
+                    "<span class='pqa-step done'>Answer</span>"
+                    if answer_done
+                    else "<span class='pqa-step'>Answer</span>"
+                )
                 + "</div>"
             ),
             (
-                f"<div class='pqa-subtle pqa-bar'><div class='pqa-bar-fill {'pqa-bar-indet' if not retrieval_done and pct==0 else ''}' style='width:{pct}%'></div></div>"
+                f"<div class='pqa-subtle pqa-bar'><div class='pqa-bar-fill {'pqa-bar-indet' if not retrieval_done and pct == 0 else ''}' style='width:{pct}%'></div></div>"
                 f"<div style='margin-top:4px'><small class='pqa-muted'>{contexts_selected}/{ev_k} contexts</small></div>"
             ),
             "<div class='pqa-subtle'>",
@@ -1501,6 +1505,9 @@ def build_intelligence_html(answer: str, contexts: List) -> str:
             parts.append("</table></div></div>")
         parts.append("</div>")
         return "".join(parts)
+    except Exception as e:
+        logger.warning(f"Failed to build intelligence panel: {e}")
+        return "<div class='pqa-subtle'><small class='pqa-muted'>Research Intelligence unavailable.</small></div>"
 
 
 def build_critique_html(answer: str, contexts: List) -> str:
@@ -1514,21 +1521,24 @@ def build_critique_html(answer: str, contexts: List) -> str:
         # Simple unsupported claim heuristic: claim words without numbers/citations nearby
         risky_terms = ["significant", "novel", "first", "proves", "causes"]
         if any(t in answer.lower() for t in risky_terms):
-            flags.append("Contains strong language; verify claims against evidence excerpts.")
+            flags.append(
+                "Contains strong language; verify claims against evidence excerpts."
+            )
         if not contexts:
-            flags.append("No evidence excerpts selected; answer may be under-supported.")
+            flags.append(
+                "No evidence excerpts selected; answer may be under-supported."
+            )
         if not flags:
             flags.append("No obvious issues detected.")
         return (
             "<div class='pqa-subtle' style='margin-top:6px'>"
-            + "<ul>" + "".join([f"<li><small>{html.escape(x)}</small></li>" for x in flags]) + "</ul>"
+            + "<ul>"
+            + "".join([f"<li><small>{html.escape(x)}</small></li>" for x in flags])
+            + "</ul>"
             + "</div>"
         )
     except Exception:
         return "<div class='pqa-subtle'><small class='pqa-muted'>Critique unavailable.</small></div>"
-    except Exception as e:
-        logger.warning(f"Failed to build intelligence panel: {e}")
-        return "<div class='pqa-subtle'><small class='pqa-muted'>Research Intelligence unavailable.</small></div>"
 
 
 def clear_all() -> Tuple[str, str, str, str, str, str, str]:
@@ -1604,6 +1614,7 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
             )
 
             gr.Markdown("### ⚙️ Configuration")
+
             def _on_config_change(cfg: str) -> str:
                 app_state["settings"] = initialize_settings(cfg)
                 return f"Configuration set to: {cfg}"
@@ -1662,11 +1673,11 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
     # Removed separate Analysis Progress tab; progress now streams inline below the question
 
     # Event handlers - automatically process documents on upload
-    def _pre_upload_disable() -> dict:
-        return gr.Button.update(interactive=False)
+    def _pre_upload_disable() -> Dict[str, Any]:
+        return {"interactive": False}
 
-    def _post_upload_enable() -> dict:
-        return gr.Button.update(interactive=True)
+    def _post_upload_enable() -> Dict[str, Any]:
+        return {"interactive": True}
 
     file_upload.change(
         fn=process_uploaded_files,
@@ -1680,10 +1691,12 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
     file_upload.change(fn=_pre_upload_disable, outputs=[ask_button])
     upload_status.change(fn=_post_upload_enable, outputs=[ask_button])
 
-    def _enable_ask(is_ready: bool) -> dict:
-        return gr.Button.update(interactive=is_ready)
+    def _enable_ask(is_ready: bool) -> Dict[str, Any]:
+        return {"interactive": bool(is_ready)}
 
-    config_dropdown.change(fn=_on_config_change, inputs=[config_dropdown], outputs=[cfg_status])
+    config_dropdown.change(
+        fn=_on_config_change, inputs=[config_dropdown], outputs=[cfg_status]
+    )
 
     ask_button.click(
         fn=ask_with_progress,
