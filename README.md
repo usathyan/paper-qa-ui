@@ -9,6 +9,9 @@ This document describes exactly how to operate the UI, what each control does, h
 
 ## Screenshot of what the UI looks like
 
+<p align="center">
+  <img src="./screenshot.png" alt="Paper-QA UI" width="1000" />
+</p>
 
 ## 2. Document intake
 - Upload PDFs via the left panel.
@@ -116,8 +119,3 @@ Clarification: identical rewritten text
 - If a port is occupied, run `make kill-server` then `make ui`.
 - If API keys are missing for cloud LLMs, use the default local config or set keys in `.env`.
 
-## Screenshot of what the UI looks like
-
-<p align="center">
-  <img src="./screenshot.png" alt="Paper-QA UI" width="1000" />
-</p>
