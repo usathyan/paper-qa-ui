@@ -433,18 +433,46 @@ async def process_question_async(
 
                 # Query the in-memory Docs corpus on a dedicated long-lived loop
                 # Schedule coroutine on the background loop and wait from current loop
+                aquery_start = time.time()
                 fut = asyncio.run_coroutine_threadsafe(
                     app_state["docs"].aquery(question, settings=settings), qloop
                 )
                 # Wait in a thread to avoid blocking current event loop
                 session = await asyncio.to_thread(fut.result, timeout=600)
+                aquery_elapsed = time.time() - aquery_start
 
-                # Emit phase completion events
+                # Emit phase completion events and answer metrics
                 try:
                     aq = app_state.get("analysis_queue")
                     if aq is not None:
                         aq.put({"type": "phase", "data": {"phase": "summaries", "status": "end"}}, timeout=0.05)
                         aq.put({"type": "phase", "data": {"phase": "answer", "status": "end"}}, timeout=0.05)
+                        # Emit answer generation stats
+                        try:
+                            contexts = getattr(session, "contexts", []) or []
+                            n_sources = len(contexts)
+                            total_chars = 0
+                            for c in contexts:
+                                try:
+                                    t = getattr(getattr(c, "text", object()), "text", None)
+                                    if isinstance(t, str):
+                                        total_chars += len(t)
+                                except Exception:
+                                    continue
+                            aq.put(
+                                {
+                                    "type": "answer_stats",
+                                    "data": {
+                                        "elapsed_s": aquery_elapsed,
+                                        "sources_included": n_sources,
+                                        "approx_prompt_chars": total_chars,
+                                        "attempts": 1,
+                                    },
+                                },
+                                timeout=0.05,
+                            )
+                        except Exception:
+                            pass
                 except Exception:
                     pass
 
@@ -909,9 +937,9 @@ def stream_analysis_progress(
             (
                 f"<li><small>Prompt building: answer_max_sources={max_sources}, sources_included=N/A, prompt_length=N/A</small></li>"
             ),
-            # Answer generation
+            # Answer generation (with elapsed)
             (
-                f"<li><small>Answer generation: max_attempts={max_attempts}, retries=N/A, tokens=N/A</small></li>"
+                f"<li><small>Answer generation: max_attempts={max_attempts}, elapsed=N/A, retries=N/A, tokens=N/A</small></li>"
             ),
             # Post-processing
             (
@@ -972,6 +1000,19 @@ def stream_analysis_progress(
                             except Exception:
                                 continue
                         per_doc_counts = tmp
+                except Exception:
+                    pass
+            elif isinstance(evt, dict) and evt.get("type") == "answer_stats":
+                data = evt.get("data", {}) or {}
+                try:
+                    # Update transparency placeholders by appending a log line
+                    elapsed_ans = data.get("elapsed_s")
+                    srcs = data.get("sources_included")
+                    plen = data.get("approx_prompt_chars")
+                    atts = data.get("attempts")
+                    logs.append(
+                        f"Answer: elapsed={elapsed_ans:.2f}s, sources_included={srcs}, prompt_chars≈{plen}, attempts={atts}"
+                    )
                 except Exception:
                     pass
             idle_cycles = 0
