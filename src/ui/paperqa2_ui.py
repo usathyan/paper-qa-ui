@@ -371,7 +371,7 @@ def process_uploaded_files(files: List[str]) -> Tuple[str, str]:
 
 
 async def process_question_async(
-    question: str, config_name: str = "optimized_ollama"
+    question: str, config_name: str = "optimized_ollama", run_critique: bool = False
 ) -> Tuple[str, str, str, str, str]:
     """Process a question asynchronously using the stored documents."""
     max_retries = 3
@@ -545,6 +545,14 @@ async def process_question_async(
                     "⚠️ Limited information found - try a more general question"
                 )
 
+            # Optional critique (heuristic placeholder)
+            critique_html = ""
+            if run_critique and answer:
+                try:
+                    critique_html = build_critique_html(answer, contexts)
+                except Exception:
+                    critique_html = "<div class='pqa-subtle'><small class='pqa-muted'>Critique unavailable.</small></div>"
+
             answer_html = format_answer_html(answer, contexts)
             sources_html = format_sources_html(contexts)
             metadata_html = format_metadata_html(
@@ -556,6 +564,42 @@ async def process_question_async(
                 }
             )
             intelligence_html = build_intelligence_html(answer, contexts)
+            if critique_html:
+                intelligence_html += "<div style='margin-top:8px'><strong>Critique</strong>" + critique_html + "</div>"
+
+            # Session data for exports
+            try:
+                export_contexts = []
+                for c in contexts:
+                    txt_obj = getattr(c, "text", None)
+                    doc = getattr(txt_obj, "doc", None) if txt_obj is not None else None
+                    title = None
+                    citation = None
+                    if doc is not None:
+                        citation = getattr(doc, "formatted_citation", None)
+                        title = getattr(doc, "title", None) or getattr(doc, "docname", None)
+                    export_contexts.append(
+                        {
+                            "doc": citation or title or "Unknown",
+                            "page": getattr(c, "page", None),
+                            "score": getattr(c, "score", None),
+                            "text": getattr(txt_obj, "text", None) if txt_obj is not None else None,
+                        }
+                    )
+                app_state["session_data"] = {
+                    "question": question,
+                    "answer": answer,
+                    "contexts": export_contexts,
+                    "processing_time": processing_time,
+                    "documents_searched": len(app_state.get("uploaded_docs", [])),
+                    "metrics": {
+                        "score_min": None,
+                        "score_mean": None,
+                        "score_max": None,
+                    },
+                }
+            except Exception:
+                pass
 
             return answer_html, sources_html, metadata_html, intelligence_html, ""
 
@@ -607,11 +651,11 @@ async def process_question_async(
 
 
 def process_question(
-    question: str, config_name: str = "optimized_ollama"
+    question: str, config_name: str = "optimized_ollama", run_critique: bool = False
 ) -> Tuple[str, str, str, str, str, str, str]:
     """Synchronous wrapper for process_question_async."""
     answer_html, sources_html, metadata_html, intelligence_html, error_msg = (
-        asyncio.run(process_question_async(question, config_name))
+        asyncio.run(process_question_async(question, config_name, run_critique))
     )
 
     # Get status updates
@@ -632,7 +676,7 @@ def process_question(
 
 
 def ask_with_progress(
-    question: str, config_name: str = "optimized_ollama"
+    question: str, config_name: str = "optimized_ollama", run_critique: bool = False
 ) -> Generator[Tuple[str, str, str, str, str, str, str], None, None]:
     """Stream pre-evidence progress inline, then yield final answer outputs.
 
@@ -668,7 +712,7 @@ def ask_with_progress(
             result_holder["error_msg"],
             _progress_html,
             result_holder["status_html"],
-        ) = process_question(question, config_name)
+        ) = process_question(question, config_name, run_critique)
 
     t = threading.Thread(target=_run_query, daemon=True)
     t.start()
@@ -1457,6 +1501,31 @@ def build_intelligence_html(answer: str, contexts: List) -> str:
             parts.append("</table></div></div>")
         parts.append("</div>")
         return "".join(parts)
+
+
+def build_critique_html(answer: str, contexts: List) -> str:
+    """Heuristic critique: flag potential unsupported claims and suggest checks.
+    This is a lightweight placeholder; can be upgraded to an LLM call.
+    """
+    try:
+        flags: List[str] = []
+        if len(answer.split()) > 250:
+            flags.append("Answer is long; consider tighter citation linkage.")
+        # Simple unsupported claim heuristic: claim words without numbers/citations nearby
+        risky_terms = ["significant", "novel", "first", "proves", "causes"]
+        if any(t in answer.lower() for t in risky_terms):
+            flags.append("Contains strong language; verify claims against evidence excerpts.")
+        if not contexts:
+            flags.append("No evidence excerpts selected; answer may be under-supported.")
+        if not flags:
+            flags.append("No obvious issues detected.")
+        return (
+            "<div class='pqa-subtle' style='margin-top:6px'>"
+            + "<ul>" + "".join([f"<li><small>{html.escape(x)}</small></li>" for x in flags]) + "</ul>"
+            + "</div>"
+        )
+    except Exception:
+        return "<div class='pqa-subtle'><small class='pqa-muted'>Critique unavailable.</small></div>"
     except Exception as e:
         logger.warning(f"Failed to build intelligence panel: {e}")
         return "<div class='pqa-subtle'><small class='pqa-muted'>Research Intelligence unavailable.</small></div>"
@@ -1565,6 +1634,7 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
 
             with gr.Row():
                 ask_button = gr.Button("🤖 Ask Question", variant="primary", size="lg")
+                critique_toggle = gr.Checkbox(label="Run Critique", value=False)
 
             # Status display
             status_display = gr.HTML(label="Processing Status")
@@ -1617,7 +1687,7 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
 
     ask_button.click(
         fn=ask_with_progress,
-        inputs=[question_input, config_dropdown],
+        inputs=[question_input, config_dropdown, critique_toggle],
         outputs=[
             inline_analysis,
             answer_display,
@@ -1631,7 +1701,7 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
 
     question_input.submit(
         fn=ask_with_progress,
-        inputs=[question_input, config_dropdown],
+        inputs=[question_input, config_dropdown, critique_toggle],
         outputs=[
             inline_analysis,
             answer_display,
