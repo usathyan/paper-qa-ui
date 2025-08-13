@@ -1499,6 +1499,29 @@ def build_intelligence_html(answer: str, contexts: List) -> str:
     try:
         # Prepare simple per-doc aggregation
         by_doc: Dict[str, List[str]] = {}
+        doc_years: Dict[str, int] = {}
+        doc_flags: Dict[str, List[str]] = {}
+
+        def _extract_year(s: str) -> int | None:
+            try:
+                m = re.search(r"\b(20\d{2}|19\d{2})\b", s)
+                if m:
+                    y = int(m.group(1))
+                    if 1900 <= y <= 2100:
+                        return y
+            except Exception:
+                return None
+            return None
+
+        def _is_preprint(s: str) -> bool:
+            s_low = s.lower()
+            return any(
+                k in s_low for k in ["arxiv", "biorxiv", "medrxiv", "preprint"]
+            )  # heuristic
+
+        def _is_retracted(s: str) -> bool:
+            return "retract" in s.lower()
+
         for c in contexts or []:
             try:
                 doc = getattr(getattr(c, "text", object()), "doc", None)
@@ -1522,10 +1545,29 @@ def build_intelligence_html(answer: str, contexts: List) -> str:
                 else:
                     txt = str(c)
                 by_doc.setdefault(doc_title, []).append(txt.lower())
+                # Flags and year per doc (first seen wins)
+                if doc_title not in doc_years:
+                    y = None
+                    try:
+                        y = _extract_year(doc_title)
+                    except Exception:
+                        y = None
+                    if y is not None:
+                        doc_years[doc_title] = y
+                # Flags
+                flags: List[str] = []
+                if _is_retracted(doc_title):
+                    flags.append("Retracted?")
+                if _is_preprint(doc_title):
+                    flags.append("Preprint")
+                if flags:
+                    doc_flags[doc_title] = list(
+                        set(doc_flags.get(doc_title, []) + flags)
+                    )
             except Exception:
                 continue
 
-        # Detect simple contradictions by antonym pairs across different docs
+        # Detect contradictions by antonym pairs and simple polarity clustering across docs
         antonym_pairs = [
             ("increase", "decrease"),
             ("higher", "lower"),
@@ -1535,6 +1577,33 @@ def build_intelligence_html(answer: str, contexts: List) -> str:
             ("protective", "risk"),
         ]
         conflict_items = []
+        # Quick claim extractor: (entity_key, polarity, doc_title)
+        claim_map: Dict[str, List[Tuple[int, str, str]]] = {}
+        verb_to_pol = {
+            "increase": 1,
+            "increases": 1,
+            "increased": 1,
+            "higher": 1,
+            "upregulate": 1,
+            "upregulated": 1,
+            "upregulation": 1,
+            "promote": 1,
+            "promotes": 1,
+            "improve": 1,
+            "improves": 1,
+            "decrease": -1,
+            "decreases": -1,
+            "decreased": -1,
+            "lower": -1,
+            "downregulate": -1,
+            "downregulated": -1,
+            "downregulation": -1,
+            "inhibit": -1,
+            "inhibits": -1,
+            "worsen": -1,
+            "worsens": -1,
+        }
+        negations = ["no ", "not ", "does not ", "lack of ", "without "]
         docs_list = list(by_doc.items())
         for i in range(len(docs_list)):
             doc_a, texts_a = docs_list[i]
@@ -1551,6 +1620,46 @@ def build_intelligence_html(answer: str, contexts: List) -> str:
                         conflict_items.append(
                             f"{doc_a} mentions '{w2}', while {doc_b} mentions '{w1}'."
                         )
+
+        # Extract simple claims per sentence and cluster by entity phrase
+        try:
+            for doc_title, texts in by_doc.items():
+                for raw in texts:
+                    for sent in re.split(r"(?<=[.!?])\s+", raw):
+                        s = sent.strip()
+                        if not s:
+                            continue
+                        for verb, pol in verb_to_pol.items():
+                            if verb in s:
+                                inv = pol
+                                s_low = s.lower()
+                                if any(neg in s_low for neg in negations):
+                                    inv = -pol
+                                m = re.search(
+                                    rf"{verb}[^a-zA-Z0-9]+(?:(?:in|of|on|for|to)\s+)?([a-z0-9\-_/]+(?:\s+[a-z0-9\-_/]+){{0,4}})",
+                                    s_low,
+                                )
+                                entity = m.group(1) if m else s_low
+                                entity = re.sub(r"\s+", " ", entity).strip()
+                                entity = entity[:80]
+                                claim_map.setdefault(entity, []).append(
+                                    (inv, verb, doc_title)
+                                )
+                                break
+            contradiction_clusters: List[str] = []
+            for entity, items in claim_map.items():
+                pols = {p for p, _v, _d in items}
+                if 1 in pols and -1 in pols:
+                    # Mixed polarity across docs
+                    docs_for_entity = list({d for _p, _v, d in items})
+                    contradiction_clusters.append(
+                        f"{html.escape(entity)}: mixed polarity across {len(docs_for_entity)} sources"
+                    )
+            # Add clustered contradictions to list
+            for cc in contradiction_clusters[:6]:
+                conflict_items.append(cc)
+        except Exception:
+            pass
 
         # Key insights: pick sentences from answer if available, else from contexts
         insights = []
@@ -1674,6 +1783,73 @@ def build_intelligence_html(answer: str, contexts: List) -> str:
                     f"<td><small>{snippet}</small></td></tr>"
                 )
             parts.append("</table></div></div>")
+        # Add scientist-relevant metrics: Quality flags and Recency/Diversity
+        try:
+            # Quality flags
+            flagged = [(doc, flags) for doc, flags in doc_flags.items() if flags]
+            parts.append(
+                "<div style='margin-top:8px'><strong>Quality flags</strong><ul>"
+            )
+            if flagged:
+                for doc, flags in flagged[:8]:
+                    parts.append(
+                        f"<li><small>{html.escape(doc)}: {', '.join(flags)}</small></li>"
+                    )
+            else:
+                parts.append("<li><small>No quality flags detected.</small></li>")
+            parts.append("</ul></div>")
+
+            # Diversity & recency
+            years: List[int] = []
+            for y in doc_years.values():
+                try:
+                    years.append(int(y))
+                except Exception:
+                    continue
+            unique_docs = len(by_doc)
+            preprints = sum(1 for f in doc_flags.values() if "Preprint" in f)
+            preprint_share = (preprints / unique_docs) if unique_docs > 0 else 0.0
+            parts.append(
+                "<div style='margin-top:8px'><strong>Diversity & recency</strong>"
+            )
+            parts.append(
+                f"<div><small>Unique papers={unique_docs}, Preprint share={preprint_share:.0%}</small></div>"
+            )
+            if years:
+                y_min = min(years)
+                y_max = max(years)
+                # Year histogram (compact SVG)
+                year_counts: Dict[int, int] = {}
+                for y in years:
+                    year_counts[y] = year_counts.get(y, 0) + 1
+                ys_sorted = list(range(y_min, y_max + 1))
+                width, height, pad = 320, 64, 4
+                maxc = max(year_counts.values()) if year_counts else 1
+                bw = (width - 2 * pad) / max(1, len(ys_sorted))
+                bars = []
+                for i, y in enumerate(ys_sorted):
+                    c = year_counts.get(y, 0)
+                    bh = 0 if maxc == 0 else int(((c / maxc) * (height - 2 * pad)))
+                    x = pad + int(i * bw)
+                    ypix = height - pad - bh
+                    bars.append(
+                        f"<rect x='{x}' y='{ypix}' width='{max(1, int(bw - 1))}' height='{bh}' fill='#10b981' />"
+                    )
+                axis = (
+                    f"<text x='{pad}' y='{height - 2}' font-size='9' fill='#9ca3af'>{y_min}</text>"
+                    f"<text x='{width - pad - 20}' y='{height - 2}' font-size='9' fill='#9ca3af' text-anchor='end'>{y_max}</text>"
+                )
+                svg = (
+                    f"<svg width='{width}' height='{height}' viewBox='0 0 {width} {height}' xmlns='http://www.w3.org/2000/svg'>"
+                    + "".join(bars)
+                    + axis
+                    + "</svg>"
+                )
+                parts.append("<div style='margin-top:4px'>" + svg + "</div>")
+            parts.append("</div>")
+        except Exception:
+            pass
+
         parts.append("</div>")
         return "".join(parts)
     except Exception as e:
