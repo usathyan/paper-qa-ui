@@ -794,6 +794,10 @@ def stream_analysis_progress(
     # No table rows in live panel; top evidence is rendered later in Research Intelligence
     retrieval_done = False
     contexts_selected = 0
+    score_min: float | None = None
+    score_mean: float | None = None
+    score_max: float | None = None
+    per_doc_counts: Dict[str, int] = {}
     embed_latency_s: float | None = None
     # Controls snapshot
     try:
@@ -876,7 +880,26 @@ def stream_analysis_progress(
             ),
             # Evidence selection (with score stats)
             (
-                f"<li><small>Evidence selection: contexts_selected={contexts_selected}, evidence_k={ev_k}, cutoff={cutoff}, get_if_none={get_if_none}, score[min/mean/max]=N/A</small></li>"
+                f"<li><small>Evidence selection: contexts_selected={contexts_selected}, evidence_k={ev_k}, cutoff={cutoff}, get_if_none={get_if_none}, score[min/mean/max]="
+                + (
+                    f"{score_min:.3f}/{score_mean:.3f}/{score_max:.3f}"
+                    if all(isinstance(x, (int, float)) for x in (score_min, score_mean, score_max))
+                    else "N/A"
+                )
+                + "</small></li>"
+            ),
+            (
+                "<li><small>Per‑doc counts: "
+                + ", ".join(
+                    [
+                        f"{html.escape(name)}={count}"
+                        for name, count in list(per_doc_counts.items())[:5]
+                    ]
+                )
+                + (" …" if len(per_doc_counts) > 5 else "")
+                + "</small></li>"
+                if per_doc_counts
+                else ""
             ),
             # Summaries
             (
@@ -933,11 +956,22 @@ def stream_analysis_progress(
                     smin = data.get("score_min")
                     smean = data.get("score_mean")
                     smax = data.get("score_max")
-                    # Inject a formatted line into logs for now; future: render inline
-                    if all(v is not None for v in (smin, smean, smax)):
-                        logs.append(
-                            f"Scores: min={float(smin):.3f}, mean={float(smean):.3f}, max={float(smax):.3f}"
-                        )
+                    if isinstance(smin, (int, float)):
+                        score_min = float(smin)
+                    if isinstance(smean, (int, float)):
+                        score_mean = float(smean)
+                    if isinstance(smax, (int, float)):
+                        score_max = float(smax)
+                    pdoc = data.get("per_doc") or {}
+                    if isinstance(pdoc, dict):
+                        # ensure str->int
+                        tmp: Dict[str, int] = {}
+                        for k, v in pdoc.items():
+                            try:
+                                tmp[str(k)] = int(v)
+                            except Exception:
+                                continue
+                        per_doc_counts = tmp
                 except Exception:
                     pass
             idle_cycles = 0
