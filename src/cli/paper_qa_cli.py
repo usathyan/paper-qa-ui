@@ -24,7 +24,7 @@ logging.basicConfig(level=logging.ERROR)
 logging.getLogger("paperqa").setLevel(logging.INFO)
 
 
-async def main():
+async def main() -> int:
     """Main CLI function."""
     parser = argparse.ArgumentParser(
         description="Paper-QA CLI - Query scientific papers with natural language",

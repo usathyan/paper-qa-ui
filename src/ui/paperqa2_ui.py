@@ -49,7 +49,7 @@ def check_ollama_status() -> bool:
     """Check if Ollama is running and accessible."""
     try:
         response = httpx.get("http://localhost:11434/api/tags", timeout=5.0)
-        return response.status_code == 200
+        return bool(response.status_code == 200)
     except Exception:
         return False
 
@@ -58,7 +58,7 @@ class StatusTracker:
     """Simple status tracker for paper-qa operations."""
 
     def __init__(self) -> None:
-        self.status_updates = []
+        self.status_updates: List[str] = []
         self.current_step = 0
 
     def add_status(self, status: str) -> None:
@@ -641,7 +641,7 @@ def build_intelligence_html(answer: str, contexts: List) -> str:
     """
     try:
         # Prepare simple per-doc aggregation
-        by_doc = {}
+        by_doc: Dict[str, List[str]] = {}
         for c in contexts or []:
             try:
                 doc = getattr(getattr(c, "text", object()), "doc", None)
