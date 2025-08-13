@@ -743,6 +743,8 @@ def ask_with_progress(
     score_cutoff: float = 0.0,
     per_doc_cap: int = 0,
     max_sources: int = 0,
+    show_flags: bool = True,
+    show_conflicts: bool = True,
 ) -> Generator[Tuple[str, str, str, str, str, str, str], None, None]:
     """Stream pre-evidence progress inline, then yield final answer outputs.
 
@@ -832,6 +834,10 @@ def ask_with_progress(
             if isinstance(score_cutoff, (int, float))
             else 0.0,
             "max_sources": int(max_sources) if isinstance(max_sources, int) else 0,
+        }
+        app_state["ui_toggles"] = {
+            "show_flags": bool(show_flags),
+            "show_conflicts": bool(show_conflicts),
         }
     except Exception:
         pass
@@ -1751,7 +1757,9 @@ def format_sources_html(contexts: List) -> str:
                 "<div class='pqa-subtle' style='margin-bottom:10px; padding:10px; border-left: 3px solid #3b82f6;'>"
             )
             html_parts.append(f"<strong>{display_name}</strong>{meta}<br>")
-            if flags_bits:
+            ui = app_state.get("ui_toggles", {}) or {}
+            show_flags = bool(ui.get("show_flags", True))
+            if flags_bits and show_flags:
                 html_parts.append(
                     "".join(
                         [
@@ -2050,6 +2058,9 @@ def build_intelligence_html(answer: str, contexts: List) -> str:
 
         # Evidence conflicts view (cluster excerpts across docs)
         try:
+            ui = app_state.get("ui_toggles", {}) or {}
+            if not bool(ui.get("show_conflicts", True)):
+                raise RuntimeError("conflicts hidden")
             conflicts_ui: List[str] = []
             for entity, items in list(claim_map.items())[:6]:
                 docs_for_entity = list({d for _p, _v, d in items})
@@ -2653,6 +2664,18 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
                 info="0 = default; hard cap on sources in answer",
             )
 
+            gr.Markdown("### ⚙️ Display Toggles")
+            show_flags_toggle = gr.Checkbox(
+                label="Show source flags (Preprint/Retracted?)",
+                value=True,
+                info="Toggle visibility of source quality badges",
+            )
+            show_conflicts_toggle = gr.Checkbox(
+                label="Show evidence conflicts",
+                value=True,
+                info="Toggle the clustered conflicts view",
+            )
+
             gr.Markdown("### 🧹 Actions")
             clear_button = gr.Button("🗑️ Clear All", variant="secondary")
 
@@ -2803,6 +2826,8 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
             score_cutoff_slider,
             per_doc_cap_number,
             max_sources_number,
+            show_flags_toggle,
+            show_conflicts_toggle,
         ],
         outputs=[
             inline_analysis,
@@ -2827,6 +2852,8 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
             score_cutoff_slider,
             per_doc_cap_number,
             max_sources_number,
+            show_flags_toggle,
+            show_conflicts_toggle,
         ],
         outputs=[
             inline_analysis,
