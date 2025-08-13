@@ -7,6 +7,9 @@ This document describes exactly how to operate the UI, what each control does, h
 - Access: http://localhost:7860
 - Requirements: Python 3.11+, Ollama running for local models (default). Optional cloud LLMs via OpenRouter/others if configured.
 
+## Screenshot of what the UI looks like
+
+
 ## 2. Document intake
 - Upload PDFs via the left panel.
 - The app copies files to `./papers/` and indexes them into an in-memory `Docs` corpus.
@@ -112,3 +115,9 @@ Clarification: identical rewritten text
 - If Ollama is not running, local configs will fail; start with `ollama serve`.
 - If a port is occupied, run `make kill-server` then `make ui`.
 - If API keys are missing for cloud LLMs, use the default local config or set keys in `.env`.
+
+## Screenshot of what the UI looks like
+
+<p align="center">
+  <img src="./screenshot.png" alt="Paper-QA UI" width="1000" />
+</p>
