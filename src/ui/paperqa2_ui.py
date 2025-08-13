@@ -827,6 +827,14 @@ def stream_analysis_progress(
     score_max: float | None = None
     per_doc_counts: Dict[str, int] = {}
     embed_latency_s: float | None = None
+    # Answer-phase metrics
+    answer_elapsed_s: float | None = None
+    answer_sources_included: int | None = None
+    answer_prompt_chars: int | None = None
+    answer_attempts: int | None = None
+    # Phase flags
+    summaries_done: bool = False
+    answer_done: bool = False
     # Controls snapshot
     try:
         cutoff = getattr(getattr(app_state["settings"], "answer", object()), "evidence_relevance_score_cutoff", None)
@@ -885,8 +893,16 @@ def stream_analysis_progress(
                     if retrieval_done
                     else "<span class='pqa-subtle' style='border-radius:10px;padding:2px 8px;font-size:12px;margin-right:6px'>Retrieval</span>"
                 )
-                + "<span class='pqa-subtle' style='border-radius:10px;padding:2px 8px;font-size:12px;margin-right:6px'>Summaries</span>"
-                + "<span class='pqa-subtle' style='border-radius:10px;padding:2px 8px;font-size:12px;margin-right:6px'>Answer</span>"
+                + (
+                    "<span style='display:inline-block;background:#10b981;color:white;border-radius:10px;padding:2px 8px;font-size:12px;margin-right:6px'>Summaries✓</span>"
+                    if summaries_done
+                    else "<span class='pqa-subtle' style='border-radius:10px;padding:2px 8px;font-size:12px;margin-right:6px'>Summaries</span>"
+                )
+                + (
+                    "<span style='display:inline-block;background:#10b981;color:white;border-radius:10px;padding:2px 8px;font-size:12px;margin-right:6px'>Answer✓</span>"
+                    if answer_done
+                    else "<span class='pqa-subtle' style='border-radius:10px;padding:2px 8px;font-size:12px;margin-right:6px'>Answer</span>"
+                )
                 + "</div>"
             ),
             (
@@ -935,11 +951,19 @@ def stream_analysis_progress(
             ),
             # Prompt building
             (
-                f"<li><small>Prompt building: answer_max_sources={max_sources}, sources_included=N/A, prompt_length=N/A</small></li>"
+                f"<li><small>Prompt building: answer_max_sources={max_sources}, sources_included="
+                + (str(answer_sources_included) if isinstance(answer_sources_included, int) else "N/A")
+                + ", prompt_length≈"
+                + (str(answer_prompt_chars) if isinstance(answer_prompt_chars, int) else "N/A")
+                + "</small></li>"
             ),
-            # Answer generation (with elapsed)
+            # Answer generation (with elapsed/attempts)
             (
-                f"<li><small>Answer generation: max_attempts={max_attempts}, elapsed=N/A, retries=N/A, tokens=N/A</small></li>"
+                f"<li><small>Answer generation: max_attempts={max_attempts}, elapsed="
+                + (f"{answer_elapsed_s:.2f}s" if isinstance(answer_elapsed_s, (int, float)) else "N/A")
+                + ", attempts="
+                + (str(answer_attempts) if isinstance(answer_attempts, int) else "N/A")
+                + ", tokens=N/A</small></li>"
             ),
             # Post-processing
             (
@@ -965,6 +989,10 @@ def stream_analysis_progress(
                 data = evt.get("data", {}) or {}
                 if data.get("phase") == "retrieval" and data.get("status") == "end":
                     retrieval_done = True
+                elif data.get("phase") == "summaries" and data.get("status") == "end":
+                    summaries_done = True
+                elif data.get("phase") == "answer" and data.get("status") == "end":
+                    answer_done = True
             elif isinstance(evt, dict) and evt.get("type") == "metric":
                 data = evt.get("data", {}) or {}
                 try:
@@ -1005,14 +1033,19 @@ def stream_analysis_progress(
             elif isinstance(evt, dict) and evt.get("type") == "answer_stats":
                 data = evt.get("data", {}) or {}
                 try:
-                    # Update transparency placeholders by appending a log line
+                    # Persist answer metrics for rendering
                     elapsed_ans = data.get("elapsed_s")
+                    if isinstance(elapsed_ans, (int, float)):
+                        answer_elapsed_s = float(elapsed_ans)
                     srcs = data.get("sources_included")
+                    if isinstance(srcs, int):
+                        answer_sources_included = srcs
                     plen = data.get("approx_prompt_chars")
+                    if isinstance(plen, int):
+                        answer_prompt_chars = plen
                     atts = data.get("attempts")
-                    logs.append(
-                        f"Answer: elapsed={elapsed_ans:.2f}s, sources_included={srcs}, prompt_chars≈{plen}, attempts={atts}"
-                    )
+                    if isinstance(atts, int):
+                        answer_attempts = atts
                 except Exception:
                     pass
             idle_cycles = 0
