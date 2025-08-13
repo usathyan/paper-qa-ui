@@ -426,8 +426,20 @@ async def process_question_async(
                 try:
                     aq = app_state.get("analysis_queue")
                     if aq is not None:
-                        aq.put({"type": "phase", "data": {"phase": "summaries", "status": "start"}}, timeout=0.05)
-                        aq.put({"type": "phase", "data": {"phase": "answer", "status": "start"}}, timeout=0.05)
+                        aq.put(
+                            {
+                                "type": "phase",
+                                "data": {"phase": "summaries", "status": "start"},
+                            },
+                            timeout=0.05,
+                        )
+                        aq.put(
+                            {
+                                "type": "phase",
+                                "data": {"phase": "answer", "status": "start"},
+                            },
+                            timeout=0.05,
+                        )
                 except Exception:
                     pass
 
@@ -445,8 +457,20 @@ async def process_question_async(
                 try:
                     aq = app_state.get("analysis_queue")
                     if aq is not None:
-                        aq.put({"type": "phase", "data": {"phase": "summaries", "status": "end"}}, timeout=0.05)
-                        aq.put({"type": "phase", "data": {"phase": "answer", "status": "end"}}, timeout=0.05)
+                        aq.put(
+                            {
+                                "type": "phase",
+                                "data": {"phase": "summaries", "status": "end"},
+                            },
+                            timeout=0.05,
+                        )
+                        aq.put(
+                            {
+                                "type": "phase",
+                                "data": {"phase": "answer", "status": "end"},
+                            },
+                            timeout=0.05,
+                        )
                         # Emit answer generation stats
                         try:
                             contexts = getattr(session, "contexts", []) or []
@@ -454,7 +478,9 @@ async def process_question_async(
                             total_chars = 0
                             for c in contexts:
                                 try:
-                                    t = getattr(getattr(c, "text", object()), "text", None)
+                                    t = getattr(
+                                        getattr(c, "text", object()), "text", None
+                                    )
                                     if isinstance(t, str):
                                         total_chars += len(t)
                                 except Exception:
@@ -837,27 +863,61 @@ def stream_analysis_progress(
     answer_done: bool = False
     # Controls snapshot
     try:
-        cutoff = getattr(getattr(app_state["settings"], "answer", object()), "evidence_relevance_score_cutoff", None)
+        cutoff = getattr(
+            getattr(app_state["settings"], "answer", object()),
+            "evidence_relevance_score_cutoff",
+            None,
+        )
     except Exception:
         cutoff = None
     try:
-        get_if_none = bool(getattr(getattr(app_state["settings"], "answer", object()), "get_evidence_if_no_contexts", False))
+        get_if_none = bool(
+            getattr(
+                getattr(app_state["settings"], "answer", object()),
+                "get_evidence_if_no_contexts",
+                False,
+            )
+        )
     except Exception:
         get_if_none = False
     try:
-        group_by_q = bool(getattr(getattr(app_state["settings"], "answer", object()), "group_contexts_by_question", False))
+        group_by_q = bool(
+            getattr(
+                getattr(app_state["settings"], "answer", object()),
+                "group_contexts_by_question",
+                False,
+            )
+        )
     except Exception:
         group_by_q = False
     try:
-        filter_extra_bg = bool(getattr(getattr(app_state["settings"], "answer", object()), "answer_filter_extra_background", False))
+        filter_extra_bg = bool(
+            getattr(
+                getattr(app_state["settings"], "answer", object()),
+                "answer_filter_extra_background",
+                False,
+            )
+        )
     except Exception:
         filter_extra_bg = False
     try:
-        max_sources = int(getattr(getattr(app_state["settings"], "answer", object()), "answer_max_sources", 10))
+        max_sources = int(
+            getattr(
+                getattr(app_state["settings"], "answer", object()),
+                "answer_max_sources",
+                10,
+            )
+        )
     except Exception:
         max_sources = 10
     try:
-        max_attempts = int(getattr(getattr(app_state["settings"], "answer", object()), "max_answer_attempts", 1))
+        max_attempts = int(
+            getattr(
+                getattr(app_state["settings"], "answer", object()),
+                "max_answer_attempts",
+                1,
+            )
+        )
     except Exception:
         max_attempts = 1
     try:
@@ -887,22 +947,10 @@ def stream_analysis_progress(
                 + f" <small class='pqa-muted'>({elapsed:.1f}s)</small></div>"
             ),
             (
-                "<div style='margin:6px 0'>"
-                + (
-                    "<span style='display:inline-block;background:#10b981;color:white;border-radius:10px;padding:2px 8px;font-size:12px;margin-right:6px'>Retrieval✓</span>"
-                    if retrieval_done
-                    else "<span class='pqa-subtle' style='border-radius:10px;padding:2px 8px;font-size:12px;margin-right:6px'>Retrieval</span>"
-                )
-                + (
-                    "<span style='display:inline-block;background:#10b981;color:white;border-radius:10px;padding:2px 8px;font-size:12px;margin-right:6px'>Summaries✓</span>"
-                    if summaries_done
-                    else "<span class='pqa-subtle' style='border-radius:10px;padding:2px 8px;font-size:12px;margin-right:6px'>Summaries</span>"
-                )
-                + (
-                    "<span style='display:inline-block;background:#10b981;color:white;border-radius:10px;padding:2px 8px;font-size:12px;margin-right:6px'>Answer✓</span>"
-                    if answer_done
-                    else "<span class='pqa-subtle' style='border-radius:10px;padding:2px 8px;font-size:12px;margin-right:6px'>Answer</span>"
-                )
+                "<div class='pqa-steps'>"
+                + ("<span class='pqa-step done'>Retrieval</span>" if retrieval_done else "<span class='pqa-step'>Retrieval</span>")
+                + ("<span class='pqa-step done'>Summaries</span>" if summaries_done else "<span class='pqa-step'>Summaries</span>")
+                + ("<span class='pqa-step done'>Answer</span>" if answer_done else "<span class='pqa-step'>Answer</span>")
                 + "</div>"
             ),
             (
@@ -927,7 +975,10 @@ def stream_analysis_progress(
                 f"<li><small>Evidence selection: contexts_selected={contexts_selected}, evidence_k={ev_k}, cutoff={cutoff}, get_if_none={get_if_none}, score[min/mean/max]="
                 + (
                     f"{score_min:.3f}/{score_mean:.3f}/{score_max:.3f}"
-                    if all(isinstance(x, (int, float)) for x in (score_min, score_mean, score_max))
+                    if all(
+                        isinstance(x, (int, float))
+                        for x in (score_min, score_mean, score_max)
+                    )
                     else "N/A"
                 )
                 + "</small></li>"
@@ -952,15 +1003,27 @@ def stream_analysis_progress(
             # Prompt building
             (
                 f"<li><small>Prompt building: answer_max_sources={max_sources}, sources_included="
-                + (str(answer_sources_included) if isinstance(answer_sources_included, int) else "N/A")
+                + (
+                    str(answer_sources_included)
+                    if isinstance(answer_sources_included, int)
+                    else "N/A"
+                )
                 + ", prompt_length≈"
-                + (str(answer_prompt_chars) if isinstance(answer_prompt_chars, int) else "N/A")
+                + (
+                    str(answer_prompt_chars)
+                    if isinstance(answer_prompt_chars, int)
+                    else "N/A"
+                )
                 + "</small></li>"
             ),
             # Answer generation (with elapsed/attempts)
             (
                 f"<li><small>Answer generation: max_attempts={max_attempts}, elapsed="
-                + (f"{answer_elapsed_s:.2f}s" if isinstance(answer_elapsed_s, (int, float)) else "N/A")
+                + (
+                    f"{answer_elapsed_s:.2f}s"
+                    if isinstance(answer_elapsed_s, (int, float))
+                    else "N/A"
+                )
                 + ", attempts="
                 + (str(answer_attempts) if isinstance(answer_attempts, int) else "N/A")
                 + ", tokens=N/A</small></li>"
@@ -972,6 +1035,27 @@ def stream_analysis_progress(
             "</ul>",
             "</div>",
         ]
+        # Compact per-doc bar visualization (top 5)
+        if per_doc_counts:
+            try:
+                maxcnt = max(per_doc_counts.values())
+                bars_items: List[str] = []
+                for name, cnt in sorted(per_doc_counts.items(), key=lambda x: -x[1])[
+                    :5
+                ]:
+                    pct = int(round((cnt / maxcnt) * 100)) if maxcnt > 0 else 0
+                    bars_items.append(
+                        f"<div style='margin:4px 0'><small>{html.escape(name)}</small>"
+                        f"<div class='pqa-subtle' style='height:8px;border-radius:6px;overflow:hidden'><div style='height:100%;width:{pct}%;background:#3b82f6'></div></div>"
+                        f"<small class='pqa-muted'>{cnt}</small></div>"
+                    )
+                parts.append(
+                    "<div class='pqa-panel' style='margin-top:8px'><strong>Evidence by document</strong>"
+                    + "".join(bars_items)
+                    + "</div>"
+                )
+            except Exception:
+                pass
         # Omit Top evidence table here; it belongs in Research Intelligence
         parts.append("</div>")
         return "".join(parts)
@@ -1379,11 +1463,22 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
         .pqa-muted { color: #6b7280; }
         .pqa-table { width: 100%; border-collapse: collapse; }
         .pqa-table th, .pqa-table td { padding: 6px; border-bottom: 1px solid #e5e7eb; text-align: left; }
+        /* Chevron step badges */
+        .pqa-steps { display: flex; gap: 6px; align-items: center; margin: 6px 0; flex-wrap: wrap; }
+        .pqa-step { position: relative; display: inline-block; background: #e5e7eb; color: #111827; padding: 4px 10px 4px 10px; border-radius: 4px 0 0 4px; font-size: 12px; line-height: 1; }
+        .pqa-step::after { content: ""; position: absolute; top: 0; right: -10px; width: 0; height: 0; border-top: 12px solid transparent; border-bottom: 12px solid transparent; border-left: 10px solid #e5e7eb; }
+        .pqa-step.done { background: #10b981; color: #ffffff; }
+        .pqa-step.done::after { border-left-color: #10b981; }
+        .pqa-step + .pqa-step { margin-left: 10px; }
         @media (prefers-color-scheme: dark) {
           .pqa-panel { background: #1f2937; color: #e5e7eb; }
           .pqa-subtle { background: #111827; color: #e5e7eb; }
           .pqa-muted { color: #9ca3af; }
           .pqa-table th, .pqa-table td { border-bottom-color: #374151; }
+          .pqa-step { background: #374151; color: #e5e7eb; }
+          .pqa-step::after { border-left-color: #374151; }
+          .pqa-step.done { background: #059669; color: #ffffff; }
+          .pqa-step.done::after { border-left-color: #059669; }
         }
         </style>
         """
