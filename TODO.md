@@ -37,10 +37,10 @@ This roadmap summarizes what is done and prioritizes next steps. It reflects the
 - Docs & license updates
 
 ## Next (high priority)
-1) Evidence curation enhancements
-   - Evidence filtering controls (e.g., per‑doc caps, score cutoff sliders)
-   - Source quality indicators (journal metrics proxy, venue reputation, open/retracted status)
-   - Evidence conflicts view (cluster excerpts across docs; highlight opposing claims)
+1) Evidence curation enhancements (phase 2)
+   - Real-time preview refinements (apply cutoff live in progress bar and counts)
+   - Per‑source quality indicators (journal proxy, venue reputation, retraction cross‑checks)
+   - Conflicts drill‑down: click entity to expand excerpts and sources contributing each polarity
 
 ## Next priority
 - True MMR (Maximum Marginal Relevance) visualization (hook‑based)
