@@ -545,6 +545,37 @@ async def process_question_async(
             # Extract answer and contexts from the session
             answer = getattr(session, "answer", "")
             contexts = getattr(session, "contexts", []) or []
+            # Apply per-doc cap if configured
+            try:
+                cap_cfg = app_state.get("curation", {}) or {}
+                cap = int(cap_cfg.get("per_doc_cap", 0) or 0)
+                if cap > 0 and contexts:
+                    kept: List[Any] = []
+                    counts: Dict[str, int] = {}
+                    for c in contexts:
+                        try:
+                            txt_obj = getattr(c, "text", None)
+                            doc = (
+                                getattr(txt_obj, "doc", None)
+                                if txt_obj is not None
+                                else None
+                            )
+                            title = None
+                            citation = None
+                            if doc is not None:
+                                citation = getattr(doc, "formatted_citation", None)
+                                title = getattr(doc, "title", None) or getattr(
+                                    doc, "docname", None
+                                )
+                            name = citation or title or "Unknown"
+                            if counts.get(name, 0) < cap:
+                                kept.append(c)
+                                counts[name] = counts.get(name, 0) + 1
+                        except Exception:
+                            kept.append(c)
+                    contexts = kept
+            except Exception:
+                pass
 
             if answer and "insufficient information" not in answer.lower():
                 if "status_tracker" in app_state:
@@ -709,6 +740,9 @@ def ask_with_progress(
     rewrite_query_toggle: bool = False,
     use_llm_rewrite: bool = False,
     bias_retrieval: bool = False,
+    score_cutoff: float = 0.0,
+    per_doc_cap: int = 0,
+    max_sources: int = 0,
 ) -> Generator[Tuple[str, str, str, str, str, str, str], None, None]:
     """Stream pre-evidence progress inline, then yield final answer outputs.
 
@@ -778,6 +812,29 @@ def ask_with_progress(
             app_state["rewrite_info"] = rewrite_details
         except Exception:
             app_state["rewrite_info"] = {"original": original_question}
+
+    # Apply evidence curation settings
+    try:
+        settings_cur = app_state.get("settings") or initialize_settings(config_name)
+        try:
+            settings_cur.answer.evidence_relevance_score_cutoff = float(score_cutoff)
+        except Exception:
+            pass
+        try:
+            if isinstance(max_sources, int) and max_sources > 0:
+                settings_cur.answer.answer_max_sources = int(max_sources)
+        except Exception:
+            pass
+        app_state["settings"] = settings_cur
+        app_state["curation"] = {
+            "per_doc_cap": int(per_doc_cap) if isinstance(per_doc_cap, int) else 0,
+            "score_cutoff": float(score_cutoff)
+            if isinstance(score_cutoff, (int, float))
+            else 0.0,
+            "max_sources": int(max_sources) if isinstance(max_sources, int) else 0,
+        }
+    except Exception:
+        pass
 
     try:
         for panel_html in stream_analysis_progress(
