@@ -92,7 +92,7 @@ def save_results(results: List[Dict[str, Any]], output_dir: Union[str, Path]) ->
     timestamp = format_timestamp().replace(" ", "_").replace(":", "-")
 
     # Clean results for JSON serialization
-    def clean_for_json(obj):
+    def clean_for_json(obj: Any) -> Any:
         """Recursively clean objects for JSON serialization."""
         if isinstance(obj, dict):
             return {k: clean_for_json(v) for k, v in obj.items()}
@@ -292,4 +292,11 @@ def save_questions(
 
 def load_questions(input_file: Union[str, Path]) -> List[Dict[str, str]]:
     """Load questions from JSON file."""
-    return load_json(input_file)
+    data = load_json(input_file)
+    # Best effort typing; ensure list of dict[str, str]
+    out: List[Dict[str, str]] = []
+    if isinstance(data, list):
+        for item in data:
+            if isinstance(item, dict):
+                out.append({str(k): str(v) for k, v in item.items()})
+    return out

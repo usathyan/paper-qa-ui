@@ -27,9 +27,10 @@ class ConfigManager:
             raise FileNotFoundError(f"Configuration file not found: {config_file}")
 
         with open(config_file, "r") as f:
-            config = json.load(f)
-
-        return config
+            loaded: Any = json.load(f)
+        if not isinstance(loaded, dict):
+            raise ValueError(f"Invalid config format in {config_file}: expected object")
+        return loaded
 
     def save_config(self, config_name: str, config: Dict[str, Any]) -> None:
         """Save configuration to JSON file."""
