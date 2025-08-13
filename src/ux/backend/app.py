@@ -18,7 +18,7 @@ from .schemas import (
     RunRequest,
     SessionSummary,
 )
-from .services.curation_service import apply_curation
+from .services.curation_service import apply_curation, apply_hard_filters
 from .services.paperqa_service import PaperQAService
 from .services.rewrite_service import rewrite as rewrite_logic
 
@@ -66,8 +66,10 @@ async def api_run(req: RunRequest) -> Dict[str, str]:
             files=req.files,
             stream_answer=req.stream_answer,
         )
-        # Post-query curation
+        # Post-query curation & hard filters when requested
         apply_curation(session, req.curation)
+        if req.mode.value == "hard" and req.rewrite and req.rewrite.filters:
+            apply_hard_filters(session, req.rewrite.filters)
         # Save session summary
         # Build minimal sources list
         sources: list[dict] = []
