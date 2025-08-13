@@ -745,11 +745,11 @@ def ask_with_progress(
     max_sources: int = 0,
     show_flags: bool = True,
     show_conflicts: bool = True,
-) -> Generator[Tuple[str, str, str, str, str, str, str], None, None]:
+) -> Generator[Tuple[str, str, str, str, str, str, str, Any], None, None]:
     """Stream pre-evidence progress inline, then yield final answer outputs.
 
     Output tuple order:
-    (analysis_progress_html, answer_html, sources_html, metadata_html, intelligence_html, error_msg, status_html)
+    (analysis_progress_html, answer_html, sources_html, metadata_html, intelligence_html, error_msg, status_html, ask_button_update)
     """
     panel_last = ""
     # Optionally rewrite query (heuristic or LLM-based) and optionally bias retrieval
@@ -854,13 +854,32 @@ def ask_with_progress(
                 if "status_tracker" in app_state and app_state["status_tracker"]
                 else ""
             )
-            yield (panel_html, "", "", "", "", "", status_html)
+            # While running: disable Ask button and show progress label
+            yield (
+                panel_html,
+                "",
+                "",
+                "",
+                "",
+                "",
+                status_html,
+                gr.update(value="Running…", interactive=False),
+            )
     except Exception as e:
         err_panel = (
             f"<div style='color:#b00'>Pre-evidence error: {html.escape(str(e))}</div>"
         )
         panel_last = err_panel
-        yield (err_panel, "", "", "", "", "", "")
+        yield (
+            err_panel,
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            gr.update(value="Ask Question", interactive=True),
+        )
 
     # Now produce the final answer, while streaming a synthesis heartbeat
     result_holder: Dict[str, Any] = {}
@@ -900,7 +919,16 @@ def ask_with_progress(
             f" <small class='pqa-muted'>({elapsed:.1f}s)</small>"
             f"</div>"
         )
-        yield (panel_last + badges + synth_block, "", "", "", "", "", "")
+        yield (
+            panel_last + badges + synth_block,
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            gr.update(value="Running…", interactive=False),
+        )
         time.sleep(0.75)
 
     # Attempt to auto-scroll to the answer section after analysis completes
@@ -927,6 +955,7 @@ def ask_with_progress(
         result_holder.get("intelligence_html", ""),
         result_holder.get("error_msg", ""),
         result_holder.get("status_html", ""),
+        gr.update(value="Ask Question", interactive=True),
     )
 
 
@@ -2628,12 +2657,12 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
 
             gr.Markdown("### 🔧 Query Options")
             rewrite_toggle = gr.Checkbox(
-                label="Rewrite query (experimental)",
+                label="Rewrite query",
                 value=False,
                 info="Rephrase your question for retrieval; shows original above progress",
             )
             use_llm_rewrite_toggle = gr.Checkbox(
-                label="Use LLM rewrite (advanced)",
+                label="Use LLM rewrite",
                 value=False,
                 info="Apply LLM-based decomposition (years/venues/fields)",
             )
@@ -2643,7 +2672,7 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
                 info="Append extracted filters to the rewritten query",
             )
 
-            gr.Markdown("### 🧪 Evidence Curation (beta)")
+            gr.Markdown("### 🧪 Evidence Curation")
             score_cutoff_slider = gr.Slider(
                 minimum=0.0,
                 maximum=1.0,
@@ -2836,6 +2865,7 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
             intelligence_display,
             error_display,
             status_display,
+            ask_button,
         ],
     )
 
@@ -2862,6 +2892,7 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
             intelligence_display,
             error_display,
             status_display,
+            ask_button,
         ],
     )
 
