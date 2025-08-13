@@ -7,7 +7,7 @@ This roadmap summarizes what is done and prioritizes next steps. It reflects the
   - Chevron phases (Retrieval → Summaries → Answer) with completion ticks
   - Live retrieval progress bar (contexts_selected / evidence_k), indeterminate stripes before counts arrive
   - Transparency metrics: score min/mean/max; per-document counts (mini bars)
-  - MMR (MVP):
+  - MMR (Maximum Marginal Relevance) (MVP):
     - Compact selected‑by‑score list (proxy based on selected evidence)
     - Basic visualization in progress panel: selected diversity share and score histogram
     - Candidate vs selected overlay using heuristic candidate parsing from logs (temporary)
@@ -32,7 +32,7 @@ This roadmap summarizes what is done and prioritizes next steps. It reflects the
 - Docs & license updates
 
 ## Next (high priority)
-1) True MMR visualization (hook‑based)
+1) True MMR (Maximum Marginal Relevance) visualization (hook‑based)
    - Integrate retrieval hooks (or upstream PR) to capture the full candidate set and the selected indices deterministically (no log parsing)
    - UI: candidate vs selected with score histogram and diversity summary (unique docs before/after)
    - Remove temporary heuristics once hooks are available

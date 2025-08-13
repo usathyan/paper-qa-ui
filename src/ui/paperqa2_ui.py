@@ -849,6 +849,35 @@ def _run_pre_evidence_in_thread(
                     pass
         except Exception:
             pass
+        # Heuristic: parse candidate lines (doc name and/or score) from logs
+        try:
+            t = str(chunk)
+            if re.search(r"\bcand(?:idate)?\b", t, re.I):
+                # Extract optional score
+                sc: float | None = None
+                ms = re.search(r"score\s*[:=]\s*([-+]?[0-9]*\.?[0-9]+)", t, re.I)
+                if ms:
+                    try:
+                        sc = float(ms.group(1))
+                    except Exception:
+                        sc = None
+                # Extract a doc/title-like token between quotes or before score
+                name = None
+                mq = re.search(r"[‘'\"]([^‘'\"]{5,120})[’'\"]", t)
+                if mq:
+                    name = mq.group(1)
+                if not name:
+                    # Fallback: take a trailing segment before score
+                    parts = re.split(r"score\s*[:=]", t, flags=re.I)
+                    if parts:
+                        seg = parts[0]
+                        # Alnum and punctuation slice
+                        seg = seg.strip()
+                        seg = re.sub(r"\s+", " ", seg)
+                        name = seg[-120:]
+                candidate_items.append({"doc": name or "Candidate", "score": sc})
+        except Exception:
+            pass
 
     async def _go() -> Any:
         return await docs.aget_evidence(question, settings=settings, callbacks=[cb])
@@ -863,6 +892,7 @@ def _run_pre_evidence_in_thread(
         except Exception:
             pass
         t0 = time.time()
+        candidate_items: List[Dict[str, Any]] = []
         fut = asyncio.run_coroutine_threadsafe(_go(), loop)
         session = fut.result(timeout=600)
         elapsed = time.time() - t0
@@ -925,6 +955,21 @@ def _run_pre_evidence_in_thread(
             try:
                 mmr_items.sort(key=lambda x: (-(x.get("score") or -1e9)))
                 q.put({"type": "mmr", "data": {"items": mmr_items}}, timeout=0.1)
+            except Exception:
+                pass
+            # Emit candidate items if any were parsed from logs
+            try:
+                if candidate_items:
+                    # Keep only the last ~200 to limit payload
+                    trimmed = candidate_items[-200:]
+                    # Normalize structure
+                    norm: List[Dict[str, Any]] = []
+                    for it in trimmed:
+                        norm.append({
+                            "doc": str(it.get("doc", "Candidate")),
+                            "score": (float(it.get("score")) if isinstance(it.get("score"), (int, float)) else None),
+                        })
+                    q.put({"type": "mmr_candidates", "data": {"items": norm}}, timeout=0.1)
             except Exception:
                 pass
         except Exception:
@@ -996,6 +1041,8 @@ def stream_analysis_progress(
     # No table rows in live panel; top evidence is rendered later in Research Intelligence
     retrieval_done = False
     contexts_selected = 0
+    candidate_count: int | None = None
+    mmr_lambda: float | None = None
     score_min: float | None = None
     score_mean: float | None = None
     score_max: float | None = None
@@ -1138,7 +1185,19 @@ def stream_analysis_progress(
             "<ul style='margin:6px 0 0 18px;padding:0'>",
             # Retrieval
             (
-                f"<li><small>Query embedding & retrieval: embed_latency={embed_latency_s:.2f}s, candidate_count=N/A, mmr_lambda=N/A</small></li>"
+                f"<li><small>Query embedding & retrieval: embed_latency={embed_latency_s:.2f}s, candidate_count="
+                + (
+                    str(candidate_count)
+                    if isinstance(candidate_count, int)
+                    else "N/A"
+                )
+                + ", mmr_lambda="
+                + (
+                    f"{mmr_lambda:.2f}"
+                    if isinstance(mmr_lambda, (int, float))
+                    else "N/A"
+                )
+                + "</small></li>"
                 if isinstance(embed_latency_s, (int, float))
                 else "<li><small>Query embedding & retrieval: (running...)</small></li>"
             ),
@@ -1258,7 +1317,7 @@ def stream_analysis_progress(
                         + "</svg>"
                     )
                 parts.append("<div class='pqa-panel' style='margin-top:8px'>")
-                parts.append("<strong>MMR selection</strong>")
+                parts.append("<strong>MMR (Maximum Marginal Relevance) selection</strong>")
                 parts.append(
                     f"<div style='margin-top:4px'><small class='pqa-muted'>Selected={total_sel}, Unique docs={unique_docs} (share={diversity_share:.0%})</small></div>"
                 )
@@ -1300,7 +1359,21 @@ def stream_analysis_progress(
         try:
             evt = q.get(timeout=0.5)
             if isinstance(evt, dict) and evt.get("type") == "log":
-                logs.append(str(evt.get("data", "")).strip())
+                msg = str(evt.get("data", "")).strip()
+                logs.append(msg)
+                # Attempt to parse candidate_count and mmr_lambda from logs
+                try:
+                    m_c = re.search(r"candidates?\s*[:=]\s*(\d+)", msg, re.I)
+                    if m_c:
+                        candidate_count = int(m_c.group(1))
+                except Exception:
+                    pass
+                try:
+                    m_l = re.search(r"mmr[_\s-]*lambda\s*[:=]\s*([0-9]*\.?[0-9]+)", msg, re.I)
+                    if m_l:
+                        mmr_lambda = float(m_l.group(1))
+                except Exception:
+                    pass
             elif isinstance(evt, dict) and evt.get("type") == "phase":
                 data = evt.get("data", {}) or {}
                 if data.get("phase") == "retrieval" and data.get("status") == "end":
