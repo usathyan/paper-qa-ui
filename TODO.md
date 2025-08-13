@@ -7,11 +7,17 @@ This roadmap summarizes what is done and prioritizes next steps. It reflects the
   - Chevron phases (Retrieval → Summaries → Answer) with completion ticks
   - Live retrieval progress bar (contexts_selected / evidence_k), indeterminate stripes before counts arrive
   - Transparency metrics: score min/mean/max; per-document counts (mini bars)
-  - MMR (MVP): compact selected‑by‑score list (proxy based on selected evidence)
+  - MMR (MVP):
+    - Compact selected‑by‑score list (proxy based on selected evidence)
+    - Basic visualization in progress panel: selected diversity share and score histogram
+    - Candidate vs selected overlay using heuristic candidate parsing from logs (temporary)
 - Answer renders as Markdown
 - Research Intelligence
-  - Contradictions (heuristic), key insights, evidence summary, top evidence
-  - Optional Critique (heuristic) under Configuration
+  - Contradictions: heuristic + simple polarity‑based clustering across sources
+  - Key insights, evidence summary, top evidence (by score)
+  - Quality flags: Preprint and possible Retracted? per source (heuristic)
+  - Diversity & recency: unique papers, preprint share, year histogram
+  - Optional Critique (LLM‑based) under Configuration; works with any configured model via litellm; falls back to heuristic
 - Query Options
   - Rewrite query (experimental) toggle; displays original question above progress
 - Exports
@@ -26,17 +32,10 @@ This roadmap summarizes what is done and prioritizes next steps. It reflects the
 - Docs & license updates
 
 ## Next (high priority)
-1) True MMR visualization
-   - Add a retrieval hook (or upstream PR) to capture the candidate set and the selected indices
-   - UI: display selected vs discarded with a score histogram and diversity summary (unique docs before/after)
-2) Critique (LLM‑based, optional)
-   - Replace heuristic with a fast LLM pass (OpenRouter), with timeout and cost notice
-   - Output: concise flags referencing implicated evidence items
-3) Scientist‑relevant analysis
-   - Contradiction analysis beyond heuristics: cluster similar claims and mark polarity across sources
-   - Retraction details: flag retracted papers (if metadata available); surface retraction notices in sources
-   - Journal quality signals: lightweight proxies (indexed venue lists, OA flags), and surface them alongside sources
-   - Diversity & recency: visual summaries for publication year distribution, doc/journal/author diversity
+1) True MMR visualization (hook‑based)
+   - Integrate retrieval hooks (or upstream PR) to capture the full candidate set and the selected indices deterministically (no log parsing)
+   - UI: candidate vs selected with score histogram and diversity summary (unique docs before/after)
+   - Remove temporary heuristics once hooks are available
 
 ## Medium priority
 - Live analytics UI
