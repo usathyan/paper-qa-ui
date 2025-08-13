@@ -12,6 +12,8 @@ import time
 import re
 from pathlib import Path
 from typing import List, Tuple, Any, Dict, Generator
+import json
+import csv
 from queue import Queue, Empty
 import threading
 
@@ -1735,6 +1737,11 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
             gr.Markdown("### 🧹 Actions")
             clear_button = gr.Button("🗑️ Clear All", variant="secondary")
 
+            gr.Markdown("### 📦 Export")
+            export_json_btn = gr.DownloadButton("⬇️ Export JSON", variant="secondary")
+            export_csv_btn = gr.DownloadButton("⬇️ Export CSV", variant="secondary")
+            export_trace_btn = gr.DownloadButton("⬇️ Export Trace (JSONL)", variant="secondary")
+
         with gr.Column(scale=2):
             gr.Markdown("### ❓ Ask Questions")
             question_input = gr.Textbox(
@@ -1797,6 +1804,54 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
         fn=_on_config_change, inputs=[config_dropdown], outputs=[cfg_status]
     )
 
+    # Export helpers
+    def _ensure_exports_dir() -> Path:
+        p = Path("./exports")
+        p.mkdir(exist_ok=True)
+        return p
+
+    def export_json() -> str:
+        data = app_state.get("session_data") or {}
+        # include trace if present
+        trace = app_state.get("session_trace") or []
+        if trace:
+            data = {**data, "trace": trace}
+        outdir = _ensure_exports_dir()
+        fname = f"session_{int(time.time())}.json"
+        fpath = outdir / fname
+        with open(fpath, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        return str(fpath)
+
+    def export_csv() -> str:
+        data = app_state.get("session_data") or {}
+        contexts = data.get("contexts") or []
+        outdir = _ensure_exports_dir()
+        fname = f"contexts_{int(time.time())}.csv"
+        fpath = outdir / fname
+        with open(fpath, "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(["doc", "page", "score", "text"]) 
+            for c in contexts:
+                writer.writerow([
+                    c.get("doc"),
+                    c.get("page"),
+                    c.get("score"),
+                    (c.get("text") or "").replace("\n", " ")[:4000],
+                ])
+        return str(fpath)
+
+    def export_trace() -> str:
+        trace = app_state.get("session_trace") or []
+        outdir = _ensure_exports_dir()
+        fname = f"trace_{int(time.time())}.jsonl"
+        fpath = outdir / fname
+        with open(fpath, "w", encoding="utf-8") as f:
+            for ev in trace:
+                f.write(json.dumps(ev, ensure_ascii=False))
+                f.write("\n")
+        return str(fpath)
+
     ask_button.click(
         fn=ask_with_progress,
         inputs=[question_input, config_dropdown, critique_toggle, rewrite_toggle],
@@ -1837,6 +1892,11 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
             status_display,
         ],
     )
+
+    # Wire export buttons
+    export_json_btn.click(fn=export_json, outputs=[export_json_btn])
+    export_csv_btn.click(fn=export_csv, outputs=[export_csv_btn])
+    export_trace_btn.click(fn=export_trace, outputs=[export_trace_btn])
 
 if __name__ == "__main__":
     import os
