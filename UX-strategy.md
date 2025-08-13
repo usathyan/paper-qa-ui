@@ -174,24 +174,20 @@ flowchart LR
 ### Plan Tab (Rewrite + Filters)
 ```mermaid
 flowchart TB
-  QO[Original Question]
-  QR[Rewritten Question (Editable)]
-  CHIPS[Filter Chips: years / venues / fields / species / study type / outcomes]
-  BTNS[Actions:<br/>Generate LLM<br/>Accept Rewrite<br/>Apply Filters (Bias or Hard)]
-
-  QO --- QR
-  QR --> CHIPS
-  CHIPS --> BTNS
+  QO[Original]
+  QO --- QR[Rewritten editable]
+  QR --> CH[Filter chips: years, venues, fields, species, type, outcomes]
+  CH --> ACT[Actions: generate, accept, apply bias or hard]
 ```
 
 ### Retrieval Live Panel (Progress + Scope)
 ```mermaid
 flowchart TB
-  SCOPE[Scope Summary Chips]
-  PROG[Progress Bar: selected / evidence_k (>= cutoff shown)]
-  HIST[Cutoff-aware Histograms]
-  MMR[MMR: cand vs selected + diversity]
-  LOG[Recent Events]
+  SCOPE[Scope chips]
+  PROG[Progress: selected / evidence_k; cutoff shown]
+  HIST[Histograms with cutoff]
+  MMR[MMR: candidates vs selected; diversity]
+  LOG[Events]
 
   SCOPE --> PROG --> HIST --> MMR --> LOG
 ```
