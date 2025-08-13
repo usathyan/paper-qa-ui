@@ -75,16 +75,14 @@ class StatusTracker:
     def get_status_html(self) -> str:
         """Get formatted HTML of all status updates."""
         if not self.status_updates:
-            return "<div style='text-align: center; color: #666;'>Ready to process questions</div>"
+            return "<div class='pqa-muted' style='text-align:center'>Ready to process questions</div>"
 
-        html_parts = [
-            "<div style='max-height: 200px; overflow-y: auto; background: #f8f9fa; padding: 10px; border-radius: 5px;'>"
-        ]
-        html_parts.append("<strong>Processing Status:</strong><br>")
-        for i, status in enumerate(
-            self.status_updates[-10:], 1
-        ):  # Show last 10 updates
-            html_parts.append(f"{i}. {status}<br>")
+        html_parts = ["<div class='pqa-subtle'>"]
+        html_parts.append("<strong>Processing Status</strong>")
+        html_parts.append("<ul style='margin:6px 0 0 18px;padding:0'>")
+        for i, status in enumerate(self.status_updates[-10:], 1):
+            html_parts.append(f"<li><small>{status}</small></li>")
+        html_parts.append("</ul>")
         html_parts.append("</div>")
         return "".join(html_parts)
 
@@ -735,9 +733,13 @@ def stream_analysis_progress(
             "</div>",
         ]
         if table_rows:
-            parts.append("<div style='margin-top:10px'><strong>Top evidence (live)</strong>")
+            parts.append(
+                "<div style='margin-top:10px'><strong>Top evidence (live)</strong>"
+            )
             parts.append("<div style='overflow-x:auto'><table class='pqa-table'>")
-            parts.append("<tr><th>Source</th><th>Score</th><th>Page</th><th>Snippet</th></tr>")
+            parts.append(
+                "<tr><th>Source</th><th>Score</th><th>Page</th><th>Snippet</th></tr>"
+            )
             for row in table_rows[:10]:
                 parts.append(
                     f"<tr><td>{html.escape(row.get('source', ''))}</td>"
