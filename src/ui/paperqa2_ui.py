@@ -786,12 +786,12 @@ def format_answer_html(answer: str, contexts: List) -> str:
     """Format the answer as HTML."""
     if not answer:
         return (
-            "<div style='color: #666; text-align: center;'>No answer generated.</div>"
+            "<div class='pqa-subtle' style='text-align: center;'><small class='pqa-muted'>No answer generated.</small></div>"
         )
 
     # Simple formatting - you can enhance this
     formatted_answer = answer.replace("\n", "<br>")
-    return f"<div style='background: #f8f9fa; padding: 15px; border-radius: 5px;'>{formatted_answer}</div>"
+    return f"<div class='pqa-panel' style='padding: 15px;'>{formatted_answer}</div>"
 
 
 def format_sources_html(contexts: List) -> str:
@@ -799,8 +799,10 @@ def format_sources_html(contexts: List) -> str:
     if not contexts:
         return "<div style='color: #666; text-align: center;'>No sources found.</div>"
 
-    html_parts = ["<div style='max-height: 300px; overflow-y: auto;'>"]
-    html_parts.append("<h4>Evidence Sources:</h4>")
+    html_parts = [
+        "<div class='pqa-panel' style='max-height:300px; overflow-y:auto;'>",
+        "<h4>Evidence Sources:</h4>",
+    ]
 
     for i, context in enumerate(contexts, 1):
         try:
@@ -842,13 +844,13 @@ def format_sources_html(contexts: List) -> str:
             if isinstance(score, (int, float)):
                 meta_bits.append(f"score={score:.3f}")
             meta = (
-                f" <small style='color:#666'>({' | '.join(meta_bits)})</small>"
+                f" <small class='pqa-muted'>({' | '.join(meta_bits)})</small>"
                 if meta_bits
                 else ""
             )
 
             html_parts.append(
-                "<div style='margin-bottom: 10px; padding: 10px; background: #fff; border-left: 3px solid #007bff;'>"
+                "<div class='pqa-subtle' style='margin-bottom:10px; padding:10px; border-left: 3px solid #3b82f6;'>"
             )
             html_parts.append(f"<strong>{display_name}</strong>{meta}<br>")
             html_parts.append(f"<small>{snippet}</small>")
@@ -864,7 +866,7 @@ def format_sources_html(contexts: List) -> str:
 def format_metadata_html(metadata: dict) -> str:
     """Format metadata as HTML."""
     html_parts = [
-        "<div style='background: #e9ecef; padding: 10px; border-radius: 5px; font-size: 0.9em;'>"
+        "<div class='pqa-panel' style='font-size:0.9em;'>"
     ]
     html_parts.append("<h5>Processing Information:</h5>")
     html_parts.append(
