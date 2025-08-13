@@ -28,16 +28,21 @@ This document describes exactly how to operate the UI, what each control does, h
 - Output: short list of potential issues (unsupported claims, strong language). Does not alter the answer.
 
 ### 4.3 Query Options
-- Rewrite query (experimental):
+- Rewrite query:
   - Rewrites the question prior to retrieval.
   - When enabled, “Rewritten query” and “Rewritten from” (original) appear above the Analysis Progress.
-- Use LLM rewrite (advanced):
+- Use LLM rewrite:
   - Invokes an LLM to return `{ rewritten, filters: { years, venues, fields } }`.
   - Filters are displayed inline (e.g., `years 2018-2024; venues Nature, PNAS; fields neurodegeneration`).
 - Bias retrieval using filters:
   - Appends filter hints to the rewritten text. This biases retrieval without changing internal ranking logic.
 
-### 4.4 Evidence Curation (beta)
+Clarification: identical rewritten text
+- If “Use LLM rewrite” is OFF, the local heuristic rewriter only removes polite prefixes, converts leading “what is/are …” to “summarize …”, and normalizes punctuation. Queries that do not match those patterns will remain unchanged.
+- If “Use LLM rewrite” is ON but a local-only config is selected (e.g., `optimized_ollama`) or the provider is not reachable, the system falls back to the heuristic, which may result in no change.
+- If an API-backed config is active (e.g., OpenRouter) and the model returns the same string (considering it already optimal), the rewritten text may legitimately equal the original.
+
+### 4.4 Evidence Curation
 - Relevance score cutoff (slider):
   - Sets `answer.evidence_relevance_score_cutoff`.
   - Values below cutoff are discarded during evidence selection.
