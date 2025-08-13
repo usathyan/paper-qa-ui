@@ -177,7 +177,7 @@ flowchart TB
   QO[Original Question]
   QR[Rewritten Question (Editable)]
   CHIPS[Filter Chips: years / venues / fields / species / study type / outcomes]
-  BTNS[Actions: Generate LLM \n Accept Rewrite \n Apply Filters (Bias|Hard)]
+  BTNS[Actions:<br/>Generate LLM<br/>Accept Rewrite<br/>Apply Filters (Bias or Hard)]
 
   QO --- QR
   QR --> CHIPS
@@ -188,7 +188,7 @@ flowchart TB
 ```mermaid
 flowchart TB
   SCOPE[Scope Summary Chips]
-  PROG[Progress Bar: selected / evidence_k (≥cutoff shown)]
+  PROG[Progress Bar: selected / evidence_k (>= cutoff shown)]
   HIST[Cutoff-aware Histograms]
   MMR[MMR: cand vs selected + diversity]
   LOG[Recent Events]
@@ -204,7 +204,7 @@ flowchart LR
   VENUE[Venue / OA / Reputation]
   META[Year / Page / Score / Flags]
   SNIP[Snippet]
-  ACT[Actions: include|exclude|pin|per-doc cap]
+  ACT[Actions: include, exclude, pin, per-doc cap]
 
   CARD --> TITLE
   CARD --> VENUE
