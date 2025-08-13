@@ -1,46 +1,23 @@
-# Paper-QA UI Roadmap (Rewritten)
-
-This roadmap summarizes what is done and prioritizes next steps. It reflects the current, working UI (inline progress, exports, toggles) and targets scientist‑relevant features.
+# Paper-QA UI Roadmap
 
 ## Done (current state)
-- Inline Live Analysis Progress
-  - Chevron phases (Retrieval → Summaries → Answer) with completion ticks
-  - Live retrieval progress bar (contexts_selected / evidence_k), indeterminate stripes before counts arrive
-  - Transparency metrics: score min/mean/max; per-document counts (mini bars)
-  - MMR (Maximum Marginal Relevance) (MVP):
-    - Compact selected‑by‑score list (proxy based on selected evidence)
-    - Live panel MMR block: selected diversity share, score histogram
-    - Candidate vs selected overlay using temporary candidate parsing from logs
-- Answer renders as Markdown
-- Research Intelligence
-  - Contradictions: heuristic + simple polarity‑based clustering across sources
-  - Key insights, evidence summary, top evidence (by score)
-  - Quality flags: Preprint and possible Retracted? per source (heuristic)
-  - Diversity & recency: unique papers, preprint share, year histogram
-  - Optional Critique (LLM‑based) under Configuration; works with any configured model via litellm; falls back to heuristic
- - Query rewrite (advanced)
-   - LLM‑based decomposition of query (years/venues/fields)
-   - Optional retrieval bias toggle applies filter hints to the rewritten query
-   - Rewritten form and filters exported under `rewrite` in session JSON
-   - UI shows original, rewritten query, and filters inline in Analysis Progress
-- Query Options
-  - Rewrite query (experimental) toggle; displays original question above progress
-- Exports
-  - JSON (answer + contexts + metrics + trace if present)
-  - CSV (contexts)
-  - JSONL trace (events) – initial support
-  - Bundle (ZIP) for JSON/CSV/JSONL
-- Stability/UX
-  - Dedicated async loop; single query lock
-  - Ask button disabled during uploads (shows Wait…); runtime config switching
-  - Dark‑mode‑safe styling; Processing Status hidden
-- Docs & license updates
+- Analysis Progress with chevrons, live retrieval progress, transparency metrics
+- MMR (MVP): selected diversity share, score histogram, candidate vs selected overlay (log-parsed)
+- Research Intelligence: contradictions (heuristic + clustering), insights, evidence summary, top evidence; conflicts list
+- Source flags (Preprint/Retracted?)
+- Critique: heuristic + optional LLM; markdown rendering and numbering normalization
+- Query rewrite (LLM-based) and retrieval bias via filter hints; inline original/rewritten/filters
+- Evidence Curation controls: score cutoff, per‑doc cap, max sources; curation preview; exports include rewrite/curation
+- UI toggles: show flags, show conflicts
+- Stability: dedicated async IO loop; single-query lock; local-first defaults
+- Exports: JSON/CSV/JSONL; ZIP bundle
+- Docs updated (README user guide; DEVELOPER notes)
 
 ## Next (high priority)
-1) Evidence curation enhancements (phase 2)
-   - Real-time preview refinements (apply cutoff live in progress bar and counts)
-   - Per‑source quality indicators (journal proxy, venue reputation, retraction cross‑checks)
-   - Conflicts drill‑down: click entity to expand excerpts and sources contributing each polarity
+1) Evidence curation (phase 2)
+   - Real-time preview refinements (apply cutoff into counts/histograms)
+   - Per‑source quality indicators (venue string, simple reputation proxy when metadata present)
+   - Conflicts drill‑down (click to expand polarity‑grouped excerpts)
 
 ## Next priority
 - True MMR (Maximum Marginal Relevance) visualization (hook‑based)

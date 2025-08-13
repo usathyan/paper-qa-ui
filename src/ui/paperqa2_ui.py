@@ -1296,7 +1296,7 @@ def stream_analysis_progress(
         if ev_k > 0 and contexts_selected >= 0:
             pct = int(max(0, min(100, round((contexts_selected / ev_k) * 100))))
         parts = [
-            "<div class='pqa-panel'>",
+            "<div class='pqa-panel' style='min-height:240px'>",
             "<style>@keyframes pqa-spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}} .pqa-spinner{display:inline-block;width:14px;height:14px;border:2px solid #9ca3af;border-top-color:#3b82f6;border-radius:50%;animation:pqa-spin 0.8s linear infinite;margin-right:6px}</style>",
             (
                 "<div style='display:flex;align-items:center;gap:6px'>"
@@ -1755,6 +1755,20 @@ def format_sources_html(contexts: List) -> str:
                 or getattr(getattr(context, "text", object()), "name", None)
                 or f"Source {i}"
             )
+            # Venue/reputation (when metadata available)
+            venue_bits = []
+            try:
+                venue = None
+                if hasattr(context, "text"):
+                    doc = getattr(getattr(context, "text", object()), "doc", None)
+                    if doc is not None:
+                        venue = getattr(doc, "venue", None) or getattr(
+                            doc, "journal", None
+                        )
+                if isinstance(venue, str) and venue.strip():
+                    venue_bits.append(venue.strip())
+            except Exception:
+                pass
             snippet = text_str if isinstance(text_str, str) else str(text_str)
             if len(snippet) > 200:
                 snippet = snippet[:200] + "..."
@@ -1786,6 +1800,10 @@ def format_sources_html(contexts: List) -> str:
                 "<div class='pqa-subtle' style='margin-bottom:10px; padding:10px; border-left: 3px solid #3b82f6;'>"
             )
             html_parts.append(f"<strong>{display_name}</strong>{meta}<br>")
+            if venue_bits:
+                html_parts.append(
+                    f"<small class='pqa-muted'>Venue: {html.escape(', '.join(venue_bits))}</small><br>"
+                )
             ui = app_state.get("ui_toggles", {}) or {}
             show_flags = bool(ui.get("show_flags", True))
             if flags_bits and show_flags:
@@ -2402,19 +2420,33 @@ async def build_llm_or_heuristic_critique_html(
                 fut = asyncio.run_coroutine_threadsafe(_go(), app_state["query_loop"])
                 content = await asyncio.to_thread(fut.result, timeout=45)
                 if isinstance(content, str) and content.strip():
-                    # Format as HTML list; strip markdown bullets and render minimal markdown
-                    items: List[str] = []
-                    for line in content.splitlines():
-                        s = line.strip().lstrip("-*").strip()
-                        if s:
-                            items.append(
-                                f"<li><small>{_render_markdown_inline(s)}</small></li>"
-                            )
-                    if items:
+                    # Normalize numbering (e.g., "\\1 foo" -> "1. foo") and detect ordered list
+                    raw_lines = [
+                        ln.strip() for ln in content.splitlines() if ln.strip()
+                    ]
+                    norm_lines: List[str] = []
+                    numbered = 0
+                    for ln in raw_lines:
+                        ln2 = re.sub(r"^\\(\d+)\s+", r"\1. ", ln)
+                        if re.match(r"^(?:\d+\.|\d+\)|\d+\s+)", ln2):
+                            numbered += 1
+                        ln2 = ln2.lstrip("-*").strip()
+                        norm_lines.append(ln2)
+                    use_ol = numbered >= max(1, int(0.5 * len(norm_lines)))
+                    tag_open = "<ol>" if use_ol else "<ul>"
+                    tag_close = "</ol>" if use_ol else "</ul>"
+                    items_html: List[str] = []
+                    for ln in norm_lines[:6]:
+                        items_html.append(
+                            f"<li><small>{_render_markdown_inline(ln)}</small></li>"
+                        )
+                    if items_html:
                         return (
-                            "<div class='pqa-subtle' style='margin-top:6px'><ul>"
-                            + "".join(items[:6])
-                            + "</ul></div>"
+                            "<div class='pqa-subtle' style='margin-top:6px'>"
+                            + tag_open
+                            + "".join(items_html)
+                            + tag_close
+                            + "</div>"
                         )
             except Exception:
                 pass
@@ -2733,6 +2765,8 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
 
             gr.Markdown("### 🔎 Live Analysis Progress")
             inline_analysis = gr.HTML(label="Analysis", show_label=False)
+            # Ensure Analysis expands to show new content
+            inline_analysis.style(height=300)
 
             gr.Markdown("### 📝 Answer")
             answer_anchor = gr.HTML(
