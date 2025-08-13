@@ -35,15 +35,15 @@ This document tracks the work to add rich, live analytics and visualizations for
 ## UI (Gradio) – Analysis Progress panel
 - [x] Embed live Analysis Progress directly under the question (inline), replacing separate tab
 - [ ] Live components:
-  - [ ] **Timeline/Stepper**: current phase (Index lookup → Retrieval → Summaries → Answer)
-  - [ ] **Progress bar**: contexts retrieved/selected vs. target (`evidence_k`)
-  - [ ] **Tool calls table**: name, status, duration
-  - [ ] **Top evidence (live table)**: source, score, page, snippet
-  - [ ] **Score histogram**: distribution of candidate scores (Plotly or lightweight SVG)
-  - [ ] **MMR selection view**: show selected vs. discarded candidates
-  - [ ] **Costs/time**: running totals (if `lmi` provides)
-  - [ ] **Errors**: surfaced inline when retries/backoff occur
-- [ ] Auto-scroll + compact mode for long runs
+  - [x] Basic phase indicators (badges): Retrieval, Summaries, Answer
+  - [x] Progress bar: contexts retrieved/selected vs. target (`evidence_k`)
+  - [ ] Tool calls table: name, status, duration
+  - [ ] Score histogram: distribution of candidate scores (Plotly or lightweight SVG)
+  - [ ] MMR selection view: show selected vs. discarded candidates
+  - [ ] Costs/time: running totals (if `lmi` provides)
+  - [ ] Errors: surfaced inline when retries/backoff occur
+- [x] Auto-scroll to Answer on completion
+- [ ] Compact mode for long runs
 - [ ] Toggle to pause streaming (reduce UI overhead)
 
 ### Additional UX/Insights Enhancements
@@ -129,6 +129,11 @@ This document tracks the work to add rich, live analytics and visualizations for
 - [x] Moved Top evidence table to Research Intelligence (removed from live panel)
 - [x] Auto-scroll to Answer after analysis completes
 - [x] Dark-mode compliance via shared CSS classes across Status, Analysis, Answer, Sources, Metadata, and Research Intelligence
+- [x] Phase badges (Retrieval, Summaries, Answer) with completion ticks
+- [x] Retrieval progress bar (contexts_selected / evidence_k)
+- [x] Transparency panel: evidence selection stats (score min/mean/max) and per-document counts (mini bar viz)
+- [x] Answer metrics: elapsed, sources included, approximate prompt size, attempts
+- [x] Hide legacy Processing Status block in UI (to be removed later)
 - [x] Dedicated background asyncio loop for all LLM/embedding I/O to prevent loop-close/binding errors; single-query lock
 - [x] Replaced deprecated `gr.utils.escape_html` with `html.escape`
 - [x] Spinner + elapsed time heartbeat; dynamic auto-expanding progress panel (no scroll)
