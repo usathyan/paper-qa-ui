@@ -46,6 +46,15 @@ This document tracks the work to add rich, live analytics and visualizations for
 - [ ] Compact mode for long runs
 - [ ] Toggle to pause streaming (reduce UI overhead)
 
+### Query rewrite / decomposition (new)
+- [ ] Add a basic "Rewrite query" toggle under Configuration (left column)
+- [ ] Minimal rewriter scaffold in UI: local heuristic pass that tightens phrasing and removes boilerplate
+- [ ] Show original vs rewritten query above progress; allow easy comparison
+- [ ] Advanced (optional): LLM-based decomposition inspired by ai2-scholarqa-lib
+  - [ ] Prompt-driven rewrite with structured filters (years, venues, fields of study)
+  - [ ] Use rewritten query for retrieval; retain original for display/trace
+  - [ ] Include rewritten form and filters in exports/traces
+
 ### Additional UX/Insights Enhancements
 - [ ] "Trace / Thinking" panel showing agent steps and tools (separate tab), sourced from callbacks (tool name, args summary, output, duration)
 - [ ] "LLM Critique" optional pass that evaluates the final answer for contradictions/consistency and citation adequacy (uses OpenRouter when configured)

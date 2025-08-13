@@ -9,6 +9,7 @@ import html
 import logging
 import os
 import time
+import re
 from pathlib import Path
 from typing import List, Tuple, Any, Dict, Generator
 from queue import Queue, Empty
@@ -695,7 +696,10 @@ def process_question(
 
 
 def ask_with_progress(
-    question: str, config_name: str = "optimized_ollama", run_critique: bool = False
+    question: str,
+    config_name: str = "optimized_ollama",
+    run_critique: bool = False,
+    rewrite_query_toggle: bool = False,
 ) -> Generator[Tuple[str, str, str, str, str, str, str], None, None]:
     """Stream pre-evidence progress inline, then yield final answer outputs.
 
@@ -703,8 +707,17 @@ def ask_with_progress(
     (analysis_progress_html, answer_html, sources_html, metadata_html, intelligence_html, error_msg, status_html)
     """
     panel_last = ""
+    # Optionally rewrite query
+    original_question = question
+    if rewrite_query_toggle:
+        try:
+            settings = app_state.get("settings") or initialize_settings(config_name)
+            question = rewrite_query(question, settings)
+        except Exception:
+            pass
+
     try:
-        for panel_html in stream_analysis_progress(question, config_name):
+        for panel_html in stream_analysis_progress(question, config_name, original_question=original_question if rewrite_query_toggle else None):
             panel_last = panel_html
             status_html = (
                 app_state["status_tracker"].get_status_html()
@@ -797,6 +810,34 @@ def _run_pre_evidence_in_thread(
     def cb(chunk: str) -> None:
         try:
             q.put({"type": "log", "data": chunk}, timeout=0.1)
+        except Exception:
+            pass
+        # Heuristic: parse progress counts from logs to update contexts_selected
+        try:
+            text = str(chunk)
+            cs: int | None = None
+            # Pattern like "5/20" or "5 / 20 contexts"
+            m = re.search(
+                r"(\d+)\s*/\s*(\d+)(?:\s*(?:contexts?|evidence))?", text, re.I
+            )
+            if m:
+                cs = int(m.group(1))
+            else:
+                m2 = re.search(r"contexts?\s*(?:selected)?\s*[:=]?\s*(\d+)", text, re.I)
+                if m2:
+                    cs = int(m2.group(1))
+                else:
+                    m3 = re.search(r"selected\s*[:=]?\s*(\d+)", text, re.I)
+                    if m3:
+                        cs = int(m3.group(1))
+            if cs is not None:
+                try:
+                    q.put(
+                        {"type": "metric", "data": {"contexts_selected": cs}},
+                        timeout=0.05,
+                    )
+                except Exception:
+                    pass
         except Exception:
             pass
 
@@ -902,7 +943,7 @@ def _run_pre_evidence_in_thread(
 
 
 def stream_analysis_progress(
-    question: str, config_name: str = "optimized_ollama"
+    question: str, config_name: str = "optimized_ollama", original_question: str | None = None
 ) -> Generator[str, None, None]:
     """Stream live analysis progress (pre-evidence) into an HTML panel."""
     # Initialize queue and settings/docs
@@ -1041,6 +1082,11 @@ def stream_analysis_progress(
                 + ("<span class='pqa-spinner'></span>" if running else "")
                 + "<strong>Analysis Progress</strong>"
                 + f" <small class='pqa-muted'>({elapsed:.1f}s)</small></div>"
+            ),
+            (
+                "<div class='pqa-subtle' style='margin:6px 0'>"
+                + (f"<small class='pqa-muted'>Rewritten from: {html.escape(original_question)}</small>" if original_question else "")
+                + "</div>"
             ),
             (
                 "<div class='pqa-steps'>"
@@ -1252,13 +1298,11 @@ def stream_analysis_progress(
 
 
 def format_answer_html(answer: str, contexts: List) -> str:
-    """Format the answer as HTML."""
+    """Return markdown string for the answer block."""
     if not answer:
-        return "<div class='pqa-subtle' style='text-align: center;'><small class='pqa-muted'>No answer generated.</small></div>"
+        return "_No answer generated._"
 
-    # Simple formatting - you can enhance this
-    formatted_answer = answer.replace("\n", "<br>")
-    return f"<div class='pqa-panel' style='padding: 15px;'>{formatted_answer}</div>"
+    return answer
 
 
 def format_sources_html(contexts: List) -> str:
@@ -1570,6 +1614,20 @@ def build_critique_html(answer: str, contexts: List) -> str:
         return "<div class='pqa-subtle'><small class='pqa-muted'>Critique unavailable.</small></div>"
 
 
+def rewrite_query(question: str, settings: Settings) -> str:
+    """Minimal local query rewriter: tighten phrasing and strip boilerplate.
+    Placeholder for advanced LLM-based decomposition.
+    """
+    q = " ".join(question.strip().split())
+    # Remove polite fillers
+    q = re.sub(r"^(please|kindly)\s+", "", q, flags=re.I)
+    # Prefer imperative style
+    q = re.sub(r"^(what is|what are)\s+", "summarize ", q, flags=re.I)
+    # Trim repeated punctuation
+    q = re.sub(r"[?!.]{2,}$", "?", q)
+    return q
+
+
 def clear_all() -> Tuple[str, str, str, str, str, str, str]:
     """Clear all uploaded documents and reset the interface."""
     app_state["uploaded_docs"] = []
@@ -1662,7 +1720,17 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
             cfg_status = gr.Markdown(visible=False)
 
             # Critique toggle (moved here under configuration)
-            critique_toggle = gr.Checkbox(label="Run Critique", value=False)
+            gr.Markdown(
+                "<small class='pqa-muted'>Enable a quick post‑answer sanity check to flag potentially unsupported or overly strong claims. This does not change the answer.</small>"
+            )
+            critique_toggle = gr.Checkbox(
+                label="Run Critique",
+                value=False,
+                info="Adds a brief critique after the answer (no answer change)",
+            )
+
+            gr.Markdown("### 🔧 Query Options")
+            rewrite_toggle = gr.Checkbox(label="Rewrite query (experimental)", value=False, info="Rephrase your question for retrieval; shows original above progress")
 
             gr.Markdown("### 🧹 Actions")
             clear_button = gr.Button("🗑️ Clear All", variant="secondary")
@@ -1678,8 +1746,8 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
             with gr.Row():
                 ask_button = gr.Button("🤖 Ask Question", variant="primary", size="lg")
 
-            # Status display
-            status_display = gr.HTML(label="Processing Status")
+            # Status display (hidden for now)
+            status_display = gr.HTML(label="Processing Status", visible=False)
 
             gr.Markdown("### 🔎 Live Analysis Progress")
             inline_analysis = gr.HTML(label="Analysis", show_label=False)
@@ -1688,7 +1756,7 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
             answer_anchor = gr.HTML(
                 "<div id='pqa-answer-anchor'></div>", show_label=False
             )
-            answer_display = gr.HTML(label="Answer")
+            answer_display = gr.Markdown(label="Answer")
 
             gr.Markdown("### 📚 Sources")
             sources_display = gr.HTML(label="Evidence Sources")
@@ -1705,10 +1773,10 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
 
     # Event handlers - automatically process documents on upload
     def _pre_upload_disable() -> Any:
-        return gr.Button.update(value="⏳ Wait…", interactive=False)
+        return gr.update(value="⏳ Wait…", interactive=False)
 
     def _post_upload_enable() -> Any:
-        return gr.Button.update(value="🤖 Ask Question", interactive=True)
+        return gr.update(value="🤖 Ask Question", interactive=True)
 
     file_upload.change(
         fn=process_uploaded_files,
@@ -1723,7 +1791,7 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
     upload_status.change(fn=_post_upload_enable, outputs=[ask_button])
 
     def _enable_ask(is_ready: bool) -> Any:
-        return gr.Button.update(interactive=bool(is_ready))
+        return gr.update(interactive=bool(is_ready))
 
     config_dropdown.change(
         fn=_on_config_change, inputs=[config_dropdown], outputs=[cfg_status]
@@ -1731,7 +1799,7 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
 
     ask_button.click(
         fn=ask_with_progress,
-        inputs=[question_input, config_dropdown, critique_toggle],
+        inputs=[question_input, config_dropdown, critique_toggle, rewrite_toggle],
         outputs=[
             inline_analysis,
             answer_display,
@@ -1745,7 +1813,7 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
 
     question_input.submit(
         fn=ask_with_progress,
-        inputs=[question_input, config_dropdown, critique_toggle],
+        inputs=[question_input, config_dropdown, critique_toggle, rewrite_toggle],
         outputs=[
             inline_analysis,
             answer_display,
