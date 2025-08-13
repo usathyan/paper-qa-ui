@@ -474,8 +474,7 @@ async def process_question_async(
             if "Event loop is closed" in str(e):
                 # Attempt to reset LiteLLM async client to avoid stale-loop issues, then retry
                 try:
-                    import litellm  # type: ignore
-
+                    import litellm  # runtime-only optional dependency
                     importlib.reload(litellm)
                     logger.info(
                         "Reloaded litellm to reset async HTTP client after loop-close error"
