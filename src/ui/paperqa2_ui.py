@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import List, Tuple, Any, Dict, Generator
 import json
 import csv
+import zipfile
 from queue import Queue, Empty
 import threading
 
@@ -559,11 +560,13 @@ async def process_question_async(
                     "⚠️ Limited information found - try a more general question"
                 )
 
-            # Optional critique (heuristic placeholder)
+            # Optional critique (LLM-backed when configured; falls back to heuristic)
             critique_html = ""
             if run_critique and answer:
                 try:
-                    critique_html = build_critique_html(answer, contexts)
+                    critique_html = await build_llm_or_heuristic_critique_html(
+                        question, answer, contexts, settings
+                    )
                 except Exception:
                     critique_html = "<div class='pqa-subtle'><small class='pqa-muted'>Critique unavailable.</small></div>"
 
@@ -719,7 +722,11 @@ def ask_with_progress(
             pass
 
     try:
-        for panel_html in stream_analysis_progress(question, config_name, original_question=original_question if rewrite_query_toggle else None):
+        for panel_html in stream_analysis_progress(
+            question,
+            config_name,
+            original_question=original_question if rewrite_query_toggle else None,
+        ):
             panel_last = panel_html
             status_html = (
                 app_state["status_tracker"].get_status_html()
@@ -945,7 +952,9 @@ def _run_pre_evidence_in_thread(
 
 
 def stream_analysis_progress(
-    question: str, config_name: str = "optimized_ollama", original_question: str | None = None
+    question: str,
+    config_name: str = "optimized_ollama",
+    original_question: str | None = None,
 ) -> Generator[str, None, None]:
     """Stream live analysis progress (pre-evidence) into an HTML panel."""
     # Initialize queue and settings/docs
@@ -1087,7 +1096,11 @@ def stream_analysis_progress(
             ),
             (
                 "<div class='pqa-subtle' style='margin:6px 0'>"
-                + (f"<small class='pqa-muted'>Rewritten from: {html.escape(original_question)}</small>" if original_question else "")
+                + (
+                    f"<small class='pqa-muted'>Rewritten from: {html.escape(original_question)}</small>"
+                    if original_question
+                    else ""
+                )
                 + "</div>"
             ),
             (
@@ -1616,6 +1629,132 @@ def build_critique_html(answer: str, contexts: List) -> str:
         return "<div class='pqa-subtle'><small class='pqa-muted'>Critique unavailable.</small></div>"
 
 
+async def build_llm_or_heuristic_critique_html(
+    question: str, answer: str, contexts: List, settings: Settings
+) -> str:
+    """Attempt an LLM-based critique via OpenRouter when configured; otherwise fallback.
+
+    Runs any network LLM call on the dedicated background loop to avoid event-loop conflicts.
+    """
+    try:
+        api_key = os.getenv("OPENROUTER_API_KEY", "").strip()
+        model_name = str(getattr(settings, "llm", "") or "").strip()
+        use_openrouter = bool(api_key) and model_name.startswith("openrouter/")
+
+        if use_openrouter:
+            try:
+                import litellm
+
+                # Build concise evidence bullets for the model
+                evidence_lines: List[str] = []
+                for c in (contexts or [])[:10]:
+                    try:
+                        txt_obj = getattr(c, "text", None)
+                        doc = (
+                            getattr(txt_obj, "doc", None)
+                            if txt_obj is not None
+                            else None
+                        )
+                        title = None
+                        citation = None
+                        if doc is not None:
+                            citation = getattr(doc, "formatted_citation", None)
+                            title = getattr(doc, "title", None) or getattr(
+                                doc, "docname", None
+                            )
+                        page = getattr(c, "page", None)
+                        raw_text = (
+                            getattr(txt_obj, "text", None)
+                            if txt_obj is not None
+                            else None
+                        )
+                        snippet = (
+                            raw_text
+                            if isinstance(raw_text, str)
+                            else (str(txt_obj) if txt_obj is not None else str(c))
+                        )
+                        if snippet and len(snippet) > 240:
+                            snippet = snippet[:240] + "..."
+                        display = citation or title or "Unknown source"
+                        pg = f" p.{int(page)}" if isinstance(page, (int, float)) else ""
+                        evidence_lines.append(f"- {display}{pg}: {snippet}")
+                    except Exception:
+                        continue
+
+                messages: List[Dict[str, str]] = [
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are a scientific QA auditor. Provide a brief, critical assessment of the answer's support. "
+                            "Flag unsupported or overconfident claims, missing citations, and contradictory evidence. "
+                            "Be concise and actionable. Return 3-6 bullet points max."
+                        ),
+                    },
+                    {
+                        "role": "user",
+                        "content": (
+                            f"Question:\n{question}\n\n"
+                            f"Answer:\n{answer}\n\n"
+                            "Evidence excerpts (doc/page: snippet):\n"
+                            + "\n".join(evidence_lines)
+                        ),
+                    },
+                ]
+
+                def _extract_content(resp: Any) -> str:
+                    try:
+                        choices = getattr(resp, "choices", None)
+                        if isinstance(choices, list) and choices:
+                            choice0 = choices[0]
+                            message = getattr(choice0, "message", None)
+                            if isinstance(message, dict):
+                                c = message.get("content")
+                                if isinstance(c, str):
+                                    return c
+                            c2 = getattr(message, "content", None)
+                            if isinstance(c2, str):
+                                return c2
+                        content_attr = getattr(resp, "content", None)
+                        if isinstance(content_attr, str):
+                            return content_attr
+                    except Exception:
+                        pass
+                    return ""
+
+                async def _go() -> str:
+                    resp = await litellm.acompletion(
+                        model=model_name,
+                        messages=messages,
+                        api_key=api_key,
+                        timeout=20,
+                    )
+                    return _extract_content(resp)
+
+                _ensure_query_loop()
+                fut = asyncio.run_coroutine_threadsafe(_go(), app_state["query_loop"])
+                content = await asyncio.to_thread(fut.result, timeout=45)
+                if isinstance(content, str) and content.strip():
+                    # Format as HTML list; strip markdown bullets
+                    items: List[str] = []
+                    for line in content.splitlines():
+                        s = line.strip().lstrip("-*").strip()
+                        if s:
+                            items.append(f"<li><small>{html.escape(s)}</small></li>")
+                    if items:
+                        return (
+                            "<div class='pqa-subtle' style='margin-top:6px'><ul>"
+                            + "".join(items[:6])
+                            + "</ul></div>"
+                        )
+            except Exception:
+                pass
+
+        # Fallback to heuristic critique
+        return build_critique_html(answer, contexts)
+    except Exception:
+        return "<div class='pqa-subtle'><small class='pqa-muted'>Critique unavailable.</small></div>"
+
+
 def rewrite_query(question: str, settings: Settings) -> str:
     """Minimal local query rewriter: tighten phrasing and strip boilerplate.
     Placeholder for advanced LLM-based decomposition.
@@ -1732,7 +1871,11 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
             )
 
             gr.Markdown("### 🔧 Query Options")
-            rewrite_toggle = gr.Checkbox(label="Rewrite query (experimental)", value=False, info="Rephrase your question for retrieval; shows original above progress")
+            rewrite_toggle = gr.Checkbox(
+                label="Rewrite query (experimental)",
+                value=False,
+                info="Rephrase your question for retrieval; shows original above progress",
+            )
 
             gr.Markdown("### 🧹 Actions")
             clear_button = gr.Button("🗑️ Clear All", variant="secondary")
@@ -1740,7 +1883,12 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
             gr.Markdown("### 📦 Export")
             export_json_btn = gr.DownloadButton("⬇️ Export JSON", variant="secondary")
             export_csv_btn = gr.DownloadButton("⬇️ Export CSV", variant="secondary")
-            export_trace_btn = gr.DownloadButton("⬇️ Export Trace (JSONL)", variant="secondary")
+            export_trace_btn = gr.DownloadButton(
+                "⬇️ Export Trace (JSONL)", variant="secondary"
+            )
+            export_bundle_btn = gr.DownloadButton(
+                "⬇️ Export Bundle (ZIP)", variant="secondary"
+            )
 
         with gr.Column(scale=2):
             gr.Markdown("### ❓ Ask Questions")
@@ -1831,14 +1979,16 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
         fpath = outdir / fname
         with open(fpath, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
-            writer.writerow(["doc", "page", "score", "text"]) 
+            writer.writerow(["doc", "page", "score", "text"])
             for c in contexts:
-                writer.writerow([
-                    c.get("doc"),
-                    c.get("page"),
-                    c.get("score"),
-                    (c.get("text") or "").replace("\n", " ")[:4000],
-                ])
+                writer.writerow(
+                    [
+                        c.get("doc"),
+                        c.get("page"),
+                        c.get("score"),
+                        (c.get("text") or "").replace("\n", " ")[:4000],
+                    ]
+                )
         return str(fpath)
 
     def export_trace() -> str:
@@ -1851,6 +2001,19 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
                 f.write(json.dumps(ev, ensure_ascii=False))
                 f.write("\n")
         return str(fpath)
+
+    def export_bundle() -> str:
+        outdir = _ensure_exports_dir()
+        ts = int(time.time())
+        json_path = Path(export_json())
+        csv_path = Path(export_csv())
+        trace_path = Path(export_trace())
+        zip_path = outdir / f"bundle_{ts}.zip"
+        with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+            zf.write(json_path, arcname=json_path.name)
+            zf.write(csv_path, arcname=csv_path.name)
+            zf.write(trace_path, arcname=trace_path.name)
+        return str(zip_path)
 
     ask_button.click(
         fn=ask_with_progress,
@@ -1897,6 +2060,7 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
     export_json_btn.click(fn=export_json, outputs=[export_json_btn])
     export_csv_btn.click(fn=export_csv, outputs=[export_csv_btn])
     export_trace_btn.click(fn=export_trace, outputs=[export_trace_btn])
+    export_bundle_btn.click(fn=export_bundle, outputs=[export_bundle_btn])
 
 if __name__ == "__main__":
     import os

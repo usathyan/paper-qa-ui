@@ -32,10 +32,11 @@ This roadmap summarizes what is done and prioritizes next steps. It reflects the
 2) Critique (LLM‑based, optional)
    - Replace heuristic with a fast LLM pass (OpenRouter), with timeout and cost notice
    - Output: concise flags referencing implicated evidence items
-3) Exports polish
-   - Enrich JSON with rewritten/original question, config toggles, and final metrics
-   - Add structured event types and timestamps to JSONL; include rewritten query and answer metrics
-   - Optionally append MMR candidate/selected sets when available
+3) Scientist‑relevant analysis
+   - Contradiction analysis beyond heuristics: cluster similar claims and mark polarity across sources
+   - Retraction details: flag retracted papers (if metadata available); surface retraction notices in sources
+   - Journal quality signals: lightweight proxies (indexed venue lists, OA flags), and surface them alongside sources
+   - Diversity & recency: visual summaries for publication year distribution, doc/journal/author diversity
 
 ## Medium priority
 - Live analytics UI
@@ -52,15 +53,14 @@ This roadmap summarizes what is done and prioritizes next steps. It reflects the
   - Source quality indicators (journal metrics proxy, venue reputation, open/retracted status)
   - Evidence conflicts view (cluster excerpts across docs; highlight opposing claims)
 
-## Scientist‑relevant analytics (future)
-- Contradiction analysis (Paper‑QA aware)
-  - Expand beyond heuristics by grouping semantically similar claims and marking polarity
-- Retraction details
-  - Flag retracted papers (if metadata available); surface retraction notices
-- Journal quality signals
-  - Lightweight proxy scores (e.g., indexed venue lists, DOAJ/open access flags, acceptance rates when available)
-- Diversity & recency
-  - Charts for publication year distribution, doc/journal/author diversity
+- Exports polish
+  - Enrich JSON with rewritten/original question, config toggles, and final metrics
+  - Add structured event types and timestamps to JSONL; include rewritten query and answer metrics
+  - Optionally append MMR candidate/selected sets when available
+
+## Later
+- Tool-call level traces and visualizations (if agent/tooling used in pipeline)
+- Cost awareness (if available), with opt-in capture and display
 
 ## Technical notes
 - Prefer structured callbacks over log scraping for progress/events
