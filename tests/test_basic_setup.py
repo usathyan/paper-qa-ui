@@ -9,11 +9,9 @@ import sys
 from pathlib import Path
 
 # Prefer package imports under src/
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-
-from config_manager import setup_environment, validate_environment
-from streaming import ConsoleStreamingCallback, create_multi_callback
-from utils import create_picalm_questions, print_system_status, save_questions
+from src.config_manager import setup_environment, validate_environment
+from src.streaming import ConsoleStreamingCallback, create_multi_callback
+from src.utils import create_picalm_questions, print_system_status, save_questions
 
 # Suppress all warnings and below globally
 logging.basicConfig(level=logging.ERROR)
