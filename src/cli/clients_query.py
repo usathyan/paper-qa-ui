@@ -20,7 +20,7 @@ import argparse
 import asyncio
 import logging
 import os
-from typing import Iterable, List
+from typing import Iterable, List, Dict, Any
 
 from paperqa.clients import (
     ALL_CLIENTS,
@@ -85,13 +85,14 @@ async def main_async(
     clients = select_clients(providers)
     client = DocMetadataClient(clients=clients)
 
-    kwargs = {}
+    kwargs: Dict[str, Any] = {}
     if doi:
         kwargs["doi"] = doi
     if title:
         kwargs["title"] = title
     if authors:
-        kwargs["authors"] = authors
+        # Many client query signatures expect a comma-separated string; coerce safely
+        kwargs["authors"] = ", ".join(authors)
     if not kwargs:
         print("Provide at least one of --title/--doi/--authors")
         return 1
