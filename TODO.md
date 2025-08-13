@@ -19,6 +19,36 @@
    - Per‑source quality indicators (venue string, simple reputation proxy when metadata present)
    - Conflicts drill‑down (click to expand polarity‑grouped excerpts)
 
+## UX redesign (phased plan)
+- Phase 1 (end-to-end minimal)
+  - Plan tab: side-by-side Original/Rewritten; Generate rewrite (LLM); Accept rewrite overwrites Query Used
+  - Filters: chips for years/venues/fields; apply as Bias mode only (append to query string)
+  - Retrieval: scope chips, progress (selected/evidence_k), cutoff count, recent events
+  - Evidence: simple list with title/citation, year/page/score, snippet; include/exclude; show flags
+  - Conflicts: basic clustered list by entity (no expansion)
+  - Synthesis: answer + critique; inline citations
+  - Export: include rewrite, curation, toggles
+
+- Phase 2 (curation + conflicts)
+  - Hard filter mode (enforce constraints at selection) alongside Bias mode
+  - Evidence cards: per‑doc cap inline control; venue/journal line (when metadata present)
+  - Conflicts: expandable items; show up to N polarity‑grouped excerpts; minimal modal for full context
+  - Cutoff-aware histograms in Retrieval panel; display potential impact before apply
+
+- Phase 3 (analytics + ergonomics)
+  - Live analytics: tool-calls table (name/status/duration); pause streaming; compact mode
+  - Saved queries: snapshot rewrite + facets + curation + toggles; load & run
+  - Snapshot diff: list changed filters/curation vs previous
+
+- Phase 4 (MMR + exports)
+  - True MMR hooks: capture candidate and selected deterministically; remove log parsing
+  - UI: candidate vs selected with diversity summary; persist to exports
+  - Exports polish: structured JSONL event types/timestamps; enriched JSON with rewrite/curation/metrics
+
+- Out of scope for phases above (consider later)
+  - Ontology pickers with external APIs (NCIt/BioPortal) beyond local suggestions
+  - Detailed venue reputation scoring beyond simple proxies when metadata absent
+
 ## Next priority
 - True MMR (Maximum Marginal Relevance) visualization (hook‑based)
   - Integrate retrieval hooks (or upstream PR) to capture the full candidate set and the selected indices deterministically (no log parsing)
