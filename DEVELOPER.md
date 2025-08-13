@@ -112,6 +112,18 @@ graph LR
     - Retrieval progress bar (contexts_selected / evidence_k)
     - Transparency panel (scores min/mean/max, per‑doc counts, prompt size, elapsed, attempts)
   - `initialize_settings()`: Load and configure Paper-QA settings; applies research-intelligence defaults
+  - Query rewrite (advanced):
+    - `llm_decompose_query(question, settings) -> Dict[str, Any]`: Calls the configured LLM (via litellm) to produce `{ rewritten, filters { years, venues, fields } }`. Runs on a dedicated asyncio loop with `asyncio.run_coroutine_threadsafe` to avoid loop-binding issues. Defensive JSON parsing strips code fences and falls back gracefully.
+    - UI toggles: `use_llm_rewrite`, `bias_retrieval`. When biasing, filter hints are appended to the rewritten string for retrieval.
+    - `app_state["rewrite_info"]` stores original/rewritten/filters/bias flags; exported in `session_data.rewrite`.
+  - Evidence curation:
+    - UI controls: `score_cutoff`, `per_doc_cap`, `max_sources`
+    - Applied as: cutoff and max_sources on `settings.answer` pre-query; `per_doc_cap` post-query to prune contexts per source
+    - `app_state["curation"]` persisted to `session_data.curation` for exports
+  - Critique rendering: `_render_markdown_inline` converts minimal markdown (links, bold, italics, code) for critique bullets
+  - MMR visualization:
+    - Selected evidence histogram and diversity share from `contexts`
+    - Candidate overlay parsed heuristically from retrieval logs (temporary until hooks expose candidates). Events: `mmr` and `mmr_candidates` update the live panel.
 
 #### 2. Configuration Manager (`src/config_manager.py`)
 - **Purpose**: Manage different LLM/embedding configurations

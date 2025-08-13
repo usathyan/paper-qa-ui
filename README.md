@@ -190,9 +190,35 @@ Tip: On very small machines, you can lower `evidence_k` and set `max_concurrent_
 ## What’s new in this release
 - Inline Live Analysis Progress with chevron phases and a retrieval progress bar
 - Transparency panel with scientist‑relevant metrics (scores, counts, prompt size, timing)
-- Research Intelligence section with contradictions, insights, evidence summary, and Top evidence
+- Research Intelligence: contradictions (heuristic + clustering), key insights, evidence summary, and Top evidence
+- Critique: optional post‑answer check; now renders basic markdown for readability
+- MMR (Maximum Marginal Relevance): live diversity share and a score histogram; candidate vs selected overlay in progress
+- Query rewrite (advanced):
+  - Use LLM rewrite (advanced): asks the model to rewrite the query and propose filters (years, venues, fields)
+  - Bias retrieval using filters: appends filter hints to the rewritten query for more targeted evidence
+  - Analysis Progress displays: original question, rewritten query, and extracted filters
+- Evidence curation controls:
+  - Relevance score cutoff (slider)
+  - Per‑document evidence cap (number)
+  - Max sources included (number)
 - Robust local‑first execution: a dedicated async loop and single‑query lock for stability
 - Dark‑mode‑safe styling across Analysis, Answer, Sources, Research Intelligence, and Metadata
+
+### Summary of recent changes (for data scientists)
+
+- Query Options
+  - Added “Use LLM rewrite (advanced)” and “Bias retrieval using filters” checkboxes
+  - The panel now shows original, rewritten query, and filters inline under Analysis Progress
+- Evidence Curation (beta)
+  - Added controls: relevance score cutoff (slider), per‑document evidence cap (number), and max sources included (number)
+  - Score cutoff and max sources are applied before the query; per‑document cap is applied after retrieval to keep evidence diverse
+  - Exports now include a `curation` section in the session JSON
+- Critique rendering
+  - Critique bullets now render basic markdown (bold/italics/code/links) for better readability
+- MMR overlay
+  - Candidate vs selected histogram and counts in the progress panel; transparency shows candidate_count and an MMR lambda value when available
+- Build and stability
+  - Changes were tested (format/lint/type checks), committed, and pushed; the UI remains responsive and local‑first
 
 ## License and third‑party notices
 
