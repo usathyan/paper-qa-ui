@@ -565,25 +565,49 @@ def ask_with_progress(
         panel_last = err_panel
         yield (err_panel, "", "", "", "", "", "")
 
-    # Now produce the final answer
-    (
-        answer_html,
-        sources_html,
-        metadata_html,
-        intelligence_html,
-        error_msg,
-        _progress_html,
-        status_html,
-    ) = process_question(question, config_name)
+    # Now produce the final answer, while streaming a synthesis heartbeat
+    result_holder: Dict[str, Any] = {}
+
+    def _run_query() -> None:
+        (
+            result_holder["answer_html"],
+            result_holder["sources_html"],
+            result_holder["metadata_html"],
+            result_holder["intelligence_html"],
+            result_holder["error_msg"],
+            _progress_html,
+            result_holder["status_html"],
+        ) = process_question(question, config_name)
+
+    t = threading.Thread(target=_run_query, daemon=True)
+    t.start()
+    synth_start = time.time()
+    # Reuse spinner style
+    spinner_css = (
+        "<style>@keyframes pqa-spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}"
+        " .pqa-spinner{display:inline-block;width:14px;height:14px;border:2px solid #ccc;"
+        " border-top-color:#007bff;border-radius:50%;animation:pqa-spin 0.8s linear infinite;"
+        " margin-right:6px}</style>"
+    )
+    while t.is_alive():
+        elapsed = time.time() - synth_start
+        synth_block = (
+            f"{spinner_css}<div style='margin-top:8px;color:#333'>"
+            f"<span class='pqa-spinner'></span> Synthesizing answer"
+            f" <small style='color:#666'>({elapsed:.1f}s)</small>"
+            f"</div>"
+        )
+        yield (panel_last + synth_block, "", "", "", "", "", "")
+        time.sleep(0.75)
 
     yield (
         panel_last,
-        answer_html,
-        sources_html,
-        metadata_html,
-        intelligence_html,
-        error_msg,
-        status_html,
+        result_holder.get("answer_html", ""),
+        result_holder.get("sources_html", ""),
+        result_holder.get("metadata_html", ""),
+        result_holder.get("intelligence_html", ""),
+        result_holder.get("error_msg", ""),
+        result_holder.get("status_html", ""),
     )
 
 
@@ -696,6 +720,7 @@ def stream_analysis_progress(
     def render_html() -> str:
         elapsed = time.time() - start_ts
         running = worker.is_alive()
+        latest = logs[-1] if logs else ""
         parts = [
             "<div style='background:#fff;padding:12px;border-radius:6px;'>",
             "<style>@keyframes pqa-spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}} .pqa-spinner{display:inline-block;width:14px;height:14px;border:2px solid #ccc;border-top-color:#007bff;border-radius:50%;animation:pqa-spin 0.8s linear infinite;margin-right:6px}</style>",
@@ -706,7 +731,7 @@ def stream_analysis_progress(
                 + f" <small style='color:#666'>({elapsed:.1f}s)</small></div>"
             ),
             "<div style='background:#f7f7f9;padding:8px;border-radius:4px'>",
-            *[f"<div><small>{html.escape(line)}</small></div>" for line in logs],
+            f"<div><small>{html.escape(latest)}</small></div>",
             "</div>",
         ]
         if table_rows:
@@ -1016,30 +1041,8 @@ def build_intelligence_html(answer: str, contexts: List) -> str:
             parts.extend([f"<li>{x}</li>" for x in ev_summary_items])
         parts.append("</ul></div>")
 
-        # Render top evidence table
-        if scored_items:
-            parts.append(
-                "<div style='margin-top:8px'><strong>Top evidence (by score)</strong>"
-            )
-            parts.append(
-                "<div style='overflow-x:auto'><table style='width:100%; border-collapse:collapse'>"
-            )
-            parts.append(
-                "<tr><th style='text-align:left;padding:6px;border-bottom:1px solid #ddd'>Source</th>"
-                "<th style='text-align:left;padding:6px;border-bottom:1px solid #ddd'>Score</th>"
-                "<th style='text-align:left;padding:6px;border-bottom:1px solid #ddd'>Page</th>"
-                "<th style='text-align:left;padding:6px;border-bottom:1px solid #ddd'>Snippet</th></tr>"
-            )
-            for score, display, page, snippet in scored_items[:10]:
-                score_str = f"{score:.3f}" if isinstance(score, (int, float)) else "-"
-                page_str = str(int(page)) if isinstance(page, (int, float)) else "-"
-                parts.append(
-                    f"<tr><td style='padding:6px;border-bottom:1px solid #f0f0f0'>{display}</td>"
-                    f"<td style='padding:6px;border-bottom:1px solid #f0f0f0'>{score_str}</td>"
-                    f"<td style='padding:6px;border-bottom:1px solid #f0f0f0'>{page_str}</td>"
-                    f"<td style='padding:6px;border-bottom:1px solid #f0f0f0'><small>{snippet}</small></td></tr>"
-                )
-            parts.append("</table></div></div>")
+        # Top evidence table intentionally omitted here to avoid duplication with
+        # the live "Analysis Progress" panel shown above.
         parts.append("</div>")
         return "".join(parts)
     except Exception as e:
