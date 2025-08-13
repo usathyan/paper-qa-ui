@@ -153,3 +153,39 @@ This document tracks the work to add rich, live analytics and visualizations for
 - Event loop contention (already mitigated with isolated loop + single-query lock)
 - Model streaming variability (local models may be bursty)
 - Critique step adds latency/cost; ship disabled by default and warn when turned on
+
+## Potential future enhancements (transparency & scientist‑relevant metrics)
+- Answer assembly transparency panel (high-level, non-intrusive):
+  - Query embedding & retrieval: embed latency, fetch_k, MMR lambda, candidate count, score min/mean/max
+  - Evidence selection: contexts_selected vs evidence_k, score stats, per-doc counts, elapsed
+  - Summaries synthesis (if used): summaries count, latency, token estimates
+  - Prompt building: prompt length (chars/tokens), sources included, max_sources
+  - Answer generation: attempts/retries, latency per attempt, token usage/cost (if available)
+  - Post-processing: sources used, final contexts, postproc time
+
+- Additional scientist‑relevant metrics:
+  - Source contribution breakdown: evidence share per paper/journal
+  - Recency distribution (years) of selected evidence; median age
+  - Diversity indices: number of unique papers, journals, and authors
+  - Agreement/contradiction rate across sources (simple antonym/negation heuristics)
+  - Evidence span length distribution (tokens/chars) and coverage per paper
+  - Domain/entity coverage (keywords/MeSH terms/GO terms) frequency
+  - Confidence calibration proxy: score percentile of selected vs candidates
+  - MMR effect: redundancy reduction vs diversity (before/after stats)
+  - Retrieval cache hits (if any), local vs remote model usage mix
+
+- Visualizations to consider (lightweight first):
+  - Timeline/stepper with per-phase durations
+  - Progress bar (contexts_selected vs evidence_k)
+  - Histograms: evidence scores; years of publication
+  - Bar charts: evidence per document/journal; top entities/keywords
+  - Scatter: score vs page number; score vs year
+  - Box/violin plots for score distributions across documents
+  - Simple Sankey: candidates → selected evidence (counts)
+  - Donut chart: contribution share by source
+  - Inline sparklines (SVG) for scores over ranked candidates
+
+- Implementation notes:
+  - Start with Plotly charts embedded via Gradio components; fall back to SVG for zero‑dep
+  - Throttle UI updates; compute heavy stats after retrieval completes
+  - Make metrics optional via settings (analytics.enabled) to avoid overhead
