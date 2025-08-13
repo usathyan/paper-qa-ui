@@ -91,7 +91,11 @@ Examples:
         return 1
 
     try:
-        from ..paperqa2_core import PaperQACore
+        # Fallback: use PaperQACore if available, otherwise skip
+        try:
+            from ..paperqa2_core import PaperQACore  # type: ignore
+        except Exception:
+            from ..paper_qa_core import PaperQACore  # type: ignore
 
         print(f"\nQuerying: {args.question}")
         print(f"Method: {args.method}")

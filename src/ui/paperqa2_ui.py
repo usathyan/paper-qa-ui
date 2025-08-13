@@ -173,7 +173,7 @@ def initialize_settings(config_name: str = "optimized_ollama") -> Settings:
         raise
 
 
-async def process_uploaded_files_async(files: List[str]) -> Tuple[str, str]:
+async def process_uploaded_files_async(files: List[Any]) -> Tuple[str, str]:
     """Process uploaded files by copying them to papers directory."""
     if not files:
         return "", "No files uploaded."
