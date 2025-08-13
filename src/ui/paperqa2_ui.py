@@ -131,6 +131,26 @@ def initialize_settings(config_name: str = "optimized_ollama") -> Settings:
                     )
             except Exception:
                 pass
+        # MMR visualization (compact)
+        try:
+            mmr_cache = app_state.get("_mmr_items", [])
+            if mmr_cache:
+                parts.append("<div class='pqa-panel' style='margin-top:8px'><strong>MMR selection (by score)</strong>")
+                top = mmr_cache[:10]
+                max_score = max([x.get("score") or 0 for x in top]) if top else 1
+                viz_rows: List[str] = []
+                for it in top:
+                    sc = float(it.get("score") or 0)
+                    pct = int(round((sc / max_score) * 100)) if max_score > 0 else 0
+                    name = str(it.get("doc") or "Unknown")
+                    viz_rows.append(
+                        f"<div style='margin:4px 0'><small>{html.escape(name)}</small>"
+                        f"<div class='pqa-subtle' style='height:8px;border-radius:6px;overflow:hidden'><div style='height:100%;width:{pct}%;background:#3b82f6'></div></div>"
+                        f"<small class='pqa-muted'>{sc:.3f}</small></div>"
+                    )
+                parts.append("".join(viz_rows) + "</div>")
+        except Exception:
+            pass
         except Exception:
             pass
         try:
@@ -754,6 +774,7 @@ def _run_pre_evidence_in_thread(
             contexts = getattr(session, "contexts", []) or []
             scores: List[float] = []
             per_doc: Dict[str, int] = {}
+            mmr_items: List[Dict[str, Any]] = []
             for c in contexts:
                 sc = getattr(c, "score", None)
                 if isinstance(sc, (int, float)):
@@ -767,6 +788,10 @@ def _run_pre_evidence_in_thread(
                     title = getattr(doc, "title", None) or getattr(doc, "docname", None)
                 name = citation or title or "Unknown"
                 per_doc[name] = per_doc.get(name, 0) + 1
+                mmr_items.append({
+                    "doc": name,
+                    "score": float(sc) if isinstance(sc, (int, float)) else None,
+                })
             score_min = min(scores) if scores else None
             score_max = max(scores) if scores else None
             score_mean = (sum(scores) / len(scores)) if scores else None
@@ -782,6 +807,11 @@ def _run_pre_evidence_in_thread(
                 },
                 timeout=0.1,
             )
+            try:
+                mmr_items.sort(key=lambda x: (-(x.get("score") or -1e9)))
+                q.put({"type": "mmr", "data": {"items": mmr_items}}, timeout=0.1)
+            except Exception:
+                pass
         except Exception:
             pass
         # Phase end
