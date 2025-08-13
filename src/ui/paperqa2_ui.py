@@ -57,11 +57,11 @@ def check_ollama_status() -> bool:
 class StatusTracker:
     """Simple status tracker for paper-qa operations."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.status_updates = []
         self.current_step = 0
 
-    def add_status(self, status: str):
+    def add_status(self, status: str) -> None:
         """Add a status update."""
         self.status_updates.append(f"{time.strftime('%H:%M:%S')} - {status}")
         logger.info(f"Status: {status}")
@@ -82,7 +82,7 @@ class StatusTracker:
         html_parts.append("</div>")
         return "".join(html_parts)
 
-    def clear(self):
+    def clear(self) -> None:
         """Clear all status updates."""
         self.status_updates = []
         self.current_step = 0

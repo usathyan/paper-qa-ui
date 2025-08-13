@@ -9,7 +9,7 @@ import asyncio
 # use package imports from src
 
 
-async def test_paper_qa_import():
+async def test_paper_qa_import() -> bool:
     """Test if we can import paper-qa."""
     print("\n" + "=" * 60)
     print("TESTING PAPER-QA IMPORT")
@@ -33,7 +33,7 @@ async def test_paper_qa_import():
         return False
 
 
-async def test_basic_paper_qa_functionality():
+async def test_basic_paper_qa_functionality() -> bool:
     """Test basic Paper-QA functionality."""
     print("\n" + "=" * 60)
     print("TESTING BASIC PAPER-QA FUNCTIONALITY")
@@ -64,7 +64,7 @@ async def test_basic_paper_qa_functionality():
         return False
 
 
-async def main():
+async def main() -> bool:
     """Run all tests."""
     print("Paper-QA Simple Import Test")
     print("=" * 60)

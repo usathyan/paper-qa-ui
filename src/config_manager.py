@@ -97,7 +97,7 @@ class ConfigManager:
         return deep_merge(base, override)
 
     def create_custom_config(
-        self, config_name: str, llm: str, embedding: str, **kwargs
+        self, config_name: str, llm: str, embedding: str, **kwargs: Any
     ) -> None:
         """Create a custom configuration with specified parameters."""
         config = {

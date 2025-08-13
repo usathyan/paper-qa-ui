@@ -38,7 +38,7 @@ NAME_TO_PROVIDER = {
 }
 
 
-def select_clients(provider_names: Iterable[str]):
+def select_clients(provider_names: Iterable[str]) -> List[type]:
     if not provider_names or any(n.lower() == "all" for n in provider_names):
         return ALL_CLIENTS
     # Import classes from paperqa.clients.* dynamically

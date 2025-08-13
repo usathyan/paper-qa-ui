@@ -10,7 +10,7 @@ import asyncio
 from paperqa import Settings
 
 
-async def test_settings():
+async def test_settings() -> bool:
     """Test Settings creation."""
     print("Testing paper-qa Settings...")
 
@@ -51,7 +51,7 @@ async def test_settings():
         return False
 
 
-async def main():
+async def main() -> None:
     """Run the test."""
     await test_settings()
 
