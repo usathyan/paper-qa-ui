@@ -39,7 +39,10 @@ class ConfigUIManager:
             raise FileNotFoundError(f"Config file not found: {config_path}")
 
         with open(config_path, "r") as f:
-            return json.load(f)
+            data: Any = json.load(f)
+        if not isinstance(data, dict):
+            raise ValueError("Invalid configuration file format")
+        return data
 
     def save_config(self, config_name: str, config_data: Dict[str, Any]) -> bool:
         """Save configuration to file."""
@@ -423,7 +426,7 @@ def create_config_ui() -> gr.Blocks:
                 [f"Error loading config: {str(e)}"] * 50
             )  # Return error for all fields
 
-    def save_config_from_ui(config_name: str, *values) -> str:
+    def save_config_from_ui(config_name: str, *values: Any) -> str:
         """Save configuration from UI component values."""
         try:
             config = _ui_values_to_config(values, schema)

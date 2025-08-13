@@ -4,8 +4,6 @@ Tests basic Paper-QA functionality without complex configuration.
 """
 
 import asyncio
-import sys
-from pathlib import Path
 
 # Add src to path
 # use package imports from src

@@ -3,8 +3,6 @@ Test paper-qa Settings
 """
 
 import asyncio
-import sys
-from pathlib import Path
 
 # Add src to path
 # use package imports from src

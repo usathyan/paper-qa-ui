@@ -13,7 +13,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 from config_manager import ConfigManager
 
 
-async def test_config_loading():
+async def test_config_loading() -> bool:
     """Test configuration loading."""
     print("Testing configuration loading...")
 
@@ -41,7 +41,7 @@ async def test_config_loading():
         return False
 
 
-async def main():
+async def main() -> None:
     """Run the test."""
     await test_config_loading()
 

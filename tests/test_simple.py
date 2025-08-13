@@ -9,7 +9,7 @@ import asyncio
 from utils import create_picalm_questions, print_system_status, save_questions
 
 
-async def test_picalm_questions():
+async def test_picalm_questions() -> bool:
     """Test PICALM questions creation."""
     print("\n" + "=" * 60)
     print("TESTING PICALM QUESTIONS")
@@ -33,7 +33,7 @@ async def test_picalm_questions():
         return False
 
 
-async def test_system_status():
+async def test_system_status() -> bool:
     """Test system status checks."""
     print("\n" + "=" * 60)
     print("TESTING SYSTEM STATUS")
@@ -48,7 +48,7 @@ async def test_system_status():
         return False
 
 
-async def test_basic_imports():
+async def test_basic_imports() -> bool:
     """Test basic imports."""
     print("\n" + "=" * 60)
     print("TESTING BASIC IMPORTS")
@@ -74,7 +74,7 @@ async def test_basic_imports():
         return False
 
 
-async def main():
+async def main() -> bool:
     """Run all tests."""
     print("Paper-QA Simple Test")
     print("=" * 60)

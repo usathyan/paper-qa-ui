@@ -7,9 +7,9 @@ import asyncio
 import logging
 
 # Prefer package imports under src/
-from config_manager import setup_environment, validate_environment
-from streaming import ConsoleStreamingCallback, create_multi_callback
-from utils import create_picalm_questions, print_system_status, save_questions
+from src.config_manager import setup_environment, validate_environment
+from src.streaming import ConsoleStreamingCallback, create_multi_callback
+from src.utils import create_picalm_questions, print_system_status, save_questions
 
 # Suppress all warnings and below globally
 logging.basicConfig(level=logging.ERROR)
@@ -17,7 +17,7 @@ logging.basicConfig(level=logging.ERROR)
 logging.getLogger("paperqa").setLevel(logging.INFO)
 
 
-async def test_environment_setup():
+async def test_environment_setup() -> bool:
     """Test environment setup and validation."""
     print("\n" + "=" * 60)
     print("TESTING ENVIRONMENT SETUP")
@@ -42,7 +42,7 @@ async def test_environment_setup():
         return False
 
 
-async def test_system_status():
+async def test_system_status() -> bool:
     """Test system status checks."""
     print("\n" + "=" * 60)
     print("TESTING SYSTEM STATUS")
@@ -57,7 +57,7 @@ async def test_system_status():
         return False
 
 
-async def test_configuration_loading():
+async def test_configuration_loading() -> bool:
     """Test configuration loading."""
     print("\n" + "=" * 60)
     print("TESTING CONFIGURATION LOADING")
@@ -76,7 +76,7 @@ async def test_configuration_loading():
         return False
 
 
-async def test_streaming_callbacks():
+async def test_streaming_callbacks() -> bool:
     """Test streaming callback functionality."""
     print("\n" + "=" * 60)
     print("TESTING STREAMING CALLBACKS")
@@ -100,7 +100,7 @@ async def test_streaming_callbacks():
         return False
 
 
-async def test_picalm_questions():
+async def test_picalm_questions() -> bool:
     """Test PICALM questions creation."""
     print("\n" + "=" * 60)
     print("TESTING PICALM QUESTIONS")
@@ -124,7 +124,7 @@ async def test_picalm_questions():
         return False
 
 
-async def test_basic_query_functions():
+async def test_basic_query_functions() -> bool:
     """Test basic query function signatures."""
     print("\n" + "=" * 60)
     print("TESTING BASIC QUERY FUNCTIONS")
@@ -156,7 +156,7 @@ async def test_basic_query_functions():
         return False
 
 
-async def main():
+async def main() -> bool:
     """Run all tests."""
     print("Paper-QA Basic Setup Test")
     print("=" * 60)
