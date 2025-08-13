@@ -9,8 +9,8 @@ This roadmap summarizes what is done and prioritizes next steps. It reflects the
   - Transparency metrics: score min/mean/max; per-document counts (mini bars)
   - MMR (Maximum Marginal Relevance) (MVP):
     - Compact selected‑by‑score list (proxy based on selected evidence)
-    - Basic visualization in progress panel: selected diversity share and score histogram
-    - Candidate vs selected overlay using heuristic candidate parsing from logs (temporary)
+    - Live panel MMR block: selected diversity share, score histogram
+    - Candidate vs selected overlay using temporary candidate parsing from logs
 - Answer renders as Markdown
 - Research Intelligence
   - Contradictions: heuristic + simple polarity‑based clustering across sources
@@ -32,25 +32,26 @@ This roadmap summarizes what is done and prioritizes next steps. It reflects the
 - Docs & license updates
 
 ## Next (high priority)
-1) True MMR (Maximum Marginal Relevance) visualization (hook‑based)
-   - Integrate retrieval hooks (or upstream PR) to capture the full candidate set and the selected indices deterministically (no log parsing)
-   - UI: candidate vs selected with score histogram and diversity summary (unique docs before/after)
-   - Remove temporary heuristics once hooks are available
+1) Query rewrite (advanced)
+   - LLM‑based decomposition inspired by ai2‑scholarqa‑lib (years, venues, fields of study)
+   - Use extracted filters to bias retrieval (toggle)
+   - Include rewritten form and filters in exports/traces
+2) Evidence curation enhancements
+   - Evidence filtering controls (e.g., per‑doc caps, score cutoff sliders)
+   - Source quality indicators (journal metrics proxy, venue reputation, open/retracted status)
+   - Evidence conflicts view (cluster excerpts across docs; highlight opposing claims)
 
-## Medium priority
+## Next priority
+- True MMR (Maximum Marginal Relevance) visualization (hook‑based)
+  - Integrate retrieval hooks (or upstream PR) to capture the full candidate set and the selected indices deterministically (no log parsing)
+  - UI: candidate vs selected with score histogram and diversity summary (unique docs before/after)
+  - Remove temporary heuristics once hooks are available; persist candidate/selected in exports
+
 - Live analytics UI
   - Tool calls table (name, status, duration)
   - Score histogram
   - Pause streaming and compact mode for long runs
   - Disable Ask during query execution; restore automatically
-- Query rewrite (advanced)
-  - LLM‑based decomposition inspired by ai2‑scholarqa‑lib (years, venues, fields of study)
-  - Use extracted filters to bias retrieval (toggle)
-  - Include rewritten form and filters in exports/traces
-- Evidence curation enhancements
-  - Evidence filtering controls (e.g., per‑doc caps, score cutoff sliders)
-  - Source quality indicators (journal metrics proxy, venue reputation, open/retracted status)
-  - Evidence conflicts view (cluster excerpts across docs; highlight opposing claims)
 
 - Exports polish
   - Enrich JSON with rewritten/original question, config toggles, and final metrics
