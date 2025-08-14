@@ -2451,37 +2451,27 @@ async def build_llm_or_heuristic_critique_html(
                 fut = asyncio.run_coroutine_threadsafe(_go(), app_state["query_loop"])
                 content = await asyncio.to_thread(fut.result, timeout=45)
                 if isinstance(content, str) and content.strip():
-                    # Normalize numbering (e.g., "\\1 foo" -> "1. foo") and detect ordered list
-                    raw_lines = [
-                        ln.strip() for ln in content.splitlines() if ln.strip()
-                    ]
-                    norm_lines: List[str] = []
-                    numbered = 0
+                    # Strip any leading numbering/bullet markers, including "\\1", "1.", "1)", "(1)", "-", "*"
+                    raw_lines = [ln.strip() for ln in content.splitlines() if ln.strip()]
+                    cleaned_lines: List[str] = []
                     for ln in raw_lines:
-                        # Convert leading "\\1 ", "\\1.", or "\\1)" to "1. "
-                        ln2 = re.sub(r"^\\(\d+)(?:[\s\.)]+)", r"\1. ", ln)
-                        if re.match(r"^(?:\d+\.|\d+\)|\d+\s+)", ln2):
-                            numbered += 1
-                        ln2 = ln2.lstrip("-*").strip()
-                        norm_lines.append(ln2)
-                    use_ol = numbered >= max(1, int(0.5 * len(norm_lines)))
-                    tag_open = "<ol>" if use_ol else "<ul>"
-                    tag_close = "</ol>" if use_ol else "</ul>"
+                        ln2 = re.sub(r"^\s*(?:\\\d+|\(\d+\)|\d+[\.)]|[-*•])\s+", "", ln)
+                        cleaned_lines.append(ln2)
                     items_html: List[str] = []
-                    for ln in norm_lines[:6]:
+                    for ln in cleaned_lines[:6]:
                         items_html.append(
                             f"<li><small>{_render_markdown_inline(ln)}</small></li>"
                         )
                     if items_html:
                         return (
                             "<div class='pqa-subtle' style='margin-top:6px'>"
-                            + tag_open
+                            + "<ul>"
                             + "".join(items_html)
-                            + tag_close
+                            + "</ul>"
                             + "</div>"
                         )
-                    # If no items built, fall back to rendering the content as markdown-ish with numbering fix
-                    fixed = _render_markdown_inline("\n".join(norm_lines))
+                    # Fallback to plain rendered text
+                    fixed = _render_markdown_inline("\n".join(cleaned_lines))
                     return (
                         "<div class='pqa-subtle' style='margin-top:6px'>"
                         + f"<p><small>{fixed}</small></p>"
