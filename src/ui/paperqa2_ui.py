@@ -2717,6 +2717,8 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
           .gr-row > .gr-column { flex: 1 1 100% !important; max-width: 100% !important; }
           #inline-analysis, #answer-panel, #sources-panel, #intelligence-panel, #metadata-panel { max-height: unset; height: auto; }
         }
+        /* Export buttons styling */
+        #export-buttons .gr-button { display: inline-block; font-weight: 400; margin-right: 8px; }
         </style>
         """
     )
@@ -2819,16 +2821,20 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
                 )
 
             with gr.Accordion("📦 Export", open=False):
-                export_json_btn = gr.DownloadButton(
-                    "⬇️ Export JSON", variant="secondary"
-                )
-                export_csv_btn = gr.DownloadButton("⬇️ Export CSV", variant="secondary")
-                export_trace_btn = gr.DownloadButton(
-                    "⬇️ Export Trace (JSONL)", variant="secondary"
-                )
-                export_bundle_btn = gr.DownloadButton(
-                    "⬇️ Export Bundle (ZIP)", variant="secondary"
-                )
+                with gr.Row(elem_id="export-buttons"):
+                    export_json_btn = gr.DownloadButton(
+                        "⬇️ Export JSON", variant="secondary"
+                    )
+                    export_csv_btn = gr.DownloadButton(
+                        "⬇️ Export CSV", variant="secondary"
+                    )
+                with gr.Row(elem_id="export-buttons"):
+                    export_trace_btn = gr.DownloadButton(
+                        "⬇️ Export Trace (JSONL)", variant="secondary"
+                    )
+                    export_bundle_btn = gr.DownloadButton(
+                        "⬇️ Export Bundle (ZIP)", variant="secondary"
+                    )
 
         # Center workspace (introduce tab shell; keep current flows under Retrieval for now)
         with gr.Column(scale=2):
