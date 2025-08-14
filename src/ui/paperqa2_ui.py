@@ -2764,10 +2764,13 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
                     value=False,
                     info="Adds a brief critique after the answer (no answer change)",
                 )
+                gr.Markdown(
+                    "<small class='pqa-muted'>Choose one rewrite mode below. Heuristic is local and fast; LLM uses your configured model and may suggest filters.</small>"
+                )
                 rewrite_toggle = gr.Checkbox(
-                    label="Rewrite query",
-                    value=False,
-                    info="Rephrase your question for retrieval; shows original above progress",
+                    label="Rewrite (heuristic)",
+                    value=True,
+                    info="Local rewrite: strip fillers, normalize phrasing. Recommended default.",
                 )
                 use_llm_rewrite_toggle = gr.Checkbox(
                     label="Use LLM rewrite",
@@ -3148,6 +3151,18 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
         inputs=[question_input, config_dropdown, use_llm_rewrite_toggle],
         outputs=[rewritten_textbox],
     )
+
+    # Make heuristic vs LLM rewrite mutually exclusive
+    def _heur_toggle(on: bool):
+        # If heuristic is turned on, turn LLM off; otherwise do not change
+        return gr.update(value=False) if on else gr.update()
+
+    def _llm_toggle(on: bool):
+        # If LLM is turned on, turn heuristic off; otherwise do not change
+        return gr.update(value=False) if on else gr.update()
+
+    rewrite_toggle.change(fn=_heur_toggle, inputs=[rewrite_toggle], outputs=[use_llm_rewrite_toggle])
+    use_llm_rewrite_toggle.change(fn=_llm_toggle, inputs=[use_llm_rewrite_toggle], outputs=[rewrite_toggle])
 
     # Intentionally no automatic submit on typing/enter; use Run button only
 
