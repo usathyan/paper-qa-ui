@@ -2838,7 +2838,7 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
             )
             with gr.Tabs() as center_tabs:
                 with gr.TabItem("Plan"):
-                    gr.Markdown("### 🗺️ Plan (Rewrite + Filters)")
+                    gr.Markdown("### 🗺️ Plan")
                     with gr.Row():
                         with gr.Column(scale=1):
                             original_textbox = gr.Textbox(
