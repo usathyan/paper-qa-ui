@@ -2458,7 +2458,8 @@ async def build_llm_or_heuristic_critique_html(
                     norm_lines: List[str] = []
                     numbered = 0
                     for ln in raw_lines:
-                        ln2 = re.sub(r"^\\(\d+)\s+", r"\1. ", ln)
+                        # Convert leading "\\1 ", "\\1.", or "\\1)" to "1. "
+                        ln2 = re.sub(r"^\\(\d+)(?:[\s\.)]+)", r"\1. ", ln)
                         if re.match(r"^(?:\d+\.|\d+\)|\d+\s+)", ln2):
                             numbered += 1
                         ln2 = ln2.lstrip("-*").strip()
@@ -2479,6 +2480,13 @@ async def build_llm_or_heuristic_critique_html(
                             + tag_close
                             + "</div>"
                         )
+                    # If no items built, fall back to rendering the content as markdown-ish with numbering fix
+                    fixed = _render_markdown_inline("\n".join(norm_lines))
+                    return (
+                        "<div class='pqa-subtle' style='margin-top:6px'>"
+                        + f"<p><small>{fixed}</small></p>"
+                        + "</div>"
+                    )
             except Exception:
                 pass
 
