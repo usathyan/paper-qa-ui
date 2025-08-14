@@ -1351,8 +1351,8 @@ def stream_analysis_progress(
                     + "</small></div>"
                 )
             ),
-            "<div class='pqa-subtle'>",
-            f"<div><small>{html.escape(latest)}</small></div>",
+            "<div class='pqa-subtle' style='max-height:120px;overflow:auto'>",
+            *[f"<div><small>{html.escape(ln)}</small></div>" for ln in logs[-8:]],
             "</div>",
             # Transparency block
             "<div class='pqa-panel' style='margin-top:8px'>",
