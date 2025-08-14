@@ -608,8 +608,97 @@ async def process_question_async(
                 except Exception:
                     critique_html = "<div class='pqa-subtle'><small class='pqa-muted'>Critique unavailable.</small></div>"
 
+            # Optional quote extraction: use contexts as passages for LLM to extract verbatim quotes
+            quotes_html = ""
+            try:
+                if bool(app_state.get("use_quote_extraction", False)) and contexts:
+                    from .prompts import (
+                        QUOTE_EXTRACTION_SYSTEM_PROMPT,
+                        QUOTE_EXTRACTION_USER_TEMPLATE,
+                    )
+                    # Build passages block from contexts (cap large lists)
+                    lines: List[str] = []
+                    for idx, c in enumerate(contexts[: min(10000, len(contexts))], 1):
+                        try:
+                            txt_obj = getattr(c, "text", None)
+                            doc = getattr(txt_obj, "doc", None) if txt_obj is not None else None
+                            title = None
+                            page = getattr(c, "page", None)
+                            if doc is not None:
+                                title = getattr(doc, "title", None) or getattr(doc, "docname", None)
+                            text = (
+                                getattr(txt_obj, "text", None)
+                                if txt_obj is not None
+                                else (str(txt_obj) if txt_obj is not None else str(c))
+                            )
+                            snippet = text if isinstance(text, str) else ""
+                            lines.append(
+                                f"id: P{idx:04d} | title: {title or '-'} | page: {int(page) if isinstance(page, (int, float)) else '-'}\ntext: {snippet}"
+                            )
+                        except Exception:
+                            continue
+                    passages_block = "\n\n".join(lines)
+                    # Call LLM
+                    import litellm
+                    messages = [
+                        {"role": "system", "content": QUOTE_EXTRACTION_SYSTEM_PROMPT},
+                        {
+                            "role": "user",
+                            "content": QUOTE_EXTRACTION_USER_TEMPLATE.format(
+                                question=question, passages_block=passages_block
+                            ),
+                        },
+                    ]
+                    try:
+                        resp = await litellm.acompletion(
+                            model=str(settings.llm), messages=messages, timeout=45
+                        )
+                        content = getattr(resp, "content", None)
+                        if not isinstance(content, str):
+                            choices = getattr(resp, "choices", None)
+                            if isinstance(choices, list) and choices:
+                                message = getattr(choices[0], "message", None)
+                                content = (
+                                    message.get("content")
+                                    if isinstance(message, dict)
+                                    else getattr(message, "content", None)
+                                )
+                        import json as _json
+                        if isinstance(content, str):
+                            try:
+                                data = _json.loads(content)
+                                quotes = data.get("quotes") or []
+                                if quotes:
+                                    parts = [
+                                        "<div class='pqa-panel'><strong>Extracted Quotes</strong><ul>"
+                                    ]
+                                    for qit in quotes[: 12]:
+                                        qtxt = str(qit.get("quote") or "").strip()
+                                        rat = str(qit.get("rationale") or "").strip()
+                                        doc_title = qit.get("doc_title") or qit.get("doc_id") or "-"
+                                        page = qit.get("page")
+                                        page_str = (
+                                            f" p.{int(page)}"
+                                            if isinstance(page, (int, float))
+                                            else ""
+                                        )
+                                        if qtxt:
+                                            parts.append(
+                                                f"<li><div><em>\"{html.escape(qtxt[:400])}\"</em></div>"
+                                                f"<div><small class='pqa-muted'>{html.escape(doc_title)}{page_str}</small></div>"
+                                                f"<div><small>{html.escape(rat[:300])}</small></div></li>"
+                                            )
+                                    parts.append("</ul></div>")
+                                    quotes_html = "".join(parts)
+                            except Exception:
+                                pass
+                    except Exception:
+                        pass
+            except Exception:
+                quotes_html = ""
+
             answer_html = format_answer_html(answer, contexts)
-            sources_html = format_sources_html(contexts)
+            sources_html = (quotes_html or "") + format_sources_html(contexts)
             metadata_html = format_metadata_html(
                 {
                     "processing_time": processing_time,
@@ -2785,7 +2874,7 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
 
             with gr.Accordion("🧪 Query Builder", open=False):
                 gr.Markdown(
-                    "<small class='pqa-muted'>Configure model & rewrite options. No behavior change in this step.</small>"
+                    "<small class='pqa-muted'>Configure model & rewrite options.</small>"
                 )
 
                 def _on_config_change(cfg: str) -> str:
@@ -2811,22 +2900,17 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
                     info="Adds a brief critique after the answer (no answer change)",
                 )
                 gr.Markdown(
-                    "<small class='pqa-muted'>Choose one rewrite mode below. Heuristic is local and fast; LLM uses your configured model and may suggest filters.</small>"
-                )
-                rewrite_toggle = gr.Checkbox(
-                    label="Rewrite (heuristic)",
-                    value=True,
-                    info="Local rewrite: strip fillers, normalize phrasing. Recommended default.",
-                )
-                use_llm_rewrite_toggle = gr.Checkbox(
-                    label="Use LLM rewrite",
-                    value=False,
-                    info="Apply LLM-based decomposition (years/venues/fields)",
+                    "<small class='pqa-muted'>Rewrite uses your configured LLM to produce a concise, retrieval‑ready version and suggest lightweight filters.</small>"
                 )
                 bias_retrieval_toggle = gr.Checkbox(
                     label="Bias retrieval using filters",
                     value=False,
                     info="Append extracted filters to the rewritten query",
+                )
+                use_quote_extraction_toggle = gr.Checkbox(
+                    label="Use quote extraction",
+                    value=False,
+                    info="After retrieval, extract verbatim supporting quotes from top passages",
                 )
                 gr.HTML(
                     "<div class='pqa-subtle'><small><strong>Query Used</strong> will be shown above Analysis Progress.</small></div>"
@@ -3133,8 +3217,7 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
             question_input,
             config_dropdown,
             critique_toggle,
-            rewrite_toggle,
-            use_llm_rewrite_toggle,
+            # rewrite always on via LLM
             bias_retrieval_toggle,
             score_cutoff_slider,
             per_doc_cap_number,
@@ -3197,32 +3280,18 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
 
     question_input.submit(
         fn=_preview_rewrite,
-        inputs=[question_input, config_dropdown, use_llm_rewrite_toggle],
+        inputs=[question_input, config_dropdown],
         outputs=[rewritten_textbox],
     )
 
     # Dedicated Rewrite button (heuristic or LLM based on toggles)
     rewrite_button.click(
         fn=_preview_rewrite,
-        inputs=[question_input, config_dropdown, use_llm_rewrite_toggle],
+        inputs=[question_input, config_dropdown],
         outputs=[rewritten_textbox],
     )
 
-    # Make heuristic vs LLM rewrite mutually exclusive
-    def _heur_toggle(on: bool) -> Any:
-        # If heuristic is turned on, turn LLM off; otherwise do not change
-        return gr.update(value=False) if on else gr.update()
-
-    def _llm_toggle(on: bool) -> Any:
-        # If LLM is turned on, turn heuristic off; otherwise do not change
-        return gr.update(value=False) if on else gr.update()
-
-    rewrite_toggle.change(
-        fn=_heur_toggle, inputs=[rewrite_toggle], outputs=[use_llm_rewrite_toggle]
-    )
-    use_llm_rewrite_toggle.change(
-        fn=_llm_toggle, inputs=[use_llm_rewrite_toggle], outputs=[rewrite_toggle]
-    )
+    # LLM rewrite is always on; removed toggle logic
 
     # Intentionally no automatic submit on typing/enter; use Run button only
 
@@ -3233,8 +3302,7 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
             question_input,
             config_dropdown,
             critique_toggle,
-            rewrite_toggle,
-            use_llm_rewrite_toggle,
+            # rewrite always on via LLM
             bias_retrieval_toggle,
             score_cutoff_slider,
             per_doc_cap_number,
