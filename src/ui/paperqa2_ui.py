@@ -2855,6 +2855,9 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
                                 placeholder="What is this paper about?",
                                 lines=3,
                             )
+                        # Inline rewrite action between question and rewritten boxes
+                        with gr.Column(scale=0):
+                            rewrite_button = gr.Button("↻ Rewrite", variant="secondary")
                         with gr.Column(scale=1):
                             rewritten_textbox = gr.Textbox(
                                 label="Rewritten (editable)",
@@ -3152,17 +3155,28 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
         outputs=[rewritten_textbox],
     )
 
+    # Dedicated Rewrite button (heuristic or LLM based on toggles)
+    rewrite_button.click(
+        fn=_preview_rewrite,
+        inputs=[question_input, config_dropdown, use_llm_rewrite_toggle],
+        outputs=[rewritten_textbox],
+    )
+
     # Make heuristic vs LLM rewrite mutually exclusive
-    def _heur_toggle(on: bool):
+    def _heur_toggle(on: bool) -> Any:
         # If heuristic is turned on, turn LLM off; otherwise do not change
         return gr.update(value=False) if on else gr.update()
 
-    def _llm_toggle(on: bool):
+    def _llm_toggle(on: bool) -> Any:
         # If LLM is turned on, turn heuristic off; otherwise do not change
         return gr.update(value=False) if on else gr.update()
 
-    rewrite_toggle.change(fn=_heur_toggle, inputs=[rewrite_toggle], outputs=[use_llm_rewrite_toggle])
-    use_llm_rewrite_toggle.change(fn=_llm_toggle, inputs=[use_llm_rewrite_toggle], outputs=[rewrite_toggle])
+    rewrite_toggle.change(
+        fn=_heur_toggle, inputs=[rewrite_toggle], outputs=[use_llm_rewrite_toggle]
+    )
+    use_llm_rewrite_toggle.change(
+        fn=_llm_toggle, inputs=[use_llm_rewrite_toggle], outputs=[rewrite_toggle]
+    )
 
     # Intentionally no automatic submit on typing/enter; use Run button only
 
