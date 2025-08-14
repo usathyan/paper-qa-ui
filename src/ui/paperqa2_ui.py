@@ -2711,106 +2711,103 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
     )
 
     with gr.Row():
-        # Left rail (initial placeholders already in place)
+        # Left rail (accordion sections; UI-only reorganization)
         with gr.Column(scale=1):
-            gr.Markdown("### 📁 Document Upload")
-            file_upload = gr.File(
-                file_count="multiple", file_types=[".pdf"], label="Upload PDF Documents"
-            )
-            upload_status = gr.Textbox(
-                label="Upload & Processing Status", interactive=False
-            )
+            with gr.Accordion("📁 Project / Corpus", open=True):
+                file_upload = gr.File(
+                    file_count="multiple", file_types=[".pdf"], label="Upload PDF Documents"
+                )
+                upload_status = gr.Textbox(
+                    label="Upload & Processing Status", interactive=False
+                )
+                clear_button = gr.Button("🗑️ Clear All", variant="secondary")
 
-            gr.Markdown("### ⚙️ Configuration")
+            with gr.Accordion("🧪 Query Builder", open=True):
+                gr.Markdown("<small class='pqa-muted'>Configure model & rewrite options. No behavior change in this step.</small>")
 
-            def _on_config_change(cfg: str) -> str:
-                app_state["settings"] = initialize_settings(cfg)
-                return f"Configuration set to: {cfg}"
+                def _on_config_change(cfg: str) -> str:
+                    app_state["settings"] = initialize_settings(cfg)
+                    return f"Configuration set to: {cfg}"
 
-            config_dropdown = gr.Dropdown(
-                choices=[
-                    "optimized_ollama",
-                    "openrouter_ollama",
-                    "ollama",
-                    "clinical_trials",
-                ],
-                value="optimized_ollama",
-                label="Select Configuration",
-                info="Choose your preferred model configuration",
-            )
-            cfg_status = gr.Markdown(visible=False)
+                config_dropdown = gr.Dropdown(
+                    choices=[
+                        "optimized_ollama",
+                        "openrouter_ollama",
+                        "ollama",
+                        "clinical_trials",
+                    ],
+                    value="optimized_ollama",
+                    label="Select Configuration",
+                    info="Choose your preferred model configuration",
+                )
+                cfg_status = gr.Markdown(visible=False)
 
-            # Critique toggle (moved here under configuration)
-            gr.Markdown(
-                "<small class='pqa-muted'>Enable a quick post‑answer sanity check to flag potentially unsupported or overly strong claims. This does not change the answer.</small>"
-            )
-            critique_toggle = gr.Checkbox(
-                label="Run Critique",
-                value=False,
-                info="Adds a brief critique after the answer (no answer change)",
-            )
+                critique_toggle = gr.Checkbox(
+                    label="Run Critique",
+                    value=False,
+                    info="Adds a brief critique after the answer (no answer change)",
+                )
+                rewrite_toggle = gr.Checkbox(
+                    label="Rewrite query",
+                    value=False,
+                    info="Rephrase your question for retrieval; shows original above progress",
+                )
+                use_llm_rewrite_toggle = gr.Checkbox(
+                    label="Use LLM rewrite",
+                    value=False,
+                    info="Apply LLM-based decomposition (years/venues/fields)",
+                )
+                bias_retrieval_toggle = gr.Checkbox(
+                    label="Bias retrieval using filters",
+                    value=False,
+                    info="Append extracted filters to the rewritten query",
+                )
+                gr.HTML("<div class='pqa-subtle'><small><strong>Query Used</strong> will be shown above Analysis Progress.</small></div>")
 
-            gr.Markdown("### 🔧 Query Options")
-            rewrite_toggle = gr.Checkbox(
-                label="Rewrite query",
-                value=False,
-                info="Rephrase your question for retrieval; shows original above progress",
-            )
-            use_llm_rewrite_toggle = gr.Checkbox(
-                label="Use LLM rewrite",
-                value=False,
-                info="Apply LLM-based decomposition (years/venues/fields)",
-            )
-            bias_retrieval_toggle = gr.Checkbox(
-                label="Bias retrieval using filters",
-                value=False,
-                info="Append extracted filters to the rewritten query",
-            )
+            with gr.Accordion("🧰 Curation Controls", open=True):
+                score_cutoff_slider = gr.Slider(
+                    minimum=0.0,
+                    maximum=1.0,
+                    step=0.01,
+                    value=0.0,
+                    label="Relevance score cutoff",
+                    info="Discard evidence below this score",
+                )
+                per_doc_cap_number = gr.Number(
+                    value=0,
+                    label="Per-document evidence cap",
+                    info="0 = unlimited; limit evidence excerpts per source",
+                )
+                max_sources_number = gr.Number(
+                    value=0,
+                    label="Max sources included",
+                    info="0 = default; hard cap on sources in answer",
+                )
 
-            gr.Markdown("### 🧪 Evidence Curation")
-            score_cutoff_slider = gr.Slider(
-                minimum=0.0,
-                maximum=1.0,
-                step=0.01,
-                value=0.0,
-                label="Relevance score cutoff",
-                info="Discard evidence below this score",
-            )
-            per_doc_cap_number = gr.Number(
-                value=0,
-                label="Per-document evidence cap",
-                info="0 = unlimited; limit evidence excerpts per source",
-            )
-            max_sources_number = gr.Number(
-                value=0,
-                label="Max sources included",
-                info="0 = default; hard cap on sources in answer",
-            )
+            with gr.Accordion("🖼️ Display Toggles", open=False):
+                show_flags_toggle = gr.Checkbox(
+                    label="Show source flags (Preprint/Retracted?)",
+                    value=True,
+                    info="Toggle visibility of source quality badges",
+                )
+                show_conflicts_toggle = gr.Checkbox(
+                    label="Show evidence conflicts",
+                    value=True,
+                    info="Toggle the clustered conflicts view",
+                )
 
-            gr.Markdown("### ⚙️ Display Toggles")
-            show_flags_toggle = gr.Checkbox(
-                label="Show source flags (Preprint/Retracted?)",
-                value=True,
-                info="Toggle visibility of source quality badges",
-            )
-            show_conflicts_toggle = gr.Checkbox(
-                label="Show evidence conflicts",
-                value=True,
-                info="Toggle the clustered conflicts view",
-            )
+            with gr.Accordion("💾 Saved Queries", open=False):
+                gr.HTML("<div class='pqa-subtle'><small>Saved snapshots will appear here.</small></div>")
 
-            gr.Markdown("### 🧹 Actions")
-            clear_button = gr.Button("🗑️ Clear All", variant="secondary")
-
-            gr.Markdown("### 📦 Export")
-            export_json_btn = gr.DownloadButton("⬇️ Export JSON", variant="secondary")
-            export_csv_btn = gr.DownloadButton("⬇️ Export CSV", variant="secondary")
-            export_trace_btn = gr.DownloadButton(
-                "⬇️ Export Trace (JSONL)", variant="secondary"
-            )
-            export_bundle_btn = gr.DownloadButton(
-                "⬇️ Export Bundle (ZIP)", variant="secondary"
-            )
+            with gr.Accordion("📦 Export", open=False):
+                export_json_btn = gr.DownloadButton("⬇️ Export JSON", variant="secondary")
+                export_csv_btn = gr.DownloadButton("⬇️ Export CSV", variant="secondary")
+                export_trace_btn = gr.DownloadButton(
+                    "⬇️ Export Trace (JSONL)", variant="secondary"
+                )
+                export_bundle_btn = gr.DownloadButton(
+                    "⬇️ Export Bundle (ZIP)", variant="secondary"
+                )
 
         # Center workspace (introduce tab shell; keep current flows under Retrieval for now)
         with gr.Column(scale=2):
@@ -2854,9 +2851,13 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
                 with gr.TabItem("Evidence"):
                     gr.Markdown("### 📚 Evidence")
                     # Sources panel lives here for the reorg
-                    sources_display = gr.HTML(label="Evidence Sources", elem_id="sources-panel")
+                    sources_display = gr.HTML(
+                        label="Evidence Sources", elem_id="sources-panel"
+                    )
                     # Empty state hint
-                    gr.HTML("<div class='pqa-subtle'><small>Run a query to populate evidence here.</small></div>")
+                    gr.HTML(
+                        "<div class='pqa-subtle'><small>Run a query to populate evidence here.</small></div>"
+                    )
 
                 with gr.TabItem("Conflicts"):
                     gr.Markdown("### ⚖️ Conflicts")
@@ -2871,7 +2872,9 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
                     )
                     # Answer panel lives here for the reorg
                     answer_display = gr.HTML(label="Answer", elem_id="answer-panel")
-                    gr.HTML("<div class='pqa-subtle'><small>Answer and Critique will render here after running a query.</small></div>")
+                    gr.HTML(
+                        "<div class='pqa-subtle'><small>Answer and Critique will render here after running a query.</small></div>"
+                    )
 
         # Right rail placeholder
         with gr.Column(scale=1):
