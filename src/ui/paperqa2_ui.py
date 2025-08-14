@@ -2975,9 +2975,6 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
             session_log_display = gr.HTML(label="Session Log")
             gr.Markdown("### ⚡ Quick Actions")
             clear_button_right = gr.Button("🧹 Clear Session", variant="secondary")
-            export_bundle_btn_right = gr.DownloadButton(
-                "⬇️ Export Bundle (ZIP)", variant="secondary"
-            )
 
     # Removed separate Analysis Progress tab; progress now streams inline below the question
 
