@@ -15,10 +15,10 @@ Notes:
 - For OpenRouter models, this script sets api_base to https://openrouter.ai/api/v1
 - Timeouts are set so failures return fast with a readable message
 """
+
 from __future__ import annotations
 
 import argparse
-import json
 import os
 import sys
 import time
@@ -34,26 +34,29 @@ def extract_content(resp: Any) -> str:
         if isinstance(resp, dict):
             choices = resp.get("choices")
             if isinstance(choices, list) and choices:
-                message = choices[0].get("message")
-                if isinstance(message, dict) and isinstance(message.get("content"), str):
-                    return message["content"]
+                message_any: Any = choices[0].get("message")
+                if isinstance(message_any, dict) and isinstance(
+                    message_any.get("content"), str
+                ):
+                    return str(message_any["content"])
             # Direct content (some providers)
-            if isinstance(resp.get("content"), str):
-                return resp["content"]
+            content_direct: Any = resp.get("content")
+            if isinstance(content_direct, str):
+                return str(content_direct)
         # Attr-style
-        choices = getattr(resp, "choices", None)
-        if isinstance(choices, list) and choices:
-            message = getattr(choices[0], "message", None)
-            if isinstance(message, dict):
-                c = message.get("content")
+        choices2: Any = getattr(resp, "choices", None)
+        if isinstance(choices2, list) and choices2:
+            message2: Any = getattr(choices2[0], "message", None)
+            if isinstance(message2, dict):
+                c = message2.get("content")
                 if isinstance(c, str):
                     return c
-            c2 = getattr(message, "content", None)
+            c2 = getattr(message2, "content", None)
             if isinstance(c2, str):
                 return c2
         content_attr = getattr(resp, "content", None)
         if isinstance(content_attr, str):
-            return content_attr
+            return str(content_attr)
     except Exception:
         pass
     return ""
@@ -61,9 +64,16 @@ def extract_content(resp: Any) -> str:
 
 def configure_litellm(model: str) -> None:
     # Use OPENROUTER_API_KEY by default, else OPENAI_API_KEY / provider-specific
-    api_key = os.getenv("OPENROUTER_API_KEY") or os.getenv("OPENAI_API_KEY") or os.getenv("LITELLM_API_KEY")
+    api_key = (
+        os.getenv("OPENROUTER_API_KEY")
+        or os.getenv("OPENAI_API_KEY")
+        or os.getenv("LITELLM_API_KEY")
+    )
     if not api_key:
-        print("ERROR: Missing API key. Set OPENROUTER_API_KEY or OPENAI_API_KEY.", file=sys.stderr)
+        print(
+            "ERROR: Missing API key. Set OPENROUTER_API_KEY or OPENAI_API_KEY.",
+            file=sys.stderr,
+        )
         sys.exit(1)
     litellm.api_key = api_key
     if model.startswith("openrouter/"):
@@ -95,8 +105,14 @@ def run_sync(model: str, question: str, timeout: float) -> int:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="Quick LiteLLM connectivity test")
-    ap.add_argument("--model", default=os.getenv("LITELLM_MODEL", "openrouter/google/gemini-2.5-flash-lite"))
-    ap.add_argument("--question", default="Rewrite this question to be concise and retrieval-ready: What is PICALM's role in AD?")
+    ap.add_argument(
+        "--model",
+        default=os.getenv("LITELLM_MODEL", "openrouter/google/gemini-2.5-flash-lite"),
+    )
+    ap.add_argument(
+        "--question",
+        default="Rewrite this question to be concise and retrieval-ready: What is PICALM's role in AD?",
+    )
     ap.add_argument("--timeout", type=float, default=30.0)
     args = ap.parse_args()
     return run_sync(args.model, args.question, args.timeout)

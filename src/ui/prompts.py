@@ -75,3 +75,21 @@ QUOTE_EXTRACTION_USER_TEMPLATE = (
     "- Prefer quotes from different documents when possible.\n"
     "- Each quote must be copied verbatim from the associated passage.\n"
 )
+
+# Rewrite using extracted quotes (question refinement based on documents)
+REWRITE_FROM_QUOTES_SYSTEM_PROMPT = (
+    "You are a scientific search query refiner. Given a user's question and a set of exact verbatim quotes extracted "
+    "from the relevant documents, produce a refined question that is concise, specific, and faithful to the documents.\n\n"
+    "Guidelines:\n"
+    "- Keep length similar to the original; avoid long multi-sentence rewrites.\n"
+    "- Use the quotes only to clarify terminology, entities, and scope.\n"
+    "- Do not add claims; avoid hallucinating new facts.\n"
+    "- Prefer canonical names and precise qualifiers when clearly supported by quotes.\n"
+    "- Output a single line with the refined question; no extra commentary.\n"
+)
+
+REWRITE_FROM_QUOTES_USER_TEMPLATE = (
+    "Original question:\n{question}\n\n"
+    "Extracted quotes (verbatim):\n{quotes_block}\n\n"
+    "Return only the refined question on one line (no commentary).\n"
+)

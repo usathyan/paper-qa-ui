@@ -658,9 +658,17 @@ async def process_question_async(
                         },
                     ]
                     try:
-                        resp = await litellm.acompletion(
-                            model=str(settings.llm), messages=messages, timeout=45
-                        )
+                        # Use OpenRouter key when available and using an openrouter/* model
+                        _kwargs: Dict[str, Any] = {
+                            "model": str(settings.llm),
+                            "messages": messages,
+                            "timeout": 45,
+                        }
+                        _or_key = os.getenv("OPENROUTER_API_KEY", "").strip()
+                        if _or_key and str(settings.llm).startswith("openrouter/"):
+                            litellm.api_base = "https://openrouter.ai/api/v1"
+                            litellm.api_key = _or_key
+                        resp = await litellm.acompletion(**_kwargs)
                         content = getattr(resp, "content", None)
                         if not isinstance(content, str):
                             choices = getattr(resp, "choices", None)
@@ -2920,11 +2928,6 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
                     value=False,
                     info="Append extracted filters to the rewritten query",
                 )
-                use_quote_extraction_toggle = gr.Checkbox(
-                    label="Use quote extraction",
-                    value=False,
-                    info="After retrieval, extract verbatim supporting quotes from top passages",
-                )
                 gr.HTML(
                     "<div class='pqa-subtle'><small><strong>Query Used</strong> will be shown above Analysis Progress.</small></div>"
                 )
@@ -3294,9 +3297,128 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
                     f" (model: {_model_str})</small>"
                 )
                 logger.info(
-                    "Preview rewrite: LLM rewrite succeeded in %.2fs",
+                    "Preview rewrite: LLM rewrite succeeded in %.2fs; rewritten='%s'",
                     (time.time() - _t0),
+                    str(rewritten)[:200],
                 )
+                # If we have prior contexts from session data, perform quote extraction + refinement
+                try:
+                    sess = app_state.get("session_data") or {}
+                    ctx = sess.get("contexts") or []
+                    if isinstance(ctx, list) and ctx:
+                        from .prompts import (
+                            QUOTE_EXTRACTION_SYSTEM_PROMPT,
+                            QUOTE_EXTRACTION_USER_TEMPLATE,
+                            REWRITE_FROM_QUOTES_SYSTEM_PROMPT,
+                            REWRITE_FROM_QUOTES_USER_TEMPLATE,
+                        )
+                        import litellm
+
+                        # Build passages block
+                        parts: List[str] = []
+                        for i, c in enumerate(ctx[:10000], 1):
+                            pdoc = c.get("doc") if isinstance(c, dict) else None
+                            ppage = c.get("page") if isinstance(c, dict) else None
+                            ptxt = c.get("text") if isinstance(c, dict) else None
+                            parts.append(
+                                f"id: P{i:04d} | title: {pdoc or '-'} | page: {ppage if ppage is not None else '-'}\ntext: {ptxt or ''}"
+                            )
+                        passages_block = "\n\n".join(parts)
+                        # Extract quotes
+                        msg = [
+                            {
+                                "role": "system",
+                                "content": QUOTE_EXTRACTION_SYSTEM_PROMPT,
+                            },
+                            {
+                                "role": "user",
+                                "content": QUOTE_EXTRACTION_USER_TEMPLATE.format(
+                                    question=q, passages_block=passages_block
+                                ),
+                            },
+                        ]
+                        _kwargs_qe: Dict[str, Any] = {
+                            "model": str(settings.llm),
+                            "messages": msg,
+                            "timeout": 30,
+                        }
+                        _or_key = os.getenv("OPENROUTER_API_KEY", "").strip()
+                        if _or_key and str(settings.llm).startswith("openrouter/"):
+                            litellm.api_base = "https://openrouter.ai/api/v1"
+                            litellm.api_key = _or_key
+                        # Run quote extraction synchronously to avoid await in sync context
+                        qe = await asyncio.to_thread(litellm.completion, **_kwargs_qe)
+                        qcontent = getattr(qe, "content", None)
+                        if not isinstance(qcontent, str):
+                            ch = getattr(qe, "choices", None)
+                            if isinstance(ch, list) and ch:
+                                m = getattr(ch[0], "message", None)
+                                if isinstance(m, dict):
+                                    qcontent = m.get("content")
+                                else:
+                                    qcontent = getattr(m, "content", None)
+                        quotes_block = ""
+                        try:
+                            import json as _json
+
+                            data = (
+                                _json.loads(qcontent)
+                                if isinstance(qcontent, str)
+                                else {}
+                            )
+                            quotes = data.get("quotes") or []
+                            if quotes:
+                                quotes_block = "\n".join(
+                                    [
+                                        f"- {str(it.get('quote') or '').strip()}"
+                                        for it in quotes[:10]
+                                    ]
+                                )
+                        except Exception:
+                            quotes_block = ""
+
+                        if quotes_block:
+                            # Refine the question using quotes
+                            msg2 = [
+                                {
+                                    "role": "system",
+                                    "content": REWRITE_FROM_QUOTES_SYSTEM_PROMPT,
+                                },
+                                {
+                                    "role": "user",
+                                    "content": REWRITE_FROM_QUOTES_USER_TEMPLATE.format(
+                                        question=q, quotes_block=quotes_block
+                                    ),
+                                },
+                            ]
+                            _kwargs_rq: Dict[str, Any] = {
+                                "model": str(settings.llm),
+                                "messages": msg2,
+                                "timeout": 30,
+                            }
+                            if _or_key and str(settings.llm).startswith("openrouter/"):
+                                litellm.api_base = "https://openrouter.ai/api/v1"
+                                litellm.api_key = _or_key
+                            rq = await asyncio.to_thread(
+                                litellm.completion, **_kwargs_rq
+                            )
+                            rcontent = getattr(rq, "content", None)
+                            if not isinstance(rcontent, str):
+                                ch2 = getattr(rq, "choices", None)
+                                if isinstance(ch2, list) and ch2:
+                                    m2 = getattr(ch2[0], "message", None)
+                                    if isinstance(m2, dict):
+                                        rcontent = m2.get("content")
+                                    else:
+                                        rcontent = getattr(m2, "content", None)
+                            if isinstance(rcontent, str) and rcontent.strip():
+                                refined_line = rcontent.strip().splitlines()[0]
+                                logger.info(
+                                    "Refined-from-quotes: '%s'", refined_line[:200]
+                                )
+                                rewritten = refined_line
+                except Exception:
+                    pass
             except Exception as e:
                 # Fallback to heuristic
                 rewritten = rewrite_query(q, settings)
@@ -3329,16 +3451,8 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
         outputs=[rewritten_textbox, rewrite_status],
     )
 
-    # Persist quote extraction toggle in app state
-    def _set_quote_extraction(on: bool) -> str:
-        app_state["use_quote_extraction"] = bool(on)
-        return ""
-
-    use_quote_extraction_toggle.change(
-        fn=_set_quote_extraction,
-        inputs=[use_quote_extraction_toggle],
-        outputs=[cfg_status],
-    )
+    # Always use quote extraction in refinement; toggle removed
+    app_state["use_quote_extraction"] = True
 
     # Intentionally no automatic submit on typing/enter; use Run button only
 
