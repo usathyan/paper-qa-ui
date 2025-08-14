@@ -2812,7 +2812,7 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
                 "⬇️ Export Bundle (ZIP)", variant="secondary"
             )
 
-        # Center workspace (introduce tab shell; keep current content under Retrieval)
+        # Center workspace (introduce tab shell; keep current flows under Retrieval for now)
         with gr.Column(scale=2):
             with gr.Tabs() as center_tabs:
                 with gr.TabItem("Plan"):
@@ -2844,39 +2844,13 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
                         label="Analysis", show_label=False, elem_id="inline-analysis"
                     )
 
-                    gr.Markdown("### 📝 Answer")
-                    answer_anchor = gr.HTML(
-                        "<div id='pqa-answer-anchor'></div>", show_label=False
-                    )
-                    # Use HTML for consistent rendering with our styled sections
-                    answer_display = gr.HTML(
-                        label="Answer", elem_id="answer-panel"
-                    )
-
-                    gr.Markdown("### 📚 Sources")
-                    sources_display = gr.HTML(
-                        label="Evidence Sources", elem_id="sources-panel"
-                    )
-
-                    gr.Markdown("### 🧠 Research Intelligence")
-                    intelligence_display = gr.HTML(
-                        label="Research Intelligence", elem_id="intelligence-panel"
-                    )
-
-                    gr.Markdown("### 📊 Metadata")
-                    metadata_display = gr.HTML(
-                        label="Processing Information", elem_id="metadata-panel"
-                    )
-
-                    error_display = gr.Textbox(
-                        label="Errors", interactive=False, visible=False
-                    )
+                    # Keep errors within Retrieval for now
+                    error_display = gr.Textbox(label="Errors", interactive=False, visible=False)
 
                 with gr.TabItem("Evidence"):
                     gr.Markdown("### 📚 Evidence")
-                    gr.HTML(
-                        "<div class='pqa-subtle'>Evidence summaries, facets, and cards will appear here. Current sources remain under Retrieval.</div>"
-                    )
+                    # Sources panel lives here for the reorg
+                    sources_display = gr.HTML(label="Evidence Sources", elem_id="sources-panel")
 
                 with gr.TabItem("Conflicts"):
                     gr.Markdown("### ⚖️ Conflicts")
@@ -2886,16 +2860,16 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
 
                 with gr.TabItem("Synthesis"):
                     gr.Markdown("### 📝 Synthesis")
-                    gr.HTML(
-                        "<div class='pqa-subtle'>Answer and Critique side‑by‑side will appear here. Current answer remains under Retrieval.</div>"
-                    )
+                    answer_anchor = gr.HTML("<div id='pqa-answer-anchor'></div>", show_label=False)
+                    # Answer panel lives here for the reorg
+                    answer_display = gr.HTML(label="Answer", elem_id="answer-panel")
 
         # Right rail placeholder
         with gr.Column(scale=1):
             gr.Markdown("### 📎 Right Rail")
-            gr.HTML(
-                "<div class='pqa-subtle'>Research Intelligence, Metadata, Session Log, and Quick Actions will move here as part of the reorg.</div>"
-            )
+            # Move Research Intelligence and Metadata to right rail for reorg
+            intelligence_display = gr.HTML(label="Research Intelligence", elem_id="intelligence-panel")
+            metadata_display = gr.HTML(label="Processing Information", elem_id="metadata-panel")
 
     # Removed separate Analysis Progress tab; progress now streams inline below the question
 
@@ -3004,14 +2978,14 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
             show_conflicts_toggle,
         ],
         outputs=[
-            inline_analysis,
-            answer_display,
-            sources_display,
-            metadata_display,
-            intelligence_display,
-            error_display,
-            status_display,
-            ask_button,
+            inline_analysis,       # Retrieval tab
+            answer_display,        # Synthesis tab
+            sources_display,       # Evidence tab
+            metadata_display,      # Right rail
+            intelligence_display,  # Right rail
+            error_display,         # Retrieval tab
+            status_display,        # Retrieval tab (hidden)
+            ask_button,            # Retrieval tab
         ],
     )
 
@@ -3031,27 +3005,27 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
             show_conflicts_toggle,
         ],
         outputs=[
-            inline_analysis,
-            answer_display,
-            sources_display,
-            metadata_display,
-            intelligence_display,
-            error_display,
-            status_display,
-            ask_button,
+            inline_analysis,       # Retrieval tab
+            answer_display,        # Synthesis tab
+            sources_display,       # Evidence tab
+            metadata_display,      # Right rail
+            intelligence_display,  # Right rail
+            error_display,         # Retrieval tab
+            status_display,        # Retrieval tab (hidden)
+            ask_button,            # Retrieval tab
         ],
     )
 
     clear_button.click(
         fn=clear_all,
         outputs=[
-            inline_analysis,
-            answer_display,
-            sources_display,
-            metadata_display,
-            intelligence_display,
-            error_display,
-            status_display,
+            inline_analysis,       # Retrieval tab
+            answer_display,        # Synthesis tab
+            sources_display,       # Evidence tab
+            metadata_display,      # Right rail
+            intelligence_display,  # Right rail
+            error_display,         # Retrieval tab
+            status_display,        # Retrieval tab
         ],
     )
 
