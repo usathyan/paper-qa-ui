@@ -2834,7 +2834,7 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
         with gr.Column(scale=2):
             # Simple stepper above tabs (static for now)
             gr.HTML(
-                "<div class='pqa-steps'><span class='pqa-step'>Plan</span><span class='pqa-step done'>Retrieval</span><span class='pqa-step'>Evidence</span><span class='pqa-step'>Conflicts</span><span class='pqa-step'>Synthesis</span></div>"
+                "<div class='pqa-steps'><span class='pqa-step done'>Plan</span><span class='pqa-step'>Retrieval</span><span class='pqa-step'>Evidence</span><span class='pqa-step'>Conflicts</span><span class='pqa-step'>Synthesis</span></div>"
             )
             with gr.Tabs() as center_tabs:
                 with gr.TabItem("Plan"):
