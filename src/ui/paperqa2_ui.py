@@ -2879,6 +2879,8 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
                 with gr.TabItem("Retrieval"):
                     # Status display (hidden for now)
                     status_display = gr.HTML(label="Processing Status", visible=False)
+                    # Placeholder Ask button kept hidden for wiring compatibility
+                    ask_button = gr.Button("🤖 Ask Question", visible=False)
 
                     gr.Markdown("### 🔎 Live Analysis Progress")
                     inline_analysis = gr.HTML(
@@ -2987,7 +2989,7 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
         postprocess=False,
     )
 
-    # Disable Ask during uploads; enable after status updates
+    # Disable Ask during uploads; enable after status updates (no-op with hidden Ask)
     file_upload.change(fn=_pre_upload_disable, outputs=[ask_button])
     upload_status.change(fn=_post_upload_enable, outputs=[ask_button])
 
@@ -3112,35 +3114,10 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
     question_input.change(
         fn=_fill_plan_fields,
         inputs=[question_input],
-        outputs=[original_textbox, rewritten_textbox],
+        outputs=[question_input, rewritten_textbox],
     )
 
-    question_input.submit(
-        fn=ask_with_progress,
-        inputs=[
-            question_input,
-            config_dropdown,
-            critique_toggle,
-            rewrite_toggle,
-            use_llm_rewrite_toggle,
-            bias_retrieval_toggle,
-            score_cutoff_slider,
-            per_doc_cap_number,
-            max_sources_number,
-            show_flags_toggle,
-            show_conflicts_toggle,
-        ],
-        outputs=[
-            inline_analysis,  # Retrieval tab
-            answer_display,  # Synthesis tab
-            sources_display,  # Evidence tab
-            metadata_display,  # Right rail
-            intelligence_display,  # Right rail
-            error_display,  # Retrieval tab
-            status_display,  # Retrieval tab (hidden)
-            ask_button,  # Retrieval tab
-        ],
-    )
+    # Intentionally no automatic submit on typing/enter; use Run button only
 
     # Plan Run button triggers same retrieval
     run_button.click(
