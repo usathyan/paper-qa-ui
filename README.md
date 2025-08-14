@@ -79,13 +79,15 @@ Clarification: identical rewritten text
 - Retrieval progress bar: `contexts_selected / evidence_k`. Indeterminate until counts arrive.
 - Curation preview: shows current curation settings and estimated contexts after per-doc cap.
 - Transparency block reports: embed latency, candidate count (if logged), MMR lambda (if logged), selection stats (min/mean/max), per-doc counts, prompt metrics, answer timing/attempts.
+- Display/UX: this panel is intentionally tall (up to ~70vh) and scrollable so status stays visible throughout processing.
 - MMR block: histogram of candidate vs selected scores; selected diversity share; counts.
 
 ### 5.2 Answer
-- Markdown answer produced by the model from selected evidence.
+- Renders with consistent HTML styling and larger font for readability, matching other panels.
 
 ### 5.3 Evidence Sources
 - Table of excerpts: citation/title, page, score, snippet.
+- Renders with consistent HTML styling and scrollable container.
 - Heuristic flags:
   - Preprint: arXiv/bioRxiv/medRxiv detected in source string.
   - Retracted?: the source string contains a retraction marker.
@@ -94,11 +96,13 @@ Clarification: identical rewritten text
 - Potential contradictions (heuristic + polarity clustering): cross-document antonyms and simple claim polarity agreement/disagreement.
 - Evidence conflicts (clustered): list of entities with the number of sources exhibiting mixed polarity; shows up to 4 source names per entity. Controlled by the display toggle.
 - Key insights: salient statements from the answer or first snippets.
+- Uses the same HTML styling and sizing as other panels.
 - Evidence summary: excerpts per document.
 - Top evidence (by score): tabular top contexts.
 
 ### 5.5 Metadata
 - Processing time, number of documents included, evidence sources count, and a coarse confidence proxy.
+- Styled consistently with other panels.
 
 ## 6. Notes on behavior
 - Rewriting and biasing affect retrieval text; they do not prune documents by themselves; they steer the selection.

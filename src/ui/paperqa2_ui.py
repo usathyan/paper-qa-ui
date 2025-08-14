@@ -2673,6 +2673,30 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
           .pqa-step.done::after { border-left-color: #059669; }
           .pqa-step.done::before { border-right-color: #059669; }
         }
+        /* Consistent panel content sizing & typography */
+        #inline-analysis,
+        #answer-panel,
+        #sources-panel,
+        #intelligence-panel,
+        #metadata-panel {
+          max-height: 600px; /* default height for most panels */
+          overflow-y: auto;
+          font-size: 16px;
+          line-height: 1.55;
+        }
+        /* Ensure inline annotations are not tiny */
+        #inline-analysis small,
+        #answer-panel small,
+        #sources-panel small,
+        #intelligence-panel small,
+        #metadata-panel small {
+          font-size: 1em;
+        }
+        /* Make Live Analysis significantly taller for visibility */
+        #inline-analysis {
+          height: clamp(500px, 70vh, 1100px);
+          max-height: none;
+        }
         </style>
         """
     )
@@ -2794,28 +2818,28 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
 
             gr.Markdown("### 🔎 Live Analysis Progress")
             inline_analysis = gr.HTML(
-                label="Analysis", show_label=False, elem_id="pqa-inline-analysis"
-            )
-            # Ensure Analysis area has minimum height via CSS
-            gr.HTML(
-                "<style>#pqa-inline-analysis { min-height: 300px; }</style>",
-                show_label=False,
+                label="Analysis", show_label=False, elem_id="inline-analysis"
             )
 
             gr.Markdown("### 📝 Answer")
             answer_anchor = gr.HTML(
                 "<div id='pqa-answer-anchor'></div>", show_label=False
             )
-            answer_display = gr.Markdown(label="Answer")
+            # Use HTML for consistent rendering with our styled sections
+            answer_display = gr.HTML(label="Answer", elem_id="answer-panel")
 
             gr.Markdown("### 📚 Sources")
-            sources_display = gr.HTML(label="Evidence Sources")
+            sources_display = gr.HTML(label="Evidence Sources", elem_id="sources-panel")
 
             gr.Markdown("### 🧠 Research Intelligence")
-            intelligence_display = gr.HTML(label="Research Intelligence")
+            intelligence_display = gr.HTML(
+                label="Research Intelligence", elem_id="intelligence-panel"
+            )
 
             gr.Markdown("### 📊 Metadata")
-            metadata_display = gr.HTML(label="Processing Information")
+            metadata_display = gr.HTML(
+                label="Processing Information", elem_id="metadata-panel"
+            )
 
             error_display = gr.Textbox(label="Errors", interactive=False, visible=False)
 
