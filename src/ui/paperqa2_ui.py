@@ -2847,11 +2847,10 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
                     gr.Markdown("### 🗺️ Plan")
                     with gr.Row():
                         with gr.Column(scale=1):
-                            original_textbox = gr.Textbox(
-                                label="Original",
-                                placeholder="Original question",
+                            question_input = gr.Textbox(
+                                label="Question",
+                                placeholder="What is this paper about?",
                                 lines=3,
-                                interactive=False,
                             )
                         with gr.Column(scale=1):
                             rewritten_textbox = gr.Textbox(
@@ -2874,20 +2873,10 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
                     gr.HTML(
                         "<div class='pqa-subtle'><small><strong>Query Used</strong>: (placeholder; the exact string sent downstream)</small></div>"
                     )
+                    with gr.Row():
+                        run_button = gr.Button("▶ Run retrieval", variant="primary")
 
                 with gr.TabItem("Retrieval"):
-                    gr.Markdown("### ❓ Ask Questions")
-                    question_input = gr.Textbox(
-                        label="Enter your question",
-                        placeholder="What is this paper about?",
-                        lines=3,
-                    )
-
-                    with gr.Row():
-                        ask_button = gr.Button(
-                            "🤖 Ask Question", variant="primary", size="lg"
-                        )
-
                     # Status display (hidden for now)
                     status_display = gr.HTML(label="Processing Status", visible=False)
 
@@ -3127,6 +3116,34 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
     )
 
     question_input.submit(
+        fn=ask_with_progress,
+        inputs=[
+            question_input,
+            config_dropdown,
+            critique_toggle,
+            rewrite_toggle,
+            use_llm_rewrite_toggle,
+            bias_retrieval_toggle,
+            score_cutoff_slider,
+            per_doc_cap_number,
+            max_sources_number,
+            show_flags_toggle,
+            show_conflicts_toggle,
+        ],
+        outputs=[
+            inline_analysis,  # Retrieval tab
+            answer_display,  # Synthesis tab
+            sources_display,  # Evidence tab
+            metadata_display,  # Right rail
+            intelligence_display,  # Right rail
+            error_display,  # Retrieval tab
+            status_display,  # Retrieval tab (hidden)
+            ask_button,  # Retrieval tab
+        ],
+    )
+
+    # Plan Run button triggers same retrieval
+    run_button.click(
         fn=ask_with_progress,
         inputs=[
             question_input,
