@@ -616,16 +616,23 @@ async def process_question_async(
                         QUOTE_EXTRACTION_SYSTEM_PROMPT,
                         QUOTE_EXTRACTION_USER_TEMPLATE,
                     )
+
                     # Build passages block from contexts (cap large lists)
                     lines: List[str] = []
                     for idx, c in enumerate(contexts[: min(10000, len(contexts))], 1):
                         try:
                             txt_obj = getattr(c, "text", None)
-                            doc = getattr(txt_obj, "doc", None) if txt_obj is not None else None
+                            doc = (
+                                getattr(txt_obj, "doc", None)
+                                if txt_obj is not None
+                                else None
+                            )
                             title = None
                             page = getattr(c, "page", None)
                             if doc is not None:
-                                title = getattr(doc, "title", None) or getattr(doc, "docname", None)
+                                title = getattr(doc, "title", None) or getattr(
+                                    doc, "docname", None
+                                )
                             text = (
                                 getattr(txt_obj, "text", None)
                                 if txt_obj is not None
@@ -640,6 +647,7 @@ async def process_question_async(
                     passages_block = "\n\n".join(lines)
                     # Call LLM
                     import litellm
+
                     messages = [
                         {"role": "system", "content": QUOTE_EXTRACTION_SYSTEM_PROMPT},
                         {
@@ -664,6 +672,7 @@ async def process_question_async(
                                     else getattr(message, "content", None)
                                 )
                         import json as _json
+
                         if isinstance(content, str):
                             try:
                                 data = _json.loads(content)
@@ -672,10 +681,14 @@ async def process_question_async(
                                     parts = [
                                         "<div class='pqa-panel'><strong>Extracted Quotes</strong><ul>"
                                     ]
-                                    for qit in quotes[: 12]:
+                                    for qit in quotes[:12]:
                                         qtxt = str(qit.get("quote") or "").strip()
                                         rat = str(qit.get("rationale") or "").strip()
-                                        doc_title = qit.get("doc_title") or qit.get("doc_id") or "-"
+                                        doc_title = (
+                                            qit.get("doc_title")
+                                            or qit.get("doc_id")
+                                            or "-"
+                                        )
                                         page = qit.get("page")
                                         page_str = (
                                             f" p.{int(page)}"
@@ -684,7 +697,7 @@ async def process_question_async(
                                         )
                                         if qtxt:
                                             parts.append(
-                                                f"<li><div><em>\"{html.escape(qtxt[:400])}\"</em></div>"
+                                                f'<li><div><em>"{html.escape(qtxt[:400])}"</em></div>'
                                                 f"<div><small class='pqa-muted'>{html.escape(doc_title)}{page_str}</small></div>"
                                                 f"<div><small>{html.escape(rat[:300])}</small></div></li>"
                                             )
@@ -2994,6 +3007,11 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
                                 placeholder="Rewritten question (placeholder)",
                                 lines=3,
                             )
+                            rewrite_status = gr.HTML(
+                                value="",
+                                label="",
+                                show_label=False,
+                            )
                     gr.Markdown("Filter chips (placeholders)")
                     gr.HTML(
                         """
@@ -3237,36 +3255,50 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
         ],
     )
 
-    # Preview rewrite on Enter without starting retrieval
-    def _preview_rewrite(q: str, cfg: str, use_llm: bool) -> str:
+    # Preview rewrite on Enter without starting retrieval (LLM first, fallback heuristic)
+    def _preview_rewrite(q: str, cfg: str) -> Tuple[str, str]:
         try:
             settings = app_state.get("settings") or initialize_settings(cfg)
             app_state["settings"] = settings
             rewritten: str = q
-            if use_llm:
+            banner: str = ""
+            try:
+                # Prefer LLM decomposition on a fresh event loop to avoid conflicts
+                logger.info("Preview rewrite: attempting LLM rewrite")
+                _t0 = time.time()
+                _loop = asyncio.new_event_loop()
                 try:
-                    # Prefer LLM decomposition when enabled
-                    decomp = asyncio.get_event_loop().run_until_complete(
-                        llm_decompose_query(q, settings)
+                    asyncio.set_event_loop(_loop)
+                    decomp = _loop.run_until_complete(
+                        asyncio.wait_for(llm_decompose_query(q, settings), timeout=30)
                     )
-                    rewritten = str(decomp.get("rewritten") or q)
-                    app_state["rewrite_info"] = {
-                        "original": q,
-                        "rewritten": rewritten,
-                        "filters": decomp.get("filters") or {},
-                        "bias_applied": False,
-                    }
-                except Exception:
-                    # Fallback to heuristic
-                    rewritten = rewrite_query(q, settings)
-                    app_state["rewrite_info"] = {
-                        "original": q,
-                        "rewritten": rewritten,
-                        "filters": {},
-                        "bias_applied": False,
-                    }
-            else:
-                # Heuristic only
+                finally:
+                    try:
+                        _loop.close()
+                    except Exception:
+                        pass
+                    try:
+                        asyncio.set_event_loop(None)
+                    except Exception:
+                        pass
+                rewritten = str(decomp.get("rewritten") or q)
+                app_state["rewrite_info"] = {
+                    "original": q,
+                    "rewritten": rewritten,
+                    "filters": decomp.get("filters") or {},
+                    "bias_applied": False,
+                }
+                _model_str = html.escape(str(getattr(settings, "llm", "")))
+                banner = (
+                    "<small class='pqa-muted'>LLM rewrite used"
+                    f" (model: {_model_str})</small>"
+                )
+                logger.info(
+                    "Preview rewrite: LLM rewrite succeeded in %.2fs",
+                    (time.time() - _t0),
+                )
+            except Exception as e:
+                # Fallback to heuristic
                 rewritten = rewrite_query(q, settings)
                 app_state["rewrite_info"] = {
                     "original": q,
@@ -3274,24 +3306,39 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
                     "filters": {},
                     "bias_applied": False,
                 }
-            return rewritten
+                reason = html.escape(str(e))[:120]
+                logger.warning(
+                    "Preview rewrite: LLM failed, heuristic used: %s", reason
+                )
+                if not banner:
+                    banner = f"<small class='pqa-muted'>Heuristic fallback used (reason: {reason})</small>"
+            return rewritten, banner
         except Exception:
-            return q
+            return q, "<small class='pqa-muted'>Heuristic fallback used</small>"
 
     question_input.submit(
         fn=_preview_rewrite,
         inputs=[question_input, config_dropdown],
-        outputs=[rewritten_textbox],
+        outputs=[rewritten_textbox, rewrite_status],
     )
 
-    # Dedicated Rewrite button (heuristic or LLM based on toggles)
+    # Dedicated Rewrite button (LLM first, fallback heuristic)
     rewrite_button.click(
         fn=_preview_rewrite,
         inputs=[question_input, config_dropdown],
-        outputs=[rewritten_textbox],
+        outputs=[rewritten_textbox, rewrite_status],
     )
 
-    # LLM rewrite is always on; removed toggle logic
+    # Persist quote extraction toggle in app state
+    def _set_quote_extraction(on: bool) -> str:
+        app_state["use_quote_extraction"] = bool(on)
+        return ""
+
+    use_quote_extraction_toggle.change(
+        fn=_set_quote_extraction,
+        inputs=[use_quote_extraction_toggle],
+        outputs=[cfg_status],
+    )
 
     # Intentionally no automatic submit on typing/enter; use Run button only
 
