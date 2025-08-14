@@ -2,6 +2,36 @@
 
 This document reorganizes the UI to align with the UX principles and end‑to‑end flow in `docs/UX-strategy.md`, without changing functionality.
 
+## Status
+
+### Done
+- Introduced center workspace tabs: Plan, Retrieval, Evidence, Conflicts, Synthesis
+- Moved Evidence Sources panel to the Evidence tab
+- Moved Answer panel to the Synthesis tab
+- Moved Research Intelligence and Metadata to the right rail
+- Added a static stepper above tabs (Plan → Retrieval → Evidence → Conflicts → Synthesis)
+- Added empty‑state hints in Evidence and Synthesis
+- Unification/polish already in codebase:
+  - Consistent HTML panel rendering and font sizing across panels
+  - Live Analysis height increased and scrollable
+  - Critique numbering normalization (removes escaped numbering and renders clean lists)
+
+### Next (no functionality changes; UI/layout only)
+- Left rail reorganization (sections/accordions):
+  - Project/Corpus (upload + corpus summary)
+  - Query Builder (Original/Read‑only, Rewritten/Editable, "Use Rewritten", filter chips, Query Used strip)
+  - Curation Controls (score cutoff, per‑doc cap, max sources)
+  - Display Toggles (flags, conflicts, charts, density)
+  - Saved Queries (list + save current)
+  - Export (JSON/CSV/Trace/Bundle)
+- Plan tab UI: side‑by‑side Original/Rewritten with chip row; show Query Used
+- Evidence tab UI: two‑column layout (left facet placeholders; right evidence cards) and top summary strip (static placeholders)
+- Conflicts tab UI: scaffold table with expandable rows; polarity placeholder columns
+- Right rail: add Session Log (mirrors status updates) and Quick Actions (clear, export bundle)
+- Navigation polish: soft gating visuals in stepper; consistent spacing
+- Responsive behavior: collapse rails into accordions on narrow screens
+- Empty/edge states and spacing polish across tabs and rails
+
 ## Layout Overview
 - Left rail (sticky, narrow)
   - Project/Corpus
