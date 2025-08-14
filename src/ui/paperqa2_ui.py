@@ -5,6 +5,7 @@ Based on insights from GitHub discussions and testing.
 """
 
 import asyncio
+import warnings
 import html
 import logging
 import os
@@ -29,6 +30,11 @@ from ..config_manager import ConfigManager
 # Configure logging with INFO level for cleaner output
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Silence Pydantic "Expected int, got float" serializer warnings from UI inputs
+warnings.filterwarnings(
+    "ignore", message="Pydantic serializer warnings:", category=UserWarning
+)
 
 # Set paper-qa to INFO level and turn down noisy libraries
 logging.getLogger("paperqa").setLevel(logging.INFO)
@@ -1291,7 +1297,8 @@ def stream_analysis_progress(
     def render_html() -> str:
         elapsed = time.time() - start_ts
         running = worker.is_alive()
-        latest = logs[-1] if logs else ""
+        # Keep last log locally if needed later; suppress unused var warning
+        _last_log = logs[-1] if logs else ""
         # Clamp progress percent 0..100
         pct = 0
         if ev_k > 0 and contexts_selected >= 0:
@@ -2452,7 +2459,9 @@ async def build_llm_or_heuristic_critique_html(
                 content = await asyncio.to_thread(fut.result, timeout=45)
                 if isinstance(content, str) and content.strip():
                     # Strip any leading numbering/bullet markers, including "\\1", "1.", "1)", "(1)", "-", "*"
-                    raw_lines = [ln.strip() for ln in content.splitlines() if ln.strip()]
+                    raw_lines = [
+                        ln.strip() for ln in content.splitlines() if ln.strip()
+                    ]
                     cleaned_lines: List[str] = []
                     for ln in raw_lines:
                         ln2 = re.sub(r"^\s*(?:\\\d+|\(\d+\)|\d+[\.)]|[-*•])\s+", "", ln)
