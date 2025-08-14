@@ -2733,7 +2733,7 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
                 upload_status = gr.Textbox(
                     label="Upload & Processing Status", interactive=False
                 )
-                clear_button = gr.Button("🗑️ Clear All", variant="secondary")
+                # Clear is available under Quick Actions in the right rail
 
             with gr.Accordion("🧪 Query Builder", open=True):
                 gr.Markdown(
@@ -3115,7 +3115,11 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
         except Exception:
             return [q, q]
 
-    question_input.change(fn=_fill_plan_fields, inputs=[question_input], outputs=[original_textbox, rewritten_textbox])
+    question_input.change(
+        fn=_fill_plan_fields,
+        inputs=[question_input],
+        outputs=[original_textbox, rewritten_textbox],
+    )
 
     question_input.submit(
         fn=ask_with_progress,
@@ -3144,7 +3148,8 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
         ],
     )
 
-    clear_button.click(
+    # Right-rail Clear Session wiring
+    clear_button_right.click(
         fn=clear_all,
         outputs=[
             inline_analysis,  # Retrieval tab
