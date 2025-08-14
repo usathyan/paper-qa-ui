@@ -3102,19 +3102,51 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
         ],
     )
 
-    # Mirror Original/Rewritten textboxes to current question and rewrite info (display-only)
-    def _fill_plan_fields(q: str) -> List[Any]:
+    # Preview rewrite on Enter without starting retrieval
+    def _preview_rewrite(q: str, cfg: str, use_llm: bool) -> str:
         try:
-            ri = app_state.get("rewrite_info") or {}
-            rewritten = ri.get("rewritten") or q
-            return [q, rewritten]
+            settings = app_state.get("settings") or initialize_settings(cfg)
+            app_state["settings"] = settings
+            rewritten: str = q
+            if use_llm:
+                try:
+                    # Prefer LLM decomposition when enabled
+                    decomp = asyncio.get_event_loop().run_until_complete(
+                        llm_decompose_query(q, settings)
+                    )
+                    rewritten = str(decomp.get("rewritten") or q)
+                    app_state["rewrite_info"] = {
+                        "original": q,
+                        "rewritten": rewritten,
+                        "filters": decomp.get("filters") or {},
+                        "bias_applied": False,
+                    }
+                except Exception:
+                    # Fallback to heuristic
+                    rewritten = rewrite_query(q, settings)
+                    app_state["rewrite_info"] = {
+                        "original": q,
+                        "rewritten": rewritten,
+                        "filters": {},
+                        "bias_applied": False,
+                    }
+            else:
+                # Heuristic only
+                rewritten = rewrite_query(q, settings)
+                app_state["rewrite_info"] = {
+                    "original": q,
+                    "rewritten": rewritten,
+                    "filters": {},
+                    "bias_applied": False,
+                }
+            return rewritten
         except Exception:
-            return [q, q]
+            return q
 
-    question_input.change(
-        fn=_fill_plan_fields,
-        inputs=[question_input],
-        outputs=[question_input, rewritten_textbox],
+    question_input.submit(
+        fn=_preview_rewrite,
+        inputs=[question_input, config_dropdown, use_llm_rewrite_toggle],
+        outputs=[rewritten_textbox],
     )
 
     # Intentionally no automatic submit on typing/enter; use Run button only
