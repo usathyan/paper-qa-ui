@@ -2795,9 +2795,14 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
             status_display = gr.HTML(label="Processing Status", visible=False)
 
             gr.Markdown("### 🔎 Live Analysis Progress")
-            inline_analysis = gr.HTML(label="Analysis", show_label=False)
-            # Ensure Analysis expands to show new content
-            inline_analysis.style(height=300)
+            inline_analysis = gr.HTML(
+                label="Analysis", show_label=False, elem_id="pqa-inline-analysis"
+            )
+            # Ensure Analysis area has minimum height via CSS
+            gr.HTML(
+                "<style>#pqa-inline-analysis { min-height: 300px; }</style>",
+                show_label=False,
+            )
 
             gr.Markdown("### 📝 Answer")
             answer_anchor = gr.HTML(
