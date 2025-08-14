@@ -2706,6 +2706,17 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
           height: clamp(500px, 70vh, 1100px);
           max-height: none;
         }
+
+        /* Layout polish */
+        .pqa-section { margin: 8px 0; }
+        .pqa-panel { margin: 8px 0; }
+        .pqa-subtle { margin: 8px 0; }
+
+        /* Responsive: stack rails and center column on narrow screens */
+        @media (max-width: 980px) {
+          .gr-row > .gr-column { flex: 1 1 100% !important; max-width: 100% !important; }
+          #inline-analysis, #answer-panel, #sources-panel, #intelligence-panel, #metadata-panel { max-height: unset; height: auto; }
+        }
         </style>
         """
     )
@@ -2823,7 +2834,7 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
         with gr.Column(scale=2):
             # Simple stepper above tabs (static for now)
             gr.HTML(
-                "<div class='pqa-steps'><span class='pqa-step done'>Plan</span><span class='pqa-step'>Retrieval</span><span class='pqa-step'>Evidence</span><span class='pqa-step'>Conflicts</span><span class='pqa-step'>Synthesis</span></div>"
+                "<div class='pqa-steps'><span class='pqa-step'>Plan</span><span class='pqa-step done'>Retrieval</span><span class='pqa-step'>Evidence</span><span class='pqa-step'>Conflicts</span><span class='pqa-step'>Synthesis</span></div>"
             )
             with gr.Tabs() as center_tabs:
                 with gr.TabItem("Plan"):
