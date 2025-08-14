@@ -2711,6 +2711,7 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
     )
 
     with gr.Row():
+        # Left rail (initial placeholders already in place)
         with gr.Column(scale=1):
             gr.Markdown("### 📁 Document Upload")
             file_upload = gr.File(
@@ -2811,46 +2812,90 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
                 "⬇️ Export Bundle (ZIP)", variant="secondary"
             )
 
+        # Center workspace (introduce tab shell; keep current content under Retrieval)
         with gr.Column(scale=2):
-            gr.Markdown("### ❓ Ask Questions")
-            question_input = gr.Textbox(
-                label="Enter your question",
-                placeholder="What is this paper about?",
-                lines=3,
+            with gr.Tabs() as center_tabs:
+                with gr.TabItem("Plan"):
+                    gr.Markdown("### 🗺️ Plan (Rewrite + Filters)")
+                    gr.HTML(
+                        "<div class='pqa-subtle'>Side‑by‑side Original/Rewritten with filter chips will appear here. Current function remains under Retrieval.</div>"
+                    )
+
+                with gr.TabItem("Retrieval"):
+                    gr.Markdown("### ❓ Ask Questions")
+                    question_input = gr.Textbox(
+                        label="Enter your question",
+                        placeholder="What is this paper about?",
+                        lines=3,
+                    )
+
+                    with gr.Row():
+                        ask_button = gr.Button(
+                            "🤖 Ask Question", variant="primary", size="lg"
+                        )
+
+                    # Status display (hidden for now)
+                    status_display = gr.HTML(
+                        label="Processing Status", visible=False
+                    )
+
+                    gr.Markdown("### 🔎 Live Analysis Progress")
+                    inline_analysis = gr.HTML(
+                        label="Analysis", show_label=False, elem_id="inline-analysis"
+                    )
+
+                    gr.Markdown("### 📝 Answer")
+                    answer_anchor = gr.HTML(
+                        "<div id='pqa-answer-anchor'></div>", show_label=False
+                    )
+                    # Use HTML for consistent rendering with our styled sections
+                    answer_display = gr.HTML(
+                        label="Answer", elem_id="answer-panel"
+                    )
+
+                    gr.Markdown("### 📚 Sources")
+                    sources_display = gr.HTML(
+                        label="Evidence Sources", elem_id="sources-panel"
+                    )
+
+                    gr.Markdown("### 🧠 Research Intelligence")
+                    intelligence_display = gr.HTML(
+                        label="Research Intelligence", elem_id="intelligence-panel"
+                    )
+
+                    gr.Markdown("### 📊 Metadata")
+                    metadata_display = gr.HTML(
+                        label="Processing Information", elem_id="metadata-panel"
+                    )
+
+                    error_display = gr.Textbox(
+                        label="Errors", interactive=False, visible=False
+                    )
+
+                with gr.TabItem("Evidence"):
+                    gr.Markdown("### 📚 Evidence")
+                    gr.HTML(
+                        "<div class='pqa-subtle'>Evidence summaries, facets, and cards will appear here. Current sources remain under Retrieval.</div>"
+                    )
+
+                with gr.TabItem("Conflicts"):
+                    gr.Markdown("### ⚖️ Conflicts")
+                    gr.HTML(
+                        "<div class='pqa-subtle'>Clustered disagreements with drill‑downs will appear here.</div>"
+                    )
+
+                with gr.TabItem("Synthesis"):
+                    gr.Markdown("### 📝 Synthesis")
+                    gr.HTML(
+                        "<div class='pqa-subtle'>Answer and Critique side‑by‑side will appear here. Current answer remains under Retrieval.</div>"
+                    )
+
+        # Right rail placeholder
+        with gr.Column(scale=1):
+            gr.Markdown("### 📎 Right Rail")
+            gr.HTML(
+                "<div class='pqa-subtle'>Research Intelligence, Metadata, Session Log, and Quick Actions will move here as part of the reorg.</div>"
             )
-
-            with gr.Row():
-                ask_button = gr.Button("🤖 Ask Question", variant="primary", size="lg")
-
-            # Status display (hidden for now)
-            status_display = gr.HTML(label="Processing Status", visible=False)
-
-            gr.Markdown("### 🔎 Live Analysis Progress")
-            inline_analysis = gr.HTML(
-                label="Analysis", show_label=False, elem_id="inline-analysis"
-            )
-
-            gr.Markdown("### 📝 Answer")
-            answer_anchor = gr.HTML(
-                "<div id='pqa-answer-anchor'></div>", show_label=False
-            )
-            # Use HTML for consistent rendering with our styled sections
-            answer_display = gr.HTML(label="Answer", elem_id="answer-panel")
-
-            gr.Markdown("### 📚 Sources")
-            sources_display = gr.HTML(label="Evidence Sources", elem_id="sources-panel")
-
-            gr.Markdown("### 🧠 Research Intelligence")
-            intelligence_display = gr.HTML(
-                label="Research Intelligence", elem_id="intelligence-panel"
-            )
-
-            gr.Markdown("### 📊 Metadata")
-            metadata_display = gr.HTML(
-                label="Processing Information", elem_id="metadata-panel"
-            )
-
-            error_display = gr.Textbox(label="Errors", interactive=False, visible=False)
 
     # Removed separate Analysis Progress tab; progress now streams inline below the question
 
