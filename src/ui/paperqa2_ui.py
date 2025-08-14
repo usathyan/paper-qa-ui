@@ -2715,7 +2715,9 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
         with gr.Column(scale=1):
             with gr.Accordion("📁 Project / Corpus", open=True):
                 file_upload = gr.File(
-                    file_count="multiple", file_types=[".pdf"], label="Upload PDF Documents"
+                    file_count="multiple",
+                    file_types=[".pdf"],
+                    label="Upload PDF Documents",
                 )
                 upload_status = gr.Textbox(
                     label="Upload & Processing Status", interactive=False
@@ -2723,7 +2725,9 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
                 clear_button = gr.Button("🗑️ Clear All", variant="secondary")
 
             with gr.Accordion("🧪 Query Builder", open=True):
-                gr.Markdown("<small class='pqa-muted'>Configure model & rewrite options. No behavior change in this step.</small>")
+                gr.Markdown(
+                    "<small class='pqa-muted'>Configure model & rewrite options. No behavior change in this step.</small>"
+                )
 
                 def _on_config_change(cfg: str) -> str:
                     app_state["settings"] = initialize_settings(cfg)
@@ -2762,7 +2766,9 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
                     value=False,
                     info="Append extracted filters to the rewritten query",
                 )
-                gr.HTML("<div class='pqa-subtle'><small><strong>Query Used</strong> will be shown above Analysis Progress.</small></div>")
+                gr.HTML(
+                    "<div class='pqa-subtle'><small><strong>Query Used</strong> will be shown above Analysis Progress.</small></div>"
+                )
 
             with gr.Accordion("🧰 Curation Controls", open=True):
                 score_cutoff_slider = gr.Slider(
@@ -2797,10 +2803,14 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
                 )
 
             with gr.Accordion("💾 Saved Queries", open=False):
-                gr.HTML("<div class='pqa-subtle'><small>Saved snapshots will appear here.</small></div>")
+                gr.HTML(
+                    "<div class='pqa-subtle'><small>Saved snapshots will appear here.</small></div>"
+                )
 
             with gr.Accordion("📦 Export", open=False):
-                export_json_btn = gr.DownloadButton("⬇️ Export JSON", variant="secondary")
+                export_json_btn = gr.DownloadButton(
+                    "⬇️ Export JSON", variant="secondary"
+                )
                 export_csv_btn = gr.DownloadButton("⬇️ Export CSV", variant="secondary")
                 export_trace_btn = gr.DownloadButton(
                     "⬇️ Export Trace (JSONL)", variant="secondary"
@@ -2818,8 +2828,33 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
             with gr.Tabs() as center_tabs:
                 with gr.TabItem("Plan"):
                     gr.Markdown("### 🗺️ Plan (Rewrite + Filters)")
+                    with gr.Row():
+                        with gr.Column(scale=1):
+                            original_textbox = gr.Textbox(
+                                label="Original",
+                                placeholder="Original question",
+                                lines=3,
+                            )
+                        with gr.Column(scale=1):
+                            rewritten_textbox = gr.Textbox(
+                                label="Rewritten (editable)",
+                                placeholder="Rewritten question (placeholder)",
+                                lines=3,
+                            )
+                    gr.Markdown("Filter chips (placeholders)")
                     gr.HTML(
-                        "<div class='pqa-subtle'>Side‑by‑side Original/Rewritten with filter chips will appear here. Current function remains under Retrieval.</div>"
+                        """
+                        <div class='pqa-subtle'>
+                          <span class='pqa-step' style='margin-right:6px'>years 2018–2024</span>
+                          <span class='pqa-step' style='margin-right:6px'>venues: Nature, PNAS</span>
+                          <span class='pqa-step' style='margin-right:6px'>fields: neurodegeneration</span>
+                          <span class='pqa-step' style='margin-right:6px'>species: human</span>
+                          <span class='pqa-step' style='margin-right:6px'>type: trial</span>
+                        </div>
+                        """
+                    )
+                    gr.HTML(
+                        "<div class='pqa-subtle'><small><strong>Query Used</strong>: (placeholder; the exact string sent downstream)</small></div>"
                     )
 
                 with gr.TabItem("Retrieval"):
@@ -2850,19 +2885,55 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
 
                 with gr.TabItem("Evidence"):
                     gr.Markdown("### 📚 Evidence")
-                    # Sources panel lives here for the reorg
-                    sources_display = gr.HTML(
-                        label="Evidence Sources", elem_id="sources-panel"
-                    )
-                    # Empty state hint
+                    # Summary strip (placeholders)
                     gr.HTML(
-                        "<div class='pqa-subtle'><small>Run a query to populate evidence here.</small></div>"
+                        "<div class='pqa-subtle'><small>Summary (placeholder): selected=—, ≥cutoff=—, venues=—, preprint share=—, years histogram=—, diversity score=—</small></div>"
                     )
+                    with gr.Row():
+                        with gr.Column(scale=1):
+                            gr.Markdown("#### Facets (placeholders)")
+                            years_slider = gr.Slider(
+                                minimum=1990,
+                                maximum=2025,
+                                step=1,
+                                value=2020,
+                                label="Years (start)",
+                            )
+                            years_slider_end = gr.Slider(
+                                minimum=1990,
+                                maximum=2025,
+                                step=1,
+                                value=2024,
+                                label="Years (end)",
+                            )
+                            venues_box = gr.Textbox(
+                                label="Venues (comma‑separated)", placeholder="Nature, PNAS"
+                            )
+                            fields_box = gr.Textbox(
+                                label="Fields (comma‑separated)", placeholder="neurodegeneration"
+                            )
+                        with gr.Column(scale=2):
+                            # Sources panel lives here for the reorg
+                            sources_display = gr.HTML(
+                                label="Evidence Sources", elem_id="sources-panel"
+                            )
+                            # Empty state hint
+                            gr.HTML(
+                                "<div class='pqa-subtle'><small>Run a query to populate evidence here.</small></div>"
+                            )
 
                 with gr.TabItem("Conflicts"):
                     gr.Markdown("### ⚖️ Conflicts")
                     gr.HTML(
-                        "<div class='pqa-subtle'>Clustered disagreements with drill‑downs will appear here.</div>"
+                        """
+                        <div class='pqa-subtle'>
+                          <strong>Conflicts (placeholder)</strong>
+                          <table class='pqa-table' style='margin-top:6px'>
+                            <thead><tr><th>Entity</th><th>#mixed</th><th>Sample sources</th><th>Expand</th></tr></thead>
+                            <tbody><tr><td>—</td><td>—</td><td>—</td><td>▶</td></tr></tbody>
+                          </table>
+                        </div>
+                        """
                     )
 
                 with gr.TabItem("Synthesis"):
@@ -2886,6 +2957,11 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
             metadata_display = gr.HTML(
                 label="Processing Information", elem_id="metadata-panel"
             )
+            gr.Markdown("### 🗒️ Session Log")
+            gr.HTML("<div class='pqa-subtle'><small>Live session events will appear here (placeholder).</small></div>")
+            gr.Markdown("### ⚡ Quick Actions")
+            clear_button_right = gr.Button("🧹 Clear Session", variant="secondary")
+            export_bundle_btn_right = gr.DownloadButton("⬇️ Export Bundle (ZIP)", variant="secondary")
 
     # Removed separate Analysis Progress tab; progress now streams inline below the question
 
