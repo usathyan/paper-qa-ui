@@ -2507,17 +2507,25 @@ async def llm_decompose_query(question: str, settings: Settings) -> Dict[str, An
         if not model_name:
             return {"rewritten": question, "filters": {}}
 
-        system = (
-            "You are a query rewriting assistant for scientific literature retrieval. "
-            "Rewrite the user's question to be concise and retrieval-friendly. "
-            "Also propose optional filters as a JSON object with: years [start,end], venues [strings], fields [strings]. "
-            "If unknown, use null or empty arrays. Respond with JSON only."
-        )
-        user = (
-            "Question: " + question + "\n\n"
-            "Return strictly this JSON schema: "
-            '{"rewritten": string, "filters": {"years": [number, number] | null, "venues": string[], "fields": string[]}}'
-        )
+        # Load prompts from an external module so they can be edited without code changes
+        try:
+            from .prompts import REWRITE_SYSTEM_PROMPT, REWRITE_USER_TEMPLATE
+        except Exception:
+            # Fallback inline prompts if external file missing
+            REWRITE_SYSTEM_PROMPT = (
+                "You are a query rewriting assistant for scientific literature retrieval. "
+                "Rewrite the user's question to be concise and retrieval-friendly. "
+                "Also propose optional filters as a JSON object with: years [start,end], venues [strings], fields [strings]. "
+                "If unknown, use null or empty arrays. Respond with JSON only."
+            )
+            REWRITE_USER_TEMPLATE = (
+                "Question: {question}\n\n"
+                "Return strictly this JSON schema: "
+                '{"rewritten": string, "filters": {"years": [number, number] | null, "venues": string[], "fields": string[]}}'
+            )
+
+        system = REWRITE_SYSTEM_PROMPT
+        user = REWRITE_USER_TEMPLATE.format(question=question)
         messages: List[Dict[str, str]] = [
             {"role": "system", "content": system},
             {"role": "user", "content": user},
@@ -2611,16 +2619,54 @@ async def llm_decompose_query(question: str, settings: Settings) -> Dict[str, An
 
 
 def rewrite_query(question: str, settings: Settings) -> str:
-    """Minimal local query rewriter: tighten phrasing and strip boilerplate.
-    Placeholder for advanced LLM-based decomposition.
+    """Heuristic rewrite: tighten phrasing, fix basic typos, normalize casing/punctuation.
+
+    This is a lightweight, local pass to improve retrieval robustness without external calls.
     """
-    q = " ".join(question.strip().split())
-    # Remove polite fillers
-    q = re.sub(r"^(please|kindly)\s+", "", q, flags=re.I)
-    # Prefer imperative style
-    q = re.sub(r"^(what is|what are)\s+", "summarize ", q, flags=re.I)
-    # Trim repeated punctuation
-    q = re.sub(r"[?!.]{2,}$", "?", q)
+    # Normalize whitespace
+    q = " ".join(str(question).strip().split())
+
+    # Quick lowercase for leading filler detection; preserve original capitalization otherwise
+    q_l = q.lower()
+    # Remove polite fillers at the start
+    for filler in ("please ", "kindly "):
+        if q_l.startswith(filler):
+            q = q[len(filler) :]
+            q_l = q_l[len(filler) :]
+            break
+
+    # Prefer imperative: "what is/are" → "summarize "
+    q = re.sub(r"^(?i)(what is|what are)\s+", "summarize ", q)
+
+    # Basic common typo fixes (minimal set; safe substitutions)
+    corrections = {
+        "alzheimer's": "Alzheimer's",
+        "parkinson's": "Parkinson's",
+        "alzeimer": "Alzheimer",
+        "alzheimer": "Alzheimer",
+        "behaviour": "behavior",
+        "analyse": "analyze",
+        "organisation": "organization",
+        "optimise": "optimize",
+    }
+
+    def _safe_fix(text: str) -> str:
+        out = text
+        for bad, good in corrections.items():
+            out = re.sub(rf"\b{bad}\b", good, out, flags=re.I)
+        return out
+
+    q = _safe_fix(q)
+
+    # Normalize stray punctuation and excessive terminal punctuation
+    q = re.sub(r"\s+([,;:.!?])", r"\1", q)  # no space before punctuation
+    q = re.sub(r"([,;:.!?]){2,}", r"\1", q)  # collapse repeats
+    q = re.sub(r"[?!.]{2,}$", "?", q)  # end with single ? if repeated
+
+    # Capitalize first letter if sentence-like
+    if q and q[0].isalpha():
+        q = q[0].upper() + q[1:]
+
     return q
 
 
