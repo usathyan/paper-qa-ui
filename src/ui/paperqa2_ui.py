@@ -2845,6 +2845,7 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
                                 label="Original",
                                 placeholder="Original question",
                                 lines=3,
+                                interactive=False,
                             )
                         with gr.Column(scale=1):
                             rewritten_textbox = gr.Textbox(
@@ -2918,10 +2919,12 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
                                 label="Years (end)",
                             )
                             venues_box = gr.Textbox(
-                                label="Venues (comma‑separated)", placeholder="Nature, PNAS"
+                                label="Venues (comma‑separated)",
+                                placeholder="Nature, PNAS",
                             )
                             fields_box = gr.Textbox(
-                                label="Fields (comma‑separated)", placeholder="neurodegeneration"
+                                label="Fields (comma‑separated)",
+                                placeholder="neurodegeneration",
                             )
                         with gr.Column(scale=2):
                             # Sources panel lives here for the reorg
@@ -2969,10 +2972,12 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
                 label="Processing Information", elem_id="metadata-panel"
             )
             gr.Markdown("### 🗒️ Session Log")
-            gr.HTML("<div class='pqa-subtle'><small>Live session events will appear here (placeholder).</small></div>")
+            session_log_display = gr.HTML(label="Session Log")
             gr.Markdown("### ⚡ Quick Actions")
             clear_button_right = gr.Button("🧹 Clear Session", variant="secondary")
-            export_bundle_btn_right = gr.DownloadButton("⬇️ Export Bundle (ZIP)", variant="secondary")
+            export_bundle_btn_right = gr.DownloadButton(
+                "⬇️ Export Bundle (ZIP)", variant="secondary"
+            )
 
     # Removed separate Analysis Progress tab; progress now streams inline below the question
 
@@ -3001,6 +3006,18 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
     config_dropdown.change(
         fn=_on_config_change, inputs=[config_dropdown], outputs=[cfg_status]
     )
+
+    # Mirror status tracker into right-rail Session Log
+    def _status_to_session_log() -> str:
+        try:
+            st = app_state.get("status_tracker")
+            return st.get_status_html() if st else ""
+        except Exception:
+            return ""
+
+    upload_status.change(fn=_status_to_session_log, outputs=[session_log_display])
+    # Also refresh on analysis updates by tying to inline_analysis panel value
+    inline_analysis.change(fn=_status_to_session_log, outputs=[session_log_display])
 
     # Export helpers
     def _ensure_exports_dir() -> Path:
@@ -3091,6 +3108,17 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
             ask_button,  # Retrieval tab
         ],
     )
+
+    # Mirror Original/Rewritten textboxes to current question and rewrite info (display-only)
+    def _fill_plan_fields(q: str) -> List[Any]:
+        try:
+            ri = app_state.get("rewrite_info") or {}
+            rewritten = ri.get("rewritten") or q
+            return [q, rewritten]
+        except Exception:
+            return [q, q]
+
+    question_input.change(fn=_fill_plan_fields, inputs=[question_input], outputs=[original_textbox, rewritten_textbox])
 
     question_input.submit(
         fn=ask_with_progress,
