@@ -2724,7 +2724,7 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
     with gr.Row():
         # Left rail (accordion sections; UI-only reorganization)
         with gr.Column(scale=1):
-            with gr.Accordion("📁 Project / Corpus", open=True):
+            with gr.Accordion("📁 Project / Corpus", open=False):
                 file_upload = gr.File(
                     file_count="multiple",
                     file_types=[".pdf"],
@@ -2735,7 +2735,7 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
                 )
                 # Clear is available under Quick Actions in the right rail
 
-            with gr.Accordion("🧪 Query Builder", open=True):
+            with gr.Accordion("🧪 Query Builder", open=False):
                 gr.Markdown(
                     "<small class='pqa-muted'>Configure model & rewrite options. No behavior change in this step.</small>"
                 )
@@ -2781,7 +2781,7 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
                     "<div class='pqa-subtle'><small><strong>Query Used</strong> will be shown above Analysis Progress.</small></div>"
                 )
 
-            with gr.Accordion("🧰 Curation Controls", open=True):
+            with gr.Accordion("🧰 Curation Controls", open=False):
                 score_cutoff_slider = gr.Slider(
                     minimum=0.0,
                     maximum=1.0,
@@ -2961,9 +2961,8 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
                         "<div class='pqa-subtle'><small>Answer and Critique will render here after running a query.</small></div>"
                     )
 
-        # Right rail placeholder
+        # Right rail
         with gr.Column(scale=1):
-            gr.Markdown("### 📎 Right Rail")
             # Move Research Intelligence and Metadata to right rail for reorg
             intelligence_display = gr.HTML(
                 label="Research Intelligence", elem_id="intelligence-panel"
