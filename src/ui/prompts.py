@@ -24,17 +24,17 @@ REWRITE_SYSTEM_PROMPT = (
 REWRITE_USER_TEMPLATE = (
     "Question: {question}\n\n"
     "Return strictly this JSON with keys exactly as shown:\n"
-    "{\n"
+    "{{\n"
     '  "rewritten": string,\n'
-    '  "filters": {\n'
+    '  "filters": {{\n'
     '    "years": [number, number] | null,\n'
     '    "venues": string[],\n'
     '    "fields": string[],\n'
     '    "species": string[],\n'
     '    "study_types": string[],\n'
     '    "outcomes": string[]\n'
-    "  }\n"
-    "}\n"
+    "  }}\n"
+    "}}\n"
 )
 
 # Quote extraction prompts
@@ -50,9 +50,9 @@ QUOTE_EXTRACTION_SYSTEM_PROMPT = (
     "- Avoid overlapping/duplicate quotes from the same passage unless they cover different aspects.\n"
     "- Keep total output compact and strictly follow the JSON schema.\n\n"
     "Output JSON schema (no extra text):\n"
-    "{\n"
+    "{{\n"
     '  "quotes": [\n'
-    "    {\n"
+    "    {{\n"
     '      "doc_id": string,\n'
     '      "doc_title": string | null,\n'
     '      "page": int | null,\n'
@@ -61,9 +61,9 @@ QUOTE_EXTRACTION_SYSTEM_PROMPT = (
     '      "quote": string,\n'
     '      "rationale": string,\n'
     '      "score": float\n'
-    "    }\n"
+    "    }}\n"
     "  ]\n"
-    "}"
+    "}}"
 )
 
 QUOTE_EXTRACTION_USER_TEMPLATE = (
@@ -74,22 +74,4 @@ QUOTE_EXTRACTION_USER_TEMPLATE = (
     "- Extract 5–8 high-quality quotes unless evidence is limited.\n"
     "- Prefer quotes from different documents when possible.\n"
     "- Each quote must be copied verbatim from the associated passage.\n"
-)
-
-# Rewrite using extracted quotes (question refinement based on documents)
-REWRITE_FROM_QUOTES_SYSTEM_PROMPT = (
-    "You are a scientific search query refiner. Given a user's question and a set of exact verbatim quotes extracted "
-    "from the relevant documents, produce a refined question that is concise, specific, and faithful to the documents.\n\n"
-    "Guidelines:\n"
-    "- Keep length similar to the original; avoid long multi-sentence rewrites.\n"
-    "- Use the quotes only to clarify terminology, entities, and scope.\n"
-    "- Do not add claims; avoid hallucinating new facts.\n"
-    "- Prefer canonical names and precise qualifiers when clearly supported by quotes.\n"
-    "- Output a single line with the refined question; no extra commentary.\n"
-)
-
-REWRITE_FROM_QUOTES_USER_TEMPLATE = (
-    "Original question:\n{question}\n\n"
-    "Extracted quotes (verbatim):\n{quotes_block}\n\n"
-    "Return only the refined question on one line (no commentary).\n"
 )

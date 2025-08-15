@@ -27,9 +27,16 @@ import importlib
 
 from ..config_manager import ConfigManager
 
-# Configure logging with INFO level for cleaner output
+# Configure logging with INFO level for cleaner output and ensure handlers
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+if not logger.handlers:
+    _h = logging.StreamHandler()
+    _h.setLevel(logging.INFO)
+    _fmt = logging.Formatter("%(levelname)s:%(name)s:%(message)s")
+    _h.setFormatter(_fmt)
+    logger.addHandler(_h)
 
 # Silence Pydantic "Expected int, got float" serializer warnings from UI inputs
 warnings.filterwarnings(
@@ -57,6 +64,7 @@ app_state: Dict[str, Any] = {
     "query_loop_thread": None,
     "session_data": None,
     "rewrite_info": None,
+    "rewrite_debug": None,  # {system,user,raw}
 }
 
 # Disable Gradio analytics
@@ -2770,6 +2778,15 @@ async def llm_decompose_query(question: str, settings: Settings) -> Dict[str, An
         content_res = _extract(resp)
         content = content_res if isinstance(content_res, str) else ""
         try:
+            # Save debug for UI panel
+            app_state["rewrite_debug"] = {
+                "system": system,
+                "user": user,
+                "raw": content,
+            }
+        except Exception:
+            pass
+        try:
             logger.info(
                 "LLM rewrite raw response: len=%d\n%s",
                 len(content),
@@ -3048,14 +3065,6 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
                     value=False,
                     info="Append extracted filters to the rewritten query",
                 )
-                litellm_debug_toggle = gr.Checkbox(
-                    label="LiteLLM debug logs",
-                    value=False,
-                    info="Enable verbose LiteLLM router/provider logs in console",
-                )
-                gr.HTML(
-                    "<div class='pqa-subtle'><small><strong>Query Used</strong> will be shown above Analysis Progress.</small></div>"
-                )
 
             with gr.Accordion("🧰 Curation Controls", open=False):
                 score_cutoff_slider = gr.Slider(
@@ -3136,24 +3145,18 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
                                 lines=3,
                             )
                             rewrite_status = gr.HTML(
-                                value="",
-                                label="",
-                                show_label=False,
+                                value="", label="", show_label=False
                             )
-                    gr.Markdown("Filter chips (placeholders)")
-                    gr.HTML(
-                        """
-                        <div class='pqa-subtle'>
-                          <span class='pqa-step' style='margin-right:6px'>years 2018–2024</span>
-                          <span class='pqa-step' style='margin-right:6px'>venues: Nature, PNAS</span>
-                          <span class='pqa-step' style='margin-right:6px'>fields: neurodegeneration</span>
-                          <span class='pqa-step' style='margin-right:6px'>species: human</span>
-                          <span class='pqa-step' style='margin-right:6px'>type: trial</span>
-                        </div>
-                        """
-                    )
-                    gr.HTML(
-                        "<div class='pqa-subtle'><small><strong>Query Used</strong>: (placeholder; the exact string sent downstream)</small></div>"
+                            rewrite_debug_panel = gr.HTML(
+                                value="<div class='pqa-subtle'><small class='pqa-muted'>Rewrite debug will appear here after the first rewrite.</small></div>",
+                                label="Debug (Rewrite)",
+                                show_label=True,
+                            )
+                    # Query Used strip (will update below)
+                    query_used_strip = gr.HTML(
+                        value="<div class='pqa-subtle'><small><strong>Query Used</strong>: —</small></div>",
+                        label="",
+                        show_label=False,
                     )
                     with gr.Row():
                         run_button = gr.Button("🤖 Ask Question", variant="primary")
@@ -3388,11 +3391,11 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
     )
 
     # Preview rewrite: always use LLM rewrite on the raw question (no retrieval required)
-    def _preview_rewrite(q: str, cfg: str) -> Tuple[str, str]:
+    async def _preview_rewrite(q: str, cfg: str) -> Tuple[str, str, str, str]:
         try:
             settings = app_state.get("settings") or initialize_settings(cfg)
             app_state["settings"] = settings
-            # Prefer LLM decomposition on a fresh event loop to avoid conflicts
+            # Use async LLM decomposition
             logger.info("Preview rewrite: attempting LLM rewrite (question-only)")
             # Log the exact prompt we will send (outer level, before inner call)
             try:
@@ -3410,21 +3413,8 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
             except Exception:
                 pass
             _t0 = time.time()
-            _loop = asyncio.new_event_loop()
-            try:
-                asyncio.set_event_loop(_loop)
-                decomp = _loop.run_until_complete(
-                    asyncio.wait_for(llm_decompose_query(q, settings), timeout=30)
-                )
-            finally:
-                try:
-                    _loop.close()
-                except Exception:
-                    pass
-                try:
-                    asyncio.set_event_loop(None)
-                except Exception:
-                    pass
+            # Use async function for better performance
+            decomp = await llm_decompose_query(q, settings)
             rewritten = str(decomp.get("rewritten") or q)
             try:
                 logger.info(
@@ -3450,43 +3440,80 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
                 (time.time() - _t0),
                 str(rewritten)[:200],
             )
-            return rewritten, banner
-        except Exception:
-            return q, "<small class='pqa-muted'>Heuristic fallback used</small>"
 
-    # Enter in Question or clicking ↻ Rewrite triggers LLM rewrite immediately
+            # Generate debug and query used info
+            debug_html = _render_rewrite_debug()
+            query_used_html = _render_query_used(q)
+
+            return rewritten, banner, debug_html, query_used_html
+        except Exception:
+            fallback_query_used = _render_query_used(q)
+            return (
+                q,
+                "<small class='pqa-muted'>Heuristic fallback used</small>",
+                "<div class='pqa-subtle'><small class='pqa-muted'>Debug unavailable.</small></div>",
+                fallback_query_used,
+            )
+
+    # Helper to render rewrite debug block
+    def _render_rewrite_debug() -> str:
+        try:
+            dbg = app_state.get("rewrite_debug") or {}
+            sys = html.escape(str(dbg.get("system") or ""))
+            usr = html.escape(str(dbg.get("user") or ""))
+            raw = html.escape(str(dbg.get("raw") or ""))
+            if not (sys or usr or raw):
+                return "<div class='pqa-subtle'><small class='pqa-muted'>No rewrite debug yet.</small></div>"
+            return (
+                "<div class='pqa-subtle' style='white-space:pre-wrap'>"
+                "<div><strong>Prompt (system)</strong></div><pre>" + sys + "</pre>"
+                "<div><strong>Prompt (user)</strong></div><pre>" + usr + "</pre>"
+                "<div><strong>Raw response</strong></div><pre>" + raw + "</pre>"
+                "</div>"
+            )
+        except Exception:
+            return "<div class='pqa-subtle'><small class='pqa-muted'>Debug unavailable.</small></div>"
+
+    # Update the debug panel and Query Used whenever rewrite status changes
+    def _render_query_used(q: str) -> str:
+        try:
+            # Check if we have a rewritten query in rewrite_info
+            rw = (app_state.get("rewrite_info") or {}).get("rewritten")
+            if isinstance(rw, str) and rw.strip():
+                # Use the rewritten query if available
+                base = rw
+            else:
+                # Fall back to the original question
+                base = q or ""
+            txt = html.escape(base or "—")
+            return f"<div class='pqa-subtle'><small><strong>Query Used</strong>: {txt}</small></div>"
+        except Exception:
+            return "<div class='pqa-subtle'><small><strong>Query Used</strong>: —</small></div>"
+
+    # Enter in Question or clicking ↻ Rewrite triggers LLM rewrite immediately and updates all panels
     question_input.submit(
         fn=_preview_rewrite,
         inputs=[question_input, config_dropdown],
-        outputs=[rewritten_textbox, rewrite_status],
+        outputs=[
+            rewritten_textbox,
+            rewrite_status,
+            rewrite_debug_panel,
+            query_used_strip,
+        ],
     )
     rewrite_button.click(
         fn=_preview_rewrite,
         inputs=[question_input, config_dropdown],
-        outputs=[rewritten_textbox, rewrite_status],
+        outputs=[
+            rewritten_textbox,
+            rewrite_status,
+            rewrite_debug_panel,
+            query_used_strip,
+        ],
     )
 
     # Always use quote extraction in refinement; toggle removed
     app_state["use_quote_extraction"] = True
-
-    # Toggle LiteLLM debug logging at runtime
-    def _set_litellm_debug(on: bool) -> str:
-        try:
-            if on:
-                os.environ["LITELLM_LOG"] = "DEBUG"
-                logging.getLogger("litellm").setLevel(logging.DEBUG)
-                logging.getLogger("LiteLLM").setLevel(logging.DEBUG)
-            else:
-                os.environ.pop("LITELLM_LOG", None)
-                logging.getLogger("litellm").setLevel(logging.INFO)
-                logging.getLogger("LiteLLM").setLevel(logging.INFO)
-        except Exception:
-            pass
-        return ""
-
-    litellm_debug_toggle.change(
-        fn=_set_litellm_debug, inputs=[litellm_debug_toggle], outputs=[cfg_status]
-    )
 
     # Intentionally no automatic submit on typing/enter; use Run button only
 

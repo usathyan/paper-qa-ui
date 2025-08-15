@@ -120,7 +120,7 @@ ui: check-env
 	@echo "🌐 Starting PaperQA2 Gradio UI..."
 	@echo "📱 Open your browser to: http://localhost:7860"
 	@echo "🛑 Press Ctrl+C to stop"
-	@$(PYTHON) -m src.ui.paperqa2_ui
+	@$(UV) run $(PYTHON) -m src.ui.paperqa2_ui
 
 # Kill hanging server processes
 kill-server:
