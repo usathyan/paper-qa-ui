@@ -13,6 +13,17 @@ This document describes exactly how to operate the UI, what each control does, h
   <img src="./screenshot.png" alt="Paper-QA UI" width="1000" />
 </p>
 
+## Demo Video
+
+Watch the UI in action! This screen recording demonstrates the complete workflow from document upload to answer generation.
+
+<p align="center">
+  <video width="1000" controls>
+    <source src="./docs/screen-recording/2025-08-15 Single Window (Dia – Paper-QA UI) C99466B3-1E5B-45AC-BF89-FFEE7111B9EA.mov" type="video/quicktime">
+    Your browser does not support the video tag.
+  </video>
+</p>
+
 ## 2. Document intake
 - Upload PDFs via the left panel.
 - The app copies files to `./papers/` and indexes them into an in-memory `Docs` corpus.
