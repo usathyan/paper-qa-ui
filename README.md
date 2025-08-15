@@ -19,7 +19,7 @@ Watch the UI in action! This screen recording demonstrates the complete workflow
 
 <p align="center">
   <video width="1000" controls>
-    <source src="./docs/screen-recording/2025-08-15 Single Window (Dia – Paper-QA UI) C99466B3-1E5B-45AC-BF89-FFEE7111B9EA.mov" type="video/quicktime">
+    <source src="./docs/screen-recording.m4v" type="video/mp4">
     Your browser does not support the video tag.
   </video>
 </p>
