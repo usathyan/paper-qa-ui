@@ -19,7 +19,7 @@ Watch the UI in action! This screen recording demonstrates the complete workflow
 
 <p align="center">
   <video width="1000" controls>
-    <source src="./docs/screen-recording.m4v" type="video/mp4">
+    <source src="./docs/screen-recording.mp4" type="video/mp4">
     Your browser does not support the video tag.
   </video>
 </p>
