@@ -36,7 +36,7 @@ This document describes exactly how to operate the UI, what each control does, h
 ### 4.3 Query Options
 - Rewrite query:
   - Rewrites the question prior to retrieval.
-  - When enabled, “Rewritten query” and “Rewritten from” (original) appear above the Analysis Progress.
+  - When enabled, "Rewritten query" and "Rewritten from" (original) appear above the Analysis Progress.
 - Use LLM rewrite:
   - Invokes an LLM to return `{ rewritten, filters: { years, venues, fields } }`.
   - Filters are displayed inline (e.g., `years 2018-2024; venues Nature, PNAS; fields neurodegeneration`).
@@ -44,8 +44,8 @@ This document describes exactly how to operate the UI, what each control does, h
   - Appends filter hints to the rewritten text. This biases retrieval without changing internal ranking logic.
 
 Clarification: identical rewritten text
-- If “Use LLM rewrite” is OFF, the local heuristic rewriter only removes polite prefixes, converts leading “what is/are …” to “summarize …”, and normalizes punctuation. Queries that do not match those patterns will remain unchanged.
-- If “Use LLM rewrite” is ON but a local-only config is selected (e.g., `optimized_ollama`) or the provider is not reachable, the system falls back to the heuristic, which may result in no change.
+- If "Use LLM rewrite" is OFF, the local heuristic rewriter only removes polite prefixes, converts leading "what is/are …" to "summarize …", and normalizes punctuation. Queries that do not match those patterns will remain unchanged.
+- If "Use LLM rewrite" is ON but a local-only config is selected (e.g., `optimized_ollama`) or the provider is not reachable, the system falls back to the heuristic, which may result in no change.
 - If an API-backed config is active (e.g., OpenRouter) and the model returns the same string (considering it already optimal), the rewritten text may legitimately equal the original.
 
 ### 4.4 Evidence Curation
@@ -70,55 +70,96 @@ Clarification: identical rewritten text
 - Export Trace (JSONL): event stream when available.
 - Export Bundle (ZIP): all of the above together.
 
-## 5. Ask Questions (right panel)
+## 5. Tab Structure and Content
 
-### 5.1 Analysis Progress
-- Header shows elapsed seconds and spinner while running.
-- “Rewritten from” and “Rewritten query” appear if rewriting is enabled.
-- Chevron phases: Retrieval, Summaries, Answer. Phases mark completion.
-- Retrieval progress bar: `contexts_selected / evidence_k`. Indeterminate until counts arrive.
-- Curation preview: shows current curation settings and estimated contexts after per-doc cap.
-- Transparency block reports: embed latency, candidate count (if logged), MMR lambda (if logged), selection stats (min/mean/max), per-doc counts, prompt metrics, answer timing/attempts.
-- Display/UX: this panel is intentionally tall (up to ~70vh) and scrollable so status stays visible throughout processing.
-- MMR block: histogram of candidate vs selected scores; selected diversity share; counts.
+The UI is organized into 5 main tabs that provide different views of the analysis:
 
-### 5.2 Answer
-- Renders with consistent HTML styling and larger font for readability, matching other panels.
+### 5.1 Plan & Retrieval Tab
+- **Question Input**: Enter your research question
+- **Rewrite Button**: Uses LLM to rewrite and extract filters
+- **Query Used**: Editable field showing the final query used for retrieval
+- **Analysis Progress**: Real-time progress with chevron indicators
+  - Shows elapsed time and spinner while running
+  - Chevron phases: Plan & Retrieval → Evidence → Research Intel → Answer
+  - Progress updates as each phase completes
 
-### 5.3 Evidence Sources
-- Table of excerpts: citation/title, page, score, snippet.
-- Renders with consistent HTML styling and scrollable container.
-- Heuristic flags:
-  - Preprint: arXiv/bioRxiv/medRxiv detected in source string.
-  - Retracted?: the source string contains a retraction marker.
+### 5.2 Evidence Tab
+- **Dynamic Summary**: Shows real-time metrics including:
+  - Total evidence pieces selected
+  - Evidence above relevance cutoff
+  - Venues/journals detected
+  - Preprint share percentage
+  - Year distribution
+  - Diversity score
+- **Facets Panel**: Filter controls for years, venues, and fields
+- **Evidence Summary**: Statistical overview of evidence sources
+- **Evidence Sources**: Table of excerpts with citation, page, score, and snippet
+- **Top Evidence (by score)**: Scrollable list of top 8 most relevant evidence pieces
 
-### 5.4 Research Intelligence
-- Potential contradictions (heuristic + polarity clustering): cross-document antonyms and simple claim polarity agreement/disagreement.
-- Evidence conflicts (clustered): list of entities with the number of sources exhibiting mixed polarity; shows up to 4 source names per entity. Controlled by the display toggle.
-- Key insights: salient statements from the answer or first snippets.
-- Uses the same HTML styling and sizing as other panels.
-- Evidence summary: excerpts per document.
-- Top evidence (by score): tabular top contexts.
+### 5.3 Conflicts Tab
+- **Evidence Quality Issues**: Flags for preprints, retractions, and other quality concerns
+- **Relevance Conflicts**: Shows evidence pieces with high score variance from same source
+- **Key Insights**: Analysis of evidence patterns including:
+  - Evidence density per source
+  - Strength of evidence base
+  - Coverage breadth
+  - Source diversity metrics
 
-### 5.5 Metadata
-- Processing time, number of documents included, evidence sources count, and a coarse confidence proxy.
-- Styled consistently with other panels.
+### 5.4 Research Intel Tab
+- **Potential Contradictions**: Cross-document antonym detection and polarity clustering
+- **Quality Flags**: Source-level quality indicators
+- **Diversity & Recency**: Year distribution histogram and source diversity metrics
+- **Critique**: LLM-generated assessment of answer quality and support
 
-## 6. Notes on behavior
+### 5.5 Answer Tab
+- **Answer Display**: Formatted answer with consistent HTML styling
+- **Clean Interface**: No placeholder text or unnecessary elements
+
+## 6. Default behaviors and assumptions
+
+The UI has been streamlined by removing several toggles and making opinionated defaults. These decisions optimize for the most common research workflows:
+
+### 6.1 Always-enabled features
+
+#### Smart Filter Biasing
+This feature takes the filters extracted by the LLM during rewrite (like years, venues, fields, species, study types, outcomes) and appends them as text hints to the final query used for retrieval.
+
+**Example:**
+- Original question: `"What is the role of PICALM in Alzheimer's?"`
+- LLM rewrite: `"PICALM role Alzheimer's disease"`
+- Extracted filters: `{years: [2020, 2024], fields: ["neurodegeneration"], species: ["human"]}`
+- **Final enhanced query**: `"PICALM role Alzheimer's disease (years 2020-2024; fields neurodegeneration; species human)"`
+
+This enhancement improves retrieval precision by providing contextual hints to the search system, helping it find more relevant and targeted papers. This was previously the "Bias retrieval using filters" toggle.
+
+#### Quote Extraction
+- **Quote extraction**: All answers include extracted quotes from sources for better traceability. This was previously a toggle.
+
+### 6.2 Removed UI complexity
+- **LiteLLM debug logs**: No longer exposed in UI (reduces clutter)
+- **File logging toggle**: Simplified to essential logging only
+- **Tab switching automation**: Plan and Retrieval consolidated into single tab
+- **Separate Analysis Progress tab**: Progress now streams inline for better UX
+- **Status display panels**: Removed redundant session log and processing info sections
+- **Placeholder text**: Cleaned up unnecessary placeholder messages throughout UI
+
+These assumptions work well for 95% of research queries. For advanced customization, see the Developer documentation.
+
+## 7. Notes on behavior
 - Rewriting and biasing affect retrieval text; they do not prune documents by themselves; they steer the selection.
 - Score cutoff and max sources are applied in `Settings` before selection.
 - Per-document cap is applied after selection to control over-representation.
 - Flags and conflicts are heuristic, not metadata-backed unless you provide metadata in your sources.
 
-## 7. Session export contents
+## 8. Session export contents
 - JSON contains: `question`, `answer`, `contexts`, `processing_time`, `documents_searched`, `metrics`, and optionally `rewrite`, `curation`, and `trace`.
 
-## 8. Operational constraints
+## 9. Operational constraints
 - One active query at a time (single-query lock).
 - Local-first by default; external services only if configured.
 - No background streaming of source documents; all processing is local unless otherwise set in configuration.
 
-## 9. Troubleshooting
+## 10. Troubleshooting
 - If Ollama is not running, local configs will fail; start with `ollama serve`.
 - If a port is occupied, run `make kill-server` then `make ui`.
 - If API keys are missing for cloud LLMs, use the default local config or set keys in `.env`.

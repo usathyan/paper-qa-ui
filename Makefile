@@ -94,16 +94,22 @@ setup:
 	@echo "🔍 Checking Ollama setup..."
 	@if command -v ollama >/dev/null 2>&1; then \
 		echo "✅ Ollama found"; \
-		if ! ollama list | grep -q "nomic-embed-text"; then \
-			echo "📥 Downloading nomic-embed-text model..."; \
-			ollama pull nomic-embed-text; \
-		fi; \
-		if ! ollama list | grep -q "llama3.2"; then \
-			echo "📥 Downloading llama3.2 model..."; \
-			ollama pull llama3.2; \
+		if ! ollama list >/dev/null 2>&1; then \
+			echo "⚠️  Ollama not running. Please start with: ollama serve"; \
+			echo "   Then run 'make setup' again to download models"; \
+		else \
+			if ! ollama list | grep -q "nomic-embed-text"; then \
+				echo "📥 Downloading nomic-embed-text model..."; \
+				ollama pull nomic-embed-text; \
+			fi; \
+			if ! ollama list | grep -q "llama3.2"; then \
+				echo "📥 Downloading llama3.2 model..."; \
+				ollama pull llama3.2; \
+			fi; \
 		fi; \
 	else \
 		echo "⚠️  Ollama not found. Please install from https://ollama.com/"; \
+		echo "   After installation, run: ollama serve"; \
 	fi
 	@echo "✅ Setup complete!"
 	@echo ""

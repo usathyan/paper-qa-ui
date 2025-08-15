@@ -231,6 +231,226 @@ def initialize_settings(config_name: str = "optimized_ollama") -> Settings:
     """
 ```
 
+## Removed Settings and UI Simplification
+
+### Overview
+
+During development, several toggles and settings were removed from the UI to reduce complexity while maintaining functionality through opinionated defaults. This section documents these changes for developers who need to modify or restore these features.
+
+### Always-Enabled Features (Previously Toggles)
+
+#### Smart Filter Biasing (`bias_retrieval`)
+- **Location**: `ask_with_progress()` function, line ~921
+- **Default**: `True` (always enabled)
+- **Functionality**: Appends extracted filters to rewritten queries
+- **Implementation**: 
+  ```python
+  # Hardcoded to True in gr.State calls
+  gr.State(True),  # bias_retrieval: Always enabled
+  ```
+- **Filter types**: years, venues, fields, species, study_types, outcomes
+- **Format**: `"query (years 2020-2024; fields neurodegeneration; species human)"`
+
+#### Quote Extraction (`use_quote_extraction`)
+- **Location**: `app_state["use_quote_extraction"]` initialization
+- **Default**: `True` (always enabled)
+- **Functionality**: Extracts relevant quotes from sources for answer traceability
+- **Implementation**: Set in app_state during initialization
+
+### Removed UI Components
+
+#### LiteLLM Debug Toggle
+- **Previous location**: Left panel Query Builder accordion
+- **Functionality**: Enabled/disabled LiteLLM debug logging
+- **Removal reason**: Cluttered UI, debugging better handled via logs
+- **Developer access**: Modify logging configuration directly
+
+#### File Logging Toggle
+- **Previous location**: Left panel Query Builder accordion  
+- **Functionality**: Enabled/disabled writing rewrite logs to files
+- **Removal reason**: Essential logs still captured, reduced complexity
+- **Developer access**: Modify logging handlers in code
+
+#### Separate Analysis Progress Tab
+- **Previous location**: Dedicated tab in center panel
+- **Functionality**: Showed real-time analysis progress
+- **Replacement**: Inline progress display in Plan & Retrieval tab
+- **Removal reason**: Better UX with consolidated view
+
+#### Tab Switching Automation
+- **Previous functionality**: Automatically switched to Retrieval tab when processing started
+- **Associated complexity**: Button state management, tab index tracking, user guidance messages
+- **Replacement**: Single consolidated "Plan & Retrieval" tab
+- **Removal reason**: Eliminated navigation confusion
+
+#### Status Display Panels
+- **Previous location**: Right rail session log and processing info sections
+- **Functionality**: Displayed session history and processing statistics
+- **Replacement**: Processing info integrated into dynamic evidence summary
+- **Removal reason**: Reduced UI clutter, information available in relevant tabs
+
+#### Placeholder Text
+- **Previous location**: Throughout UI (Evidence tab, Answer tab, etc.)
+- **Functionality**: Displayed placeholder messages like "Answer and Critique will render here"
+- **Replacement**: Clean interfaces with no unnecessary text
+- **Removal reason**: Improved user experience, reduced confusion
+
+## Current Tab Structure
+
+### Overview
+The UI is organized into 5 main tabs that provide different views of the analysis:
+
+### Tab 1: Plan & Retrieval
+- **Purpose**: Question input, query rewriting, and real-time progress tracking
+- **Components**:
+  - Question input textbox
+  - Rewrite button (LLM-based query optimization)
+  - Query Used (editable field for final query)
+  - Analysis Progress (real-time chevron indicators)
+- **Progress Phases**: Plan & Retrieval → Evidence → Research Intel → Answer
+
+### Tab 2: Evidence
+- **Purpose**: Comprehensive evidence analysis and filtering
+- **Components**:
+  - Dynamic Summary (real-time metrics)
+  - Facets Panel (filter controls)
+  - Evidence Summary (statistical overview)
+  - Evidence Sources (excerpts table)
+  - Top Evidence (by score) - scrollable list of top 8 pieces
+
+### Tab 3: Conflicts
+- **Purpose**: Evidence quality analysis and conflict detection
+- **Components**:
+  - Evidence Quality Issues (preprint/retraction flags)
+  - Relevance Conflicts (score variance analysis)
+  - Key Insights (evidence pattern analysis)
+
+### Tab 4: Research Intel
+- **Purpose**: Research intelligence and critique
+- **Components**:
+  - Potential Contradictions (cross-document analysis)
+  - Quality Flags (source-level indicators)
+  - Diversity & Recency (year distribution)
+  - Critique (LLM-generated assessment)
+
+### Tab 5: Answer
+- **Purpose**: Final answer display
+- **Components**:
+  - Answer Display (formatted HTML)
+  - Clean interface (no placeholders)
+
+### Implementation Details
+
+#### Dynamic Evidence Summary
+```python
+def build_evidence_meta_summary_html(contexts: List, score_cutoff: float = 0.0) -> str:
+    """Generate dynamic evidence metadata summary for the Evidence tab header."""
+    # Calculates: total evidence, above cutoff count, venues, preprint share, 
+    # year distribution, diversity score
+```
+
+#### Top Evidence Generation
+```python
+def build_top_evidence_html(contexts: List) -> str:
+    """Generate top evidence by relevance score for the Evidence tab."""
+    # Sorts by score, displays top 8 with formatting
+```
+
+#### Evidence Conflicts Analysis
+```python
+def build_conflicts_html(answer: str, contexts: List) -> str:
+    """Generate evidence conflicts and key insights for the Evidence tab."""
+    # Analyzes quality issues, relevance conflicts, and evidence patterns
+```
+
+### Modifiable Parameters for Developers
+
+If you need to restore or modify these features:
+
+#### Bias Retrieval
+```python
+# In ask_with_progress() function calls, change:
+gr.State(True),  # bias_retrieval: Always enabled
+# To:
+bias_retrieval_toggle,  # Restore UI toggle
+
+# Add back UI component in left panel:
+bias_retrieval_toggle = gr.Checkbox(
+    label="Enhance search with smart filters",
+    value=True,
+    info="Uses AI-extracted context (years, fields, etc.) to improve search precision"
+)
+```
+
+#### Quote Extraction
+```python
+# In initialization, change:
+app_state["use_quote_extraction"] = True
+# To conditional based on toggle:
+app_state["use_quote_extraction"] = quote_extraction_toggle.value
+```
+
+#### Debug Logging
+```python
+# Restore LiteLLM debug toggle:
+litellm_debug_toggle = gr.Checkbox(
+    label="Enable LiteLLM debug logs",
+    value=False,
+    info="Shows detailed LLM API call information"
+)
+
+# Add event handler:
+def _set_litellm_debug(enabled: bool) -> str:
+    import litellm
+    litellm.set_verbose = enabled
+    return f"LiteLLM debug {'enabled' if enabled else 'disabled'}"
+```
+
+### Parameter Limits and Validation
+
+#### Score Cutoff
+- **Range**: 0.0 to 1.0 (float)
+- **Default**: 0.0 (no filtering)
+- **Validation**: Gradio slider enforces bounds
+
+#### Per-Document Cap
+- **Range**: 0 to unlimited (integer)
+- **Default**: 0 (unlimited)
+- **Validation**: Non-negative integers only
+
+#### Max Sources
+- **Range**: 0 to unlimited (integer)  
+- **Default**: 0 (use Paper-QA defaults)
+- **Validation**: Non-negative integers only
+
+#### Years Range (Evidence Tab)
+- **Range**: 1990 to 2025 (integers)
+- **Default**: 2020-2024
+- **Validation**: Start year ≤ End year
+
+### Configuration Override Examples
+
+For advanced users needing to override defaults programmatically:
+
+```python
+# Override bias_retrieval in configuration
+def custom_ask_with_progress(*args):
+    # Force bias_retrieval = False for specific use case
+    modified_args = list(args)
+    modified_args[5] = False  # bias_retrieval parameter position
+    return original_ask_with_progress(*modified_args)
+
+# Restore removed UI toggle
+def add_bias_retrieval_toggle():
+    with gr.Accordion("Advanced Options", open=False):
+        bias_toggle = gr.Checkbox(
+            label="Smart filter biasing",
+            value=True,
+            info="Append extracted filters to queries"
+        )
+    return bias_toggle
+```
+
 ## UI Components and Flow
 
 ### Main Interface Structure

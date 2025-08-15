@@ -64,7 +64,6 @@ app_state: Dict[str, Any] = {
     "query_loop_thread": None,
     "session_data": None,
     "rewrite_info": None,
-    "rewrite_debug": None,  # {system,user,raw}
 }
 
 # Disable Gradio analytics
@@ -403,7 +402,7 @@ def process_uploaded_files(files: List[str]) -> Tuple[str, str]:
 
 async def process_question_async(
     question: str, config_name: str = "optimized_ollama", run_critique: bool = False
-) -> Tuple[str, str, str, str, str]:
+) -> Tuple[str, str, str, str, str, str, str, str]:
     """Process a question asynchronously using the stored documents."""
     max_retries = 3
     retry_delay = 2.0
@@ -413,7 +412,7 @@ async def process_question_async(
             start_time = time.time()
 
             if not question.strip():
-                return "", "", "", "", "Please enter a question."
+                return "", "", "", "Please enter a question.", "", "", "", ""
 
             # Check if documents have been uploaded and processed
             if not app_state.get("uploaded_docs"):
@@ -421,8 +420,11 @@ async def process_question_async(
                     "",
                     "",
                     "",
-                    "",
                     "📚 Please upload documents first. Documents will be automatically processed when uploaded.",
+                    "",
+                    "",
+                    "",
+                    "",
                 )
 
             # Check if Ollama is running (for local configurations)
@@ -431,8 +433,11 @@ async def process_question_async(
                     "",
                     "",
                     "",
-                    "",
                     "❌ Ollama is not running. Please start Ollama with 'ollama serve' and try again.",
+                    "",
+                    "",
+                    "",
+                    "",
                 )
 
             logger.info(
@@ -726,14 +731,21 @@ async def process_question_async(
 
             answer_html = format_answer_html(answer, contexts)
             sources_html = (quotes_html or "") + format_sources_html(contexts)
-            metadata_html = format_metadata_html(
-                {
-                    "processing_time": processing_time,
-                    "documents_searched": len(app_state["uploaded_docs"]),
-                    "evidence_sources": len(contexts),
-                    "confidence": 0.85 if contexts else 0.3,
-                }
+            conflicts_html = build_conflicts_html(answer, contexts)
+            evidence_summary_html = build_evidence_summary_html(contexts)
+            top_evidence_html = build_top_evidence_html(contexts)
+            evidence_meta_summary_html = build_evidence_meta_summary_html(
+                contexts, score_cutoff=0.0
             )
+            # Store processing information for session log
+            processing_info = {
+                "processing_time": processing_time,
+                "documents_searched": len(app_state["uploaded_docs"]),
+                "evidence_sources": len(contexts),
+                "confidence": 0.85 if contexts else 0.3,
+            }
+            app_state["last_processing_info"] = processing_info
+
             intelligence_html = build_intelligence_html(answer, contexts)
             if critique_html:
                 intelligence_html += (
@@ -781,7 +793,16 @@ async def process_question_async(
             except Exception:
                 pass
 
-            return answer_html, sources_html, metadata_html, intelligence_html, ""
+            return (
+                answer_html,
+                sources_html,
+                intelligence_html,
+                "",
+                conflicts_html,
+                evidence_summary_html,
+                top_evidence_html,
+                evidence_meta_summary_html,
+            )
 
         except Exception as e:
             logger.error(
@@ -825,18 +846,25 @@ async def process_question_async(
                 error_msg = f"❌ Processing failed: {str(e)}"
 
             app_state["processing_status"] = "❌ Error occurred during processing"
-            return "", "", "", "", error_msg
+            return "", "", "", error_msg, "", "", "", ""
     # Safety net (should not be reached)
-    return "", "", "", "", "❌ Unknown error"
+    return "", "", "", "❌ Unknown error", "", "", "", ""
 
 
 def process_question(
     question: str, config_name: str = "optimized_ollama", run_critique: bool = False
-) -> Tuple[str, str, str, str, str, str, str]:
+) -> Tuple[str, str, str, str, str, str, str, str, str, str]:
     """Synchronous wrapper for process_question_async."""
-    answer_html, sources_html, metadata_html, intelligence_html, error_msg = (
-        asyncio.run(process_question_async(question, config_name, run_critique))
-    )
+    (
+        answer_html,
+        sources_html,
+        intelligence_html,
+        error_msg,
+        conflicts_html,
+        evidence_summary_html,
+        top_evidence_html,
+        evidence_meta_summary_html,
+    ) = asyncio.run(process_question_async(question, config_name, run_critique))
 
     # Get status updates
     progress_html = ""
@@ -847,11 +875,14 @@ def process_question(
     return (
         answer_html,
         sources_html,
-        metadata_html,
         intelligence_html,
         error_msg,
         progress_html,
         status_html,
+        conflicts_html,
+        evidence_summary_html,
+        top_evidence_html,
+        evidence_meta_summary_html,
     )
 
 
@@ -867,11 +898,13 @@ def ask_with_progress(
     max_sources: int = 0,
     show_flags: bool = True,
     show_conflicts: bool = True,
-) -> Generator[Tuple[str, str, str, str, str, str, str, Any], None, None]:
+) -> Generator[
+    Tuple[str, str, str, str, str, str, Any, Any, str, str, str, str], None, None
+]:
     """Stream pre-evidence progress inline, then yield final answer outputs.
 
     Output tuple order:
-    (analysis_progress_html, answer_html, sources_html, metadata_html, intelligence_html, error_msg, status_html, ask_button_update)
+    (analysis_progress_html, answer_html, sources_html, intelligence_html, error_msg, status_html, ask_button_update, tabs_update, progress_steps, evidence_summary_html, conflicts_html)
     """
     panel_last = ""
     # Optionally rewrite query (heuristic or LLM-based) and optionally bias retrieval
@@ -910,6 +943,19 @@ def ask_with_progress(
                         fields = filters.get("fields") or []
                         if isinstance(fields, list) and fields:
                             hints.append("fields " + ", ".join(map(str, fields[:5])))
+                        species = filters.get("species") or []
+                        if isinstance(species, list) and species:
+                            hints.append("species " + ", ".join(map(str, species[:3])))
+                        study_types = filters.get("study_types") or []
+                        if isinstance(study_types, list) and study_types:
+                            hints.append(
+                                "study types " + ", ".join(map(str, study_types[:3]))
+                            )
+                        outcomes = filters.get("outcomes") or []
+                        if isinstance(outcomes, list) and outcomes:
+                            hints.append(
+                                "outcomes " + ", ".join(map(str, outcomes[:5]))
+                            )
                         if hints:
                             augmented = rw + " (" + "; ".join(hints) + ")"
                             question = augmented
@@ -976,16 +1022,20 @@ def ask_with_progress(
                 if "status_tracker" in app_state and app_state["status_tracker"]
                 else ""
             )
-            # While running: disable Ask button and show progress label
+            # While running: disable Ask button and show progress label, switch to Retrieval tab
             yield (
                 panel_html,
                 "",
                 "",
                 "",
                 "",
-                "",
                 status_html,
                 gr.update(value="Running…", interactive=False),
+                gr.update(),  # No tab switching needed
+                _update_progress_steps("retrieval"),  # Update progress steps
+                "",  # evidence_summary_html
+                "",  # conflicts_html
+                "",  # evidence_meta_summary_html
             )
     except Exception as e:
         err_panel = (
@@ -999,8 +1049,12 @@ def ask_with_progress(
             "",
             "",
             "",
-            "",
             gr.update(value="Ask Question", interactive=True),
+            gr.update(),  # Keep current tab
+            _update_progress_steps(""),  # Reset progress steps on error
+            "",  # evidence_summary_html
+            "",  # conflicts_html
+            "",  # evidence_meta_summary_html
         )
 
     # Now produce the final answer, while streaming a synthesis heartbeat
@@ -1010,11 +1064,14 @@ def ask_with_progress(
         (
             result_holder["answer_html"],
             result_holder["sources_html"],
-            result_holder["metadata_html"],
             result_holder["intelligence_html"],
             result_holder["error_msg"],
             _progress_html,
             result_holder["status_html"],
+            result_holder["conflicts_html"],
+            result_holder["evidence_summary_html"],
+            result_holder["top_evidence_html"],
+            result_holder["evidence_meta_summary_html"],
         ) = process_question(question, config_name, run_critique)
 
     t = threading.Thread(target=_run_query, daemon=True)
@@ -1048,8 +1105,12 @@ def ask_with_progress(
             "",
             "",
             "",
-            "",
             gr.update(value="Running…", interactive=False),
+            gr.update(),  # Keep current tab
+            _update_progress_steps("evidence"),  # Evidence processing
+            "",  # evidence_summary_html
+            "",  # conflicts_html
+            "",  # evidence_meta_summary_html
         )
         time.sleep(0.75)
 
@@ -1073,11 +1134,17 @@ def ask_with_progress(
         panel_last + completed_badges + scroll_js,
         result_holder.get("answer_html", ""),
         result_holder.get("sources_html", ""),
-        result_holder.get("metadata_html", ""),
         result_holder.get("intelligence_html", ""),
         result_holder.get("error_msg", ""),
         result_holder.get("status_html", ""),
         gr.update(value="Ask Question", interactive=True),
+        gr.update(),  # Keep current tab
+        _update_progress_steps("summary"),  # All steps completed
+        result_holder.get("evidence_summary_html", ""),  # evidence_summary_html
+        result_holder.get("conflicts_html", ""),  # conflicts_html
+        result_holder.get(
+            "evidence_meta_summary_html", ""
+        ),  # evidence_meta_summary_html
     )
 
 
@@ -1310,6 +1377,38 @@ def _run_pre_evidence_in_thread(
             pass
 
 
+def _format_log_line(log_line: str) -> str:
+    """Format a log line, handling JSON content specially."""
+    try:
+        # Check if the line contains JSON
+        if log_line.strip().startswith("```json") and log_line.strip().endswith("```"):
+            # Remove the backticks and parse JSON
+            json_content = log_line.strip()[7:-3].strip()  # Remove ```json and ```
+            import json
+
+            parsed = json.loads(json_content)
+
+            # Format as a nice summary card
+            summary = parsed.get("summary", "No summary available")
+            score = parsed.get("relevance_score", "N/A")
+
+            return (
+                f"<div class='pqa-context-card' style='margin:4px 0;padding:8px;background:#f8f9fa;border-left:3px solid #3b82f6;border-radius:4px;'>"
+                f"<div style='display:flex;justify-content:space-between;align-items:start;margin-bottom:4px;'>"
+                f"<strong style='color:#1f2937;font-size:12px;'>Context Summary</strong>"
+                f"<span style='background:#3b82f6;color:white;padding:2px 6px;border-radius:10px;font-size:10px;'>Score: {score}</span>"
+                f"</div>"
+                f"<div style='font-size:11px;line-height:1.4;color:#374151;'>{html.escape(summary)}</div>"
+                f"</div>"
+            )
+        else:
+            # Regular log line
+            return f"<div><small>{html.escape(log_line)}</small></div>"
+    except Exception:
+        # Fallback to original formatting
+        return f"<div><small>{html.escape(log_line)}</small></div>"
+
+
 def stream_analysis_progress(
     question: str,
     config_name: str = "optimized_ollama",
@@ -1352,7 +1451,7 @@ def stream_analysis_progress(
     # Initial UI shell
     start_ts = time.time()
     logs: List[str] = ["Started analysis..."]
-    # No table rows in live panel; top evidence is rendered later in Research Intelligence
+    # No table rows in live panel; top evidence is rendered later in Research Intel
     retrieval_done = False
     contexts_selected = 0
     contexts_selected_filtered: int | None = None
@@ -1372,9 +1471,7 @@ def stream_analysis_progress(
     answer_sources_included: int | None = None
     answer_prompt_chars: int | None = None
     answer_attempts: int | None = None
-    # Phase flags
-    summaries_done: bool = False
-    answer_done: bool = False
+    # Phase flags - only tracking retrieval_done now since chevrons were removed
     # Controls snapshot
     try:
         cutoff = getattr(
@@ -1477,25 +1574,6 @@ def stream_analysis_progress(
                 + "</div>"
             ),
             (
-                "<div class='pqa-steps'>"
-                + (
-                    "<span class='pqa-step done'>Retrieval</span>"
-                    if retrieval_done
-                    else "<span class='pqa-step'>Retrieval</span>"
-                )
-                + (
-                    "<span class='pqa-step done'>Summaries</span>"
-                    if summaries_done
-                    else "<span class='pqa-step'>Summaries</span>"
-                )
-                + (
-                    "<span class='pqa-step done'>Answer</span>"
-                    if answer_done
-                    else "<span class='pqa-step'>Answer</span>"
-                )
-                + "</div>"
-            ),
-            (
                 f"<div class='pqa-subtle pqa-bar'><div class='pqa-bar-fill {'pqa-bar-indet' if not retrieval_done and pct == 0 else ''}' style='width:{pct}%'></div></div>"
                 + (
                     f"<div style='margin-top:4px'><small class='pqa-muted'>{contexts_selected}/{ev_k} contexts"
@@ -1508,7 +1586,7 @@ def stream_analysis_progress(
                 )
             ),
             "<div class='pqa-subtle' style='max-height:120px;overflow:auto'>",
-            *[f"<div><small>{html.escape(ln)}</small></div>" for ln in logs[-8:]],
+            *[_format_log_line(ln) for ln in logs[-8:]],
             "</div>",
             # Transparency block
             "<div class='pqa-panel' style='margin-top:8px'>",
@@ -1730,7 +1808,7 @@ def stream_analysis_progress(
                 )
             except Exception:
                 pass
-        # Omit Top evidence table here; it belongs in Research Intelligence
+        # Omit Top evidence table here; it belongs in Research Intel
         parts.append("</div>")
         return "".join(parts)
 
@@ -1764,9 +1842,18 @@ def stream_analysis_progress(
                 if data.get("phase") == "retrieval" and data.get("status") == "end":
                     retrieval_done = True
                 elif data.get("phase") == "summaries" and data.get("status") == "end":
-                    summaries_done = True
+                    pass  # Summaries phase completed
                 elif data.get("phase") == "answer" and data.get("status") == "end":
-                    answer_done = True
+                    pass  # Answer phase completed
+
+            # Fallback logic: Update phases based on log content patterns
+            if isinstance(evt, dict) and evt.get("type") == "log":
+                msg = str(evt.get("data", "")).strip().lower()
+                if (
+                    "docs.aquery completed" in msg
+                    or "answer generated successfully" in msg
+                ):
+                    retrieval_done = True
             elif isinstance(evt, dict) and evt.get("type") == "metric":
                 data = evt.get("data", {}) or {}
                 try:
@@ -2015,7 +2102,7 @@ def format_sources_html(contexts: List) -> str:
 def format_metadata_html(metadata: dict) -> str:
     """Format metadata as HTML."""
     html_parts = ["<div class='pqa-panel' style='font-size:0.9em;'>"]
-    html_parts.append("<h5>Processing Information:</h5>")
+    html_parts.append("<h5>Processing Information</h5>")
     html_parts.append(
         f"<strong>Processing Time:</strong> {metadata.get('processing_time', 0):.2f} seconds<br>"
     )
@@ -2030,6 +2117,405 @@ def format_metadata_html(metadata: dict) -> str:
     )
     html_parts.append("</div>")
     return "".join(html_parts)
+
+
+def build_evidence_summary_html(contexts: List) -> str:
+    """Generate an evidence summary with top evidence by score."""
+    try:
+        if not contexts:
+            return "<div class='pqa-panel'><h4>📊 Evidence Summary</h4><p>No evidence available.</p></div>"
+
+        # Sort contexts by relevance score if available
+        scored_contexts = []
+        for c in contexts:
+            try:
+                # Try to get score from different possible attributes
+                score = (
+                    getattr(c, "score", None)
+                    or getattr(c, "relevance_score", None)
+                    or 0.0
+                )
+                if hasattr(c, "text"):
+                    text_obj = getattr(c, "text", None)
+                    if text_obj and hasattr(text_obj, "text"):
+                        text = text_obj.text
+                    else:
+                        text = str(c.text) if c.text else ""
+                else:
+                    text = str(c)
+
+                # Get document info
+                doc_title = "Unknown source"
+                if hasattr(c, "text") and hasattr(c.text, "doc"):
+                    doc = c.text.doc
+                    if doc:
+                        doc_title = (
+                            getattr(doc, "formatted_citation", None)
+                            or getattr(doc, "title", None)
+                            or getattr(doc, "docname", None)
+                            or "Unknown source"
+                        )
+
+                scored_contexts.append((score, text, doc_title))
+            except Exception:
+                continue
+
+        # Sort by score descending
+        scored_contexts.sort(key=lambda x: x[0], reverse=True)
+
+        # Build summary statistics
+        total_evidence = len(contexts)
+        avg_score = (
+            sum(score for score, _, _ in scored_contexts) / total_evidence
+            if scored_contexts
+            else 0.0
+        )
+        unique_docs = len(set(doc_title for _, _, doc_title in scored_contexts))
+
+        # Build HTML
+        parts = ["<div class='pqa-panel'>"]
+        parts.append("<h4>📊 Evidence Summary</h4>")
+
+        # Summary stats
+        parts.append(f"""
+        <div class='pqa-subtle' style='margin-bottom: 12px;'>
+            <strong>Total Evidence:</strong> {total_evidence} pieces | 
+            <strong>Sources:</strong> {unique_docs} documents | 
+            <strong>Avg. Relevance:</strong> {avg_score:.2f}
+        </div>
+        """)
+
+        parts.append("</div>")
+
+        return "".join(parts)
+
+    except Exception as e:
+        logger.warning(f"Failed to build evidence summary HTML: {e}")
+        return "<div class='pqa-panel'><h4>📊 Evidence Summary</h4><p>Evidence summary unavailable.</p></div>"
+
+
+def build_top_evidence_html(contexts: List) -> str:
+    """Generate top evidence by relevance score for the Evidence tab."""
+    try:
+        if not contexts:
+            return "<div class='pqa-panel'><h4>🏆 Top Evidence (by score)</h4><p>No evidence available.</p></div>"
+
+        # Sort contexts by relevance score if available
+        scored_contexts = []
+        for c in contexts:
+            try:
+                # Try to get score from different possible attributes
+                score = (
+                    getattr(c, "score", None)
+                    or getattr(c, "relevance_score", None)
+                    or 0.0
+                )
+                if hasattr(c, "text"):
+                    text_obj = getattr(c, "text", None)
+                    if text_obj and hasattr(text_obj, "text"):
+                        text = text_obj.text
+                    else:
+                        text = str(c.text) if c.text else ""
+                else:
+                    text = str(c)
+
+                # Get document info
+                doc_title = "Unknown source"
+                if hasattr(c, "text") and hasattr(c.text, "doc"):
+                    doc = c.text.doc
+                    if doc:
+                        doc_title = (
+                            getattr(doc, "formatted_citation", None)
+                            or getattr(doc, "title", None)
+                            or getattr(doc, "docname", None)
+                            or "Unknown source"
+                        )
+
+                scored_contexts.append((score, text, doc_title))
+            except Exception:
+                continue
+
+        # Sort by score descending
+        scored_contexts.sort(key=lambda x: x[0], reverse=True)
+
+        # Build HTML
+        parts = ["<div class='pqa-panel'>"]
+        parts.append("<h4>🏆 Top Evidence (by score)</h4>")
+
+        parts.append(
+            "<div style='max-height: 400px; overflow-y: auto; margin-top: 8px;'>"
+        )
+
+        for i, (score, text, doc_title) in enumerate(scored_contexts[:8]):  # Show top 8
+            # Truncate text for display
+            display_text = text[:250] + "..." if len(text) > 250 else text
+            parts.append(f"""
+            <div style='border: 1px solid #ddd; border-radius: 4px; padding: 8px; margin-bottom: 8px; background: #f9f9f9;'>
+                <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;'>
+                    <small><strong>#{i + 1}</strong></small>
+                    <span style='background: #e3f2fd; padding: 2px 6px; border-radius: 3px; font-size: 0.8em;'>
+                        Score: {score:.3f}
+                    </span>
+                </div>
+                <div style='font-size: 0.9em; margin-bottom: 4px;'>{html.escape(display_text)}</div>
+                <div style='font-size: 0.8em; color: #666; font-style: italic;'>{html.escape(doc_title)}</div>
+            </div>
+            """)
+
+        parts.append("</div>")
+        parts.append("</div>")
+
+        return "".join(parts)
+
+    except Exception as e:
+        logger.warning(f"Failed to build top evidence HTML: {e}")
+        return "<div class='pqa-panel'><h4>🏆 Top Evidence (by score)</h4><p>Top evidence unavailable.</p></div>"
+
+
+def build_evidence_meta_summary_html(contexts: List, score_cutoff: float = 0.0) -> str:
+    """Generate dynamic evidence metadata summary for the Evidence tab header."""
+    try:
+        if not contexts:
+            return "<div class='pqa-subtle'><small>Summary: No evidence processed yet.</small></div>"
+
+        # Calculate metrics
+        total_evidence = len(contexts)
+
+        # Count evidence above cutoff
+        above_cutoff = 0
+        all_scores = []
+        for c in contexts:
+            try:
+                score = (
+                    getattr(c, "score", None)
+                    or getattr(c, "relevance_score", None)
+                    or 0.0
+                )
+                all_scores.append(score)
+                if score >= score_cutoff:
+                    above_cutoff += 1
+            except Exception:
+                continue
+
+        # Extract venues and years
+        venues: set[str] = set()
+        years: list[int] = []
+        preprint_count = 0
+
+        for c in contexts:
+            try:
+                txt_obj = getattr(c, "text", None)
+                doc = getattr(txt_obj, "doc", None) if txt_obj is not None else None
+                if doc is not None:
+                    citation = getattr(doc, "formatted_citation", None) or ""
+                    title = getattr(doc, "title", None) or ""
+
+                    # Extract venue (simple heuristic)
+                    venue_text = citation + " " + title
+                    venue_patterns = [
+                        r"\b(Nature|Science|Cell|PNAS|NEJM|Lancet|BMJ|JAMA)\b",
+                        r"\b([A-Z][a-z]+ [A-Z][a-z]+)\b(?=\s*\d{4})",  # Journal Name YYYY pattern
+                    ]
+                    for pattern in venue_patterns:
+                        matches = re.findall(pattern, venue_text, re.IGNORECASE)
+                        venues.update(
+                            match if isinstance(match, str) else match[0]
+                            for match in matches
+                        )
+
+                    # Extract year
+                    year_match = re.search(r"\b(20\d{2}|19\d{2})\b", venue_text)
+                    if year_match:
+                        year = int(year_match.group(1))
+                        if 1990 <= year <= 2025:
+                            years.append(year)
+
+                    # Check for preprints
+                    if any(
+                        k in venue_text.lower()
+                        for k in ["arxiv", "biorxiv", "medrxiv", "preprint"]
+                    ):
+                        preprint_count += 1
+
+            except Exception:
+                continue
+
+        # Calculate diversity score (simple heuristic based on unique venues and year spread)
+        unique_venues = len(venues)
+        year_span = (max(years) - min(years) + 1) if years else 0
+        diversity_score = min(1.0, (unique_venues * 0.3 + year_span * 0.01))
+
+        preprint_share = (
+            (preprint_count / total_evidence) if total_evidence > 0 else 0.0
+        )
+
+        # Build year histogram (simple text representation)
+        year_histogram = ""
+        if years:
+            year_counts: dict[int, int] = {}
+            for y in years:
+                year_counts[y] = year_counts.get(y, 0) + 1
+            sorted_years = sorted(year_counts.keys())
+            if len(sorted_years) <= 5:
+                year_histogram = ", ".join(
+                    f"{y}({year_counts[y]})" for y in sorted_years
+                )
+            else:
+                year_histogram = (
+                    f"{min(sorted_years)}-{max(sorted_years)} ({len(sorted_years)} yrs)"
+                )
+
+        # Format venues list
+        venues_display = ", ".join(sorted(list(venues))[:3])
+        if len(venues) > 3:
+            venues_display += f" +{len(venues) - 3} more"
+
+        if not venues_display:
+            venues_display = "—"
+        if not year_histogram:
+            year_histogram = "—"
+
+        summary_html = f"""
+        <div class='pqa-subtle'>
+            <small>
+                Summary: selected={total_evidence}, ≥cutoff({score_cutoff:.1f})={above_cutoff}, 
+                venues={venues_display}, preprint share={preprint_share:.0%}, 
+                years={year_histogram}, diversity score={diversity_score:.2f}
+            </small>
+        </div>
+        """
+
+        return summary_html.strip()
+
+    except Exception as e:
+        logger.warning(f"Failed to build evidence meta summary: {e}")
+        return "<div class='pqa-subtle'><small>Summary: Analysis unavailable.</small></div>"
+
+
+def build_conflicts_html(answer: str, contexts: List) -> str:
+    """Extract and format conflicts for the Evidence tab."""
+    try:
+        # Same conflict detection logic as build_intelligence_html
+        by_doc: Dict[str, List[str]] = {}
+        doc_years: Dict[str, int] = {}
+        doc_flags: Dict[str, List[str]] = {}
+        claim_map: Dict[str, List[Tuple[str, str, str]]] = {}
+
+        def _extract_year(s: str) -> int | None:
+            m = re.search(r"\b(19|20)\d{2}\b", s)
+            return int(m.group(0)) if m else None
+
+        def _is_preprint(s: str) -> bool:
+            return any(
+                k in s.lower() for k in ["arxiv", "biorxiv", "medrxiv", "preprint"]
+            )
+
+        def _is_retracted(s: str) -> bool:
+            return "retract" in s.lower()
+
+        for c in contexts or []:
+            try:
+                doc = getattr(getattr(c, "text", object()), "doc", None)
+                doc_title = None
+                if doc is not None:
+                    doc_title = (
+                        getattr(doc, "formatted_citation", None)
+                        or getattr(doc, "title", None)
+                        or getattr(doc, "docname", None)
+                    )
+                if not doc_title:
+                    doc_title = "Unknown source"
+                txt = ""
+                if hasattr(c, "text"):
+                    t = getattr(c.text, "text", None)
+                    txt = (
+                        t
+                        if isinstance(t, str)
+                        else (str(c.text) if c.text is not None else "")
+                    )
+                else:
+                    txt = str(c)
+                by_doc.setdefault(doc_title, []).append(txt.lower())
+
+                # Flags and year per doc
+                if doc_title not in doc_years:
+                    y = _extract_year(doc_title)
+                    if y is not None:
+                        doc_years[doc_title] = y
+
+                flags: List[str] = []
+                if _is_retracted(doc_title):
+                    flags.append("Retracted?")
+                if _is_preprint(doc_title):
+                    flags.append("Preprint")
+                if flags:
+                    doc_flags[doc_title] = list(
+                        set(doc_flags.get(doc_title, []) + flags)
+                    )
+            except Exception:
+                continue
+
+        # Detect contradictions by antonym pairs and simple polarity clustering across docs
+        conflict_items: List[str] = []
+        antonym_pairs = [
+            ("increase", "decrease"),
+            ("higher", "lower"),
+            ("more", "less"),
+            ("positive", "negative"),
+            ("beneficial", "harmful"),
+            ("effective", "ineffective"),
+        ]
+
+        for pos, neg in antonym_pairs:
+            pos_docs = [d for d, txts in by_doc.items() if any(pos in t for t in txts)]
+            neg_docs = [d for d, txts in by_doc.items() if any(neg in t for t in txts)]
+            if pos_docs and neg_docs and not set(pos_docs).intersection(neg_docs):
+                conflict_items.append(
+                    f"Conflicting findings on '{pos}' vs '{neg}' across sources"
+                )
+
+        # Evidence conflicts view (cluster excerpts across docs)
+        conflicts_ui: List[str] = []
+        try:
+            ui = app_state.get("ui_toggles", {}) or {}
+            if bool(ui.get("show_conflicts", True)):
+                for entity, items in list(claim_map.items())[:6]:
+                    docs_for_entity = list({d for _p, _v, d in items})
+                    docs_display = ", ".join(
+                        [html.escape(d) for d in docs_for_entity[:4]]
+                    )
+                    conflicts_ui.append(
+                        f"<li><small><strong>{html.escape(entity)}</strong>: {len(docs_for_entity)} source(s) [{docs_display}{' …' if len(docs_for_entity) > 4 else ''}]</small></li>"
+                    )
+        except Exception:
+            pass
+
+        # Build conflicts HTML
+        parts = ["<div class='pqa-panel'>"]
+        parts.append("<h4>⚖️ Evidence Conflicts</h4>")
+
+        # Potential contradictions
+        parts.append("<div><strong>Potential contradictions</strong><ul>")
+        if conflict_items:
+            parts.extend([f"<li>{x}</li>" for x in conflict_items[:8]])
+        else:
+            parts.append("<li>No explicit contradictions detected across sources.</li>")
+        parts.append("</ul></div>")
+
+        # Evidence conflicts
+        if conflicts_ui:
+            parts.append(
+                "<div style='margin-top:8px'><strong>Clustered conflicts</strong><ul>"
+            )
+            parts.extend(conflicts_ui)
+            parts.append("</ul></div>")
+
+        parts.append("</div>")
+        return "".join(parts)
+
+    except Exception as e:
+        logger.warning(f"Failed to build conflicts HTML: {e}")
+        return "<div class='pqa-panel'><h4>⚖️ Evidence Conflicts</h4><p>Conflicts analysis unavailable.</p></div>"
 
 
 def build_intelligence_html(answer: str, contexts: List) -> str:
@@ -2201,87 +2687,9 @@ def build_intelligence_html(answer: str, contexts: List) -> str:
         except Exception:
             pass
 
-        # Key insights: pick sentences from answer if available, else from contexts
-        insights = []
-        if answer:
-            for sent in answer.replace("\n", " ").split(". "):
-                s = sent.strip()
-                if not s:
-                    continue
-                if any(
-                    k in s.lower()
-                    for k in [
-                        "suggest",
-                        "indicat",
-                        "demonstrat",
-                        "evidence",
-                        "supports",
-                        "contradict",
-                    ]
-                ):
-                    insights.append(s)
-                if len(insights) >= 5:
-                    break
-        if not insights:
-            # Fallback: pull first snippets from contexts
-            for c in contexts[:5]:
-                try:
-                    t = getattr(getattr(c, "text", object()), "text", None)
-                    snippet = t if isinstance(t, str) else (str(getattr(c, "text", "")))
-                    if snippet:
-                        insights.append(
-                            snippet[:160] + ("..." if len(snippet) > 160 else "")
-                        )
-                except Exception:
-                    continue
-
-        # Evidence summary: count by doc
-        ev_summary_items = [
-            f"{doc}: {len(chunks)} excerpt(s)" for doc, chunks in by_doc.items()
-        ]
-
-        # Top evidence with scores
-        scored_items = []
-        for c in contexts or []:
-            try:
-                score = getattr(c, "score", None)
-                txt_obj = getattr(c, "text", None)
-                doc = getattr(txt_obj, "doc", None) if txt_obj is not None else None
-                title = None
-                citation = None
-                if doc is not None:
-                    citation = getattr(doc, "formatted_citation", None)
-                    title = getattr(doc, "title", None) or getattr(doc, "docname", None)
-                page = getattr(c, "page", None)
-                raw_text = (
-                    getattr(txt_obj, "text", None) if txt_obj is not None else None
-                )
-                snippet = (
-                    raw_text
-                    if isinstance(raw_text, str)
-                    else (str(txt_obj) if txt_obj is not None else str(c))
-                )
-                if snippet and len(snippet) > 220:
-                    snippet = snippet[:220] + "..."
-                display = citation or title or "Unknown source"
-                scored_items.append(
-                    (
-                        score if isinstance(score, (int, float)) else None,
-                        display,
-                        page,
-                        snippet,
-                    )
-                )
-            except Exception:
-                continue
-        # Sort by score desc, None at end
-        scored_items.sort(
-            key=lambda x: (-x[0], 1) if isinstance(x[0], (int, float)) else (9999, 1)
-        )
-
         parts = [
             "<div class='pqa-panel'>",
-            "<h4>Research Intelligence</h4>",
+            "<h4>Research Intel</h4>",
             "<div><strong>Potential contradictions</strong><ul>",
         ]
         if conflict_items:
@@ -2290,62 +2698,6 @@ def build_intelligence_html(answer: str, contexts: List) -> str:
             parts.append("<li>No explicit contradictions detected across sources.</li>")
         parts.append("</ul></div>")
 
-        # Evidence conflicts view (cluster excerpts across docs)
-        try:
-            ui = app_state.get("ui_toggles", {}) or {}
-            if not bool(ui.get("show_conflicts", True)):
-                raise RuntimeError("conflicts hidden")
-            conflicts_ui: List[str] = []
-            for entity, items in list(claim_map.items())[:6]:
-                docs_for_entity = list({d for _p, _v, d in items})
-                docs_display = ", ".join([html.escape(d) for d in docs_for_entity[:4]])
-                conflicts_ui.append(
-                    f"<li><small><strong>{html.escape(entity)}</strong>: {len(docs_for_entity)} source(s) [{docs_display}{' …' if len(docs_for_entity) > 4 else ''}]</small></li>"
-                )
-            parts.append(
-                "<div style='margin-top:8px'><strong>Evidence conflicts</strong><ul>"
-            )
-            if conflicts_ui:
-                parts.extend(conflicts_ui)
-            else:
-                parts.append("<li><small>No clustered conflicts detected.</small></li>")
-            parts.append("</ul></div>")
-        except Exception:
-            pass
-
-        parts.append("<div style='margin-top:8px'><strong>Key insights</strong><ul>")
-        if insights:
-            parts.extend([f"<li>{x}</li>" for x in insights[:8]])
-        else:
-            parts.append("<li>No additional insights extracted.</li>")
-        parts.append("</ul></div>")
-
-        parts.append(
-            "<div style='margin-top:8px'><strong>Evidence summary</strong><ul>"
-        )
-        if ev_summary_items:
-            parts.extend([f"<li>{x}</li>" for x in ev_summary_items])
-        parts.append("</ul></div>")
-
-        # Render top evidence table under Research Intelligence
-        if scored_items:
-            parts.append(
-                "<div style='margin-top:8px'><strong>Top evidence (by score)</strong>"
-            )
-            parts.append("<div style='overflow-x:auto'><table class='pqa-table'>")
-            parts.append(
-                "<tr><th>Source</th><th>Score</th><th>Page</th><th>Snippet</th></tr>"
-            )
-            for score, display, page, snippet in scored_items[:10]:
-                score_str = f"{score:.3f}" if isinstance(score, (int, float)) else "-"
-                page_str = str(int(page)) if isinstance(page, (int, float)) else "-"
-                parts.append(
-                    f"<tr><td>{display}</td>"
-                    f"<td>{score_str}</td>"
-                    f"<td>{page_str}</td>"
-                    f"<td><small>{snippet}</small></td></tr>"
-                )
-            parts.append("</table></div></div>")
         # Add scientist-relevant metrics: Quality flags and Recency/Diversity
         try:
             # Quality flags
@@ -2417,7 +2769,7 @@ def build_intelligence_html(answer: str, contexts: List) -> str:
         return "".join(parts)
     except Exception as e:
         logger.warning(f"Failed to build intelligence panel: {e}")
-        return "<div class='pqa-subtle'><small class='pqa-muted'>Research Intelligence unavailable.</small></div>"
+        return "<div class='pqa-subtle'><small class='pqa-muted'>Research Intel unavailable.</small></div>"
 
 
 def build_critique_html(answer: str, contexts: List) -> str:
@@ -2613,7 +2965,10 @@ async def build_llm_or_heuristic_critique_html(
                     ]
                     cleaned_lines: List[str] = []
                     for ln in raw_lines:
-                        ln2 = re.sub(r"^\s*(?:\\\d+|\(\d+\)|\d+[\.)]|[-*•])\s+", "", ln)
+                        # Fix the regex to properly handle escaped backslash-number sequences
+                        ln2 = re.sub(
+                            r"^\s*(?:\\\\?\d+\s+|\(\d+\)|\d+[\.)]|[-*•])\s*", "", ln
+                        )
                         cleaned_lines.append(ln2)
                     items_html: List[str] = []
                     for ln in cleaned_lines[:6]:
@@ -2777,15 +3132,7 @@ async def llm_decompose_query(question: str, settings: Settings) -> Dict[str, An
 
         content_res = _extract(resp)
         content = content_res if isinstance(content_res, str) else ""
-        try:
-            # Save debug for UI panel
-            app_state["rewrite_debug"] = {
-                "system": system,
-                "user": user,
-                "raw": content,
-            }
-        except Exception:
-            pass
+
         try:
             logger.info(
                 "LLM rewrite raw response: len=%d\n%s",
@@ -2828,7 +3175,13 @@ async def llm_decompose_query(question: str, settings: Settings) -> Dict[str, An
         rewritten = str(data.get("rewritten") or question)
         filters = data.get("filters") or {}
         # Normalize filters
-        norm: Dict[str, Any] = {"venues": [], "fields": []}
+        norm: Dict[str, Any] = {
+            "venues": [],
+            "fields": [],
+            "species": [],
+            "study_types": [],
+            "outcomes": [],
+        }
         # years
         yrs = filters.get("years") if isinstance(filters, dict) else None
         if isinstance(yrs, (list, tuple)) and len(yrs) == 2:
@@ -2840,8 +3193,8 @@ async def llm_decompose_query(question: str, settings: Settings) -> Dict[str, An
                 norm["years"] = None
         else:
             norm["years"] = None
-        # venues, fields
-        for key in ("venues", "fields"):
+        # All list-based filters
+        for key in ("venues", "fields", "species", "study_types", "outcomes"):
             val = filters.get(key) if isinstance(filters, dict) else None
             if isinstance(val, list):
                 norm[key] = [str(x) for x in val if isinstance(x, (str, int, float))][
@@ -2851,11 +3204,14 @@ async def llm_decompose_query(question: str, settings: Settings) -> Dict[str, An
                 norm[key] = []
         try:
             logger.info(
-                "LLM rewrite parsed: rewritten_len=%d years=%s venues=%d fields=%d",
+                "LLM rewrite parsed: rewritten_len=%d years=%s venues=%d fields=%d species=%d study_types=%d outcomes=%d",
                 len(rewritten or ""),
                 (norm.get("years") if isinstance(norm.get("years"), list) else None),
                 len(norm.get("venues", [])),
                 len(norm.get("fields", [])),
+                len(norm.get("species", [])),
+                len(norm.get("study_types", [])),
+                len(norm.get("outcomes", [])),
             )
         except Exception:
             pass
@@ -2916,7 +3272,7 @@ def rewrite_query(question: str, settings: Settings) -> str:
     return q
 
 
-def clear_all() -> Tuple[str, str, str, str, str, str, str]:
+def clear_all() -> Tuple[str, str, str, str, str, str, str, str]:
     """Clear all uploaded documents and reset the interface."""
     app_state["uploaded_docs"] = []
     app_state["processing_status"] = ""
@@ -2927,7 +3283,7 @@ def clear_all() -> Tuple[str, str, str, str, str, str, str]:
         app_state["status_tracker"].add_status("🧹 All documents and data cleared")
 
     logger.info("Cleared all documents and reset interface")
-    return "", "", "", "", "", "", ""
+    return "", "", "", "", "", "", "", ""
 
 
 # Initialize default settings
@@ -2954,6 +3310,9 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
         .pqa-step { position: relative; display: inline-block; background: #e5e7eb; color: #111827; padding: 6px 16px 6px 16px; font-size: 12px; line-height: 1; }
         .pqa-step::before { content: ""; position: absolute; top: 0; left: -10px; width: 0; height: 0; border-top: 12px solid transparent; border-bottom: 12px solid transparent; border-right: 10px solid #e5e7eb; }
         .pqa-step::after { content: ""; position: absolute; top: 0; right: -10px; width: 0; height: 0; border-top: 12px solid transparent; border-bottom: 12px solid transparent; border-left: 10px solid #e5e7eb; }
+        .pqa-step.active { background: #3b82f6; color: white; }
+        .pqa-step.active::before { border-right-color: #3b82f6; }
+        .pqa-step.active::after { border-left-color: #3b82f6; }
         .pqa-step.done { background: #10b981; color: #ffffff; }
         .pqa-step.done::after { border-left-color: #10b981; }
         .pqa-step.done::before { border-right-color: #10b981; }
@@ -3057,14 +3416,6 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
                     value=False,
                     info="Adds a brief critique after the answer (no answer change)",
                 )
-                gr.Markdown(
-                    "<small class='pqa-muted'>Rewrite uses your configured LLM to produce a concise, retrieval‑ready version and suggest lightweight filters.</small>"
-                )
-                bias_retrieval_toggle = gr.Checkbox(
-                    label="Bias retrieval using filters",
-                    value=False,
-                    info="Append extracted filters to the rewritten query",
-                )
 
             with gr.Accordion("🧰 Curation Controls", open=False):
                 score_cutoff_slider = gr.Slider(
@@ -3100,7 +3451,7 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
 
             with gr.Accordion("💾 Saved Queries", open=False):
                 gr.HTML(
-                    "<div class='pqa-subtle'><small>Saved snapshots will appear here.</small></div>"
+                    "<div class='pqa-subtle'><small>Contact me if you need this capability.</small></div>"
                 )
 
             with gr.Accordion("📦 Export", open=False):
@@ -3121,13 +3472,19 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
 
         # Center workspace (introduce tab shell; keep current flows under Retrieval for now)
         with gr.Column(scale=2):
-            # Simple stepper above tabs (static for now)
-            gr.HTML(
-                "<div class='pqa-steps'><span class='pqa-step done'>Plan</span><span class='pqa-step'>Retrieval</span><span class='pqa-step'>Evidence</span><span class='pqa-step'>Conflicts</span><span class='pqa-step'>Synthesis</span></div>"
+            # Dynamic stepper above tabs
+            progress_steps = gr.HTML(
+                "<div class='pqa-steps'><span class='pqa-step done'>Plan & Retrieval</span><span class='pqa-step'>Evidence</span><span class='pqa-step'>Research Intel</span><span class='pqa-step'>Answer</span></div>",
+                elem_id="progress-steps",
             )
             with gr.Tabs() as center_tabs:
-                with gr.TabItem("Plan"):
-                    gr.Markdown("### 🗺️ Plan")
+                with gr.TabItem("Plan & Retrieval"):
+                    gr.Markdown("### 🗺️ Plan & 🔎 Retrieval")
+
+                    # Plan section
+                    gr.HTML(
+                        "<div style='margin-bottom: 8px;'><small class='pqa-muted'>💡 Rewrite uses your configured LLM to produce a concise, retrieval‑ready version and suggest lightweight filters.</small></div>"
+                    )
                     with gr.Row():
                         with gr.Column(scale=1):
                             question_input = gr.Textbox(
@@ -3140,38 +3497,40 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
                             rewrite_button = gr.Button("↻ Rewrite", variant="secondary")
                         with gr.Column(scale=1):
                             rewritten_textbox = gr.Textbox(
-                                label="Rewritten (editable)",
+                                label="Rewritten",
                                 placeholder="Rewritten question (placeholder)",
                                 lines=3,
                             )
                             rewrite_status = gr.HTML(
                                 value="", label="", show_label=False
                             )
-                            rewrite_debug_panel = gr.HTML(
-                                value="<div class='pqa-subtle'><small class='pqa-muted'>Rewrite debug will appear here after the first rewrite.</small></div>",
-                                label="Debug (Rewrite)",
-                                show_label=True,
-                            )
-                    # Query Used strip (will update below)
-                    query_used_strip = gr.HTML(
-                        value="<div class='pqa-subtle'><small><strong>Query Used</strong>: —</small></div>",
-                        label="",
-                        show_label=False,
+                    # Query Used - editable textbox for user to modify the final query
+                    query_used_strip = gr.Textbox(
+                        value="",
+                        label="Query Used (editable)",
+                        placeholder="The final query will appear here after rewrite...",
+                        lines=2,
+                        show_label=True,
+                        info="Edit this query to customize what will be used for retrieval",
                     )
                     with gr.Row():
                         run_button = gr.Button("🤖 Ask Question", variant="primary")
+                    # Status indicator for user guidance
+                    run_status = gr.HTML(
+                        value="<div style='text-align:center;margin-top:8px;'><small class='pqa-muted'>Ready to ask your question</small></div>",
+                        show_label=False,
+                    )
 
-                with gr.TabItem("Retrieval"):
-                    # Status display (hidden for now)
-                    status_display = gr.HTML(label="Processing Status", visible=False)
-                    # Placeholder Ask button kept hidden for wiring compatibility
-                    ask_button = gr.Button("🤖 Ask Question", visible=False)
-
+                    # Retrieval section
                     gr.Markdown("### 🔎 Live Analysis Progress")
                     inline_analysis = gr.HTML(
                         label="Analysis", show_label=False, elem_id="inline-analysis"
                     )
 
+                    # Status display (hidden for now)
+                    status_display = gr.HTML(label="Processing Status", visible=False)
+                    # Placeholder Ask button kept hidden for wiring compatibility
+                    ask_button = gr.Button("🤖 Ask Question", visible=False)
                     # Keep errors within Retrieval for now
                     error_display = gr.Textbox(
                         label="Errors", interactive=False, visible=False
@@ -3179,13 +3538,14 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
 
                 with gr.TabItem("Evidence"):
                     gr.Markdown("### 📚 Evidence")
-                    # Summary strip (placeholders)
-                    gr.HTML(
-                        "<div class='pqa-subtle'><small>Summary (placeholder): selected=—, ≥cutoff=—, venues=—, preprint share=—, years histogram=—, diversity score=—</small></div>"
+                    # Summary strip - dynamic
+                    evidence_meta_summary = gr.HTML(
+                        "<div class='pqa-subtle'><small>Summary: No evidence processed yet.</small></div>",
+                        elem_id="evidence-meta-summary",
                     )
                     with gr.Row():
                         with gr.Column(scale=1):
-                            gr.Markdown("#### Facets (placeholders)")
+                            gr.Markdown("#### Facets")
                             years_slider = gr.Slider(
                                 minimum=1990,
                                 maximum=2025,
@@ -3209,52 +3569,38 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
                                 placeholder="neurodegeneration",
                             )
                         with gr.Column(scale=2):
+                            # Evidence Summary panel
+                            evidence_summary_display = gr.HTML(
+                                label="Evidence Summary",
+                                elem_id="evidence-summary-panel",
+                            )
                             # Sources panel lives here for the reorg
                             sources_display = gr.HTML(
                                 label="Evidence Sources", elem_id="sources-panel"
                             )
-                            # Empty state hint
-                            gr.HTML(
-                                "<div class='pqa-subtle'><small>Run a query to populate evidence here.</small></div>"
-                            )
 
                 with gr.TabItem("Conflicts"):
                     gr.Markdown("### ⚖️ Conflicts")
-                    gr.HTML(
-                        """
-                        <div class='pqa-subtle'>
-                          <strong>Conflicts (placeholder)</strong>
-                          <table class='pqa-table' style='margin-top:6px'>
-                            <thead><tr><th>Entity</th><th>#mixed</th><th>Sample sources</th><th>Expand</th></tr></thead>
-                            <tbody><tr><td>—</td><td>—</td><td>—</td><td>▶</td></tr></tbody>
-                          </table>
-                        </div>
-                        """
+                    conflicts_display = gr.HTML(
+                        label="Evidence Conflicts", elem_id="conflicts-panel"
                     )
 
-                with gr.TabItem("Synthesis"):
-                    gr.Markdown("### 📝 Synthesis")
+                with gr.TabItem("Research Intel"):
+                    gr.Markdown("### 🧠 Research Intel")
+                    intelligence_display = gr.HTML(
+                        label="Research Intel", elem_id="intelligence-panel"
+                    )
+
+                with gr.TabItem("Answer"):
+                    gr.Markdown("### 📝 Answer")
                     answer_anchor = gr.HTML(
                         "<div id='pqa-answer-anchor'></div>", show_label=False
                     )
                     # Answer panel lives here for the reorg
                     answer_display = gr.HTML(label="Answer", elem_id="answer-panel")
-                    gr.HTML(
-                        "<div class='pqa-subtle'><small>Answer and Critique will render here after running a query.</small></div>"
-                    )
 
         # Right rail
         with gr.Column(scale=1):
-            # Move Research Intelligence and Metadata to right rail for reorg
-            intelligence_display = gr.HTML(
-                label="Research Intelligence", elem_id="intelligence-panel"
-            )
-            metadata_display = gr.HTML(
-                label="Processing Information", elem_id="metadata-panel"
-            )
-            gr.Markdown("### 🗒️ Session Log")
-            session_log_display = gr.HTML(label="Session Log")
-            gr.Markdown("### ⚡ Quick Actions")
             clear_button_right = gr.Button("🧹 Clear Session", variant="secondary")
 
     # Removed separate Analysis Progress tab; progress now streams inline below the question
@@ -3287,17 +3633,14 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
         fn=_on_config_change, inputs=[config_dropdown], outputs=[cfg_status]
     )
 
-    # Mirror status tracker into right-rail Session Log
+    # Mirror status tracker into right-rail Session Log with Processing Information
     def _status_to_session_log() -> str:
         try:
             st = app_state.get("status_tracker")
-            return st.get_status_html() if st else ""
+            status_html = st.get_status_html() if st else ""
+            return status_html
         except Exception:
             return ""
-
-    upload_status.change(fn=_status_to_session_log, outputs=[session_log_display])
-    # Also refresh on analysis updates by tying to inline_analysis panel value
-    inline_analysis.change(fn=_status_to_session_log, outputs=[session_log_display])
 
     # No auto-run retrieval on upload status change
 
@@ -3370,8 +3713,9 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
             question_input,
             config_dropdown,
             critique_toggle,
-            # rewrite always on via LLM
-            bias_retrieval_toggle,
+            gr.State(True),  # rewrite_query_toggle: True for original Ask button
+            gr.State(True),  # use_llm_rewrite: True for original Ask button
+            gr.State(True),  # bias_retrieval: Always enabled
             score_cutoff_slider,
             per_doc_cap_number,
             max_sources_number,
@@ -3380,18 +3724,22 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
         ],
         outputs=[
             inline_analysis,  # Retrieval tab
-            answer_display,  # Synthesis tab
+            answer_display,  # Answer tab
             sources_display,  # Evidence tab
-            metadata_display,  # Right rail
-            intelligence_display,  # Right rail
+            intelligence_display,  # Research Intel tab
             error_display,  # Retrieval tab
             status_display,  # Retrieval tab (hidden)
             ask_button,  # Retrieval tab
+            center_tabs,  # Tab switching
+            progress_steps,  # Progress chevrons
+            evidence_summary_display,  # Evidence tab
+            conflicts_display,  # Conflicts tab
+            evidence_meta_summary,  # Evidence tab summary
         ],
     )
 
     # Preview rewrite: always use LLM rewrite on the raw question (no retrieval required)
-    async def _preview_rewrite(q: str, cfg: str) -> Tuple[str, str, str, str]:
+    async def _preview_rewrite(q: str, cfg: str) -> Tuple[str, str, str]:
         try:
             settings = app_state.get("settings") or initialize_settings(cfg)
             app_state["settings"] = settings
@@ -3441,75 +3789,86 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
                 str(rewritten)[:200],
             )
 
-            # Generate debug and query used info
-            debug_html = _render_rewrite_debug()
+            # Generate the query used display
             query_used_html = _render_query_used(q)
-
-            return rewritten, banner, debug_html, query_used_html
+            return rewritten, banner, query_used_html
         except Exception:
-            fallback_query_used = _render_query_used(q)
             return (
                 q,
                 "<small class='pqa-muted'>Heuristic fallback used</small>",
-                "<div class='pqa-subtle'><small class='pqa-muted'>Debug unavailable.</small></div>",
-                fallback_query_used,
+                _render_query_used(q),
             )
 
-    # Helper to render rewrite debug block
-    def _render_rewrite_debug() -> str:
-        try:
-            dbg = app_state.get("rewrite_debug") or {}
-            sys = html.escape(str(dbg.get("system") or ""))
-            usr = html.escape(str(dbg.get("user") or ""))
-            raw = html.escape(str(dbg.get("raw") or ""))
-            if not (sys or usr or raw):
-                return "<div class='pqa-subtle'><small class='pqa-muted'>No rewrite debug yet.</small></div>"
-            return (
-                "<div class='pqa-subtle' style='white-space:pre-wrap'>"
-                "<div><strong>Prompt (system)</strong></div><pre>" + sys + "</pre>"
-                "<div><strong>Prompt (user)</strong></div><pre>" + usr + "</pre>"
-                "<div><strong>Raw response</strong></div><pre>" + raw + "</pre>"
-                "</div>"
-            )
-        except Exception:
-            return "<div class='pqa-subtle'><small class='pqa-muted'>Debug unavailable.</small></div>"
-
-    # Update the debug panel and Query Used whenever rewrite status changes
+    # Update the Query Used textbox whenever rewrite status changes
     def _render_query_used(q: str) -> str:
         try:
             # Check if we have a rewritten query in rewrite_info
             rw = (app_state.get("rewrite_info") or {}).get("rewritten")
             if isinstance(rw, str) and rw.strip():
                 # Use the rewritten query if available
-                base = rw
+                return rw
             else:
                 # Fall back to the original question
-                base = q or ""
-            txt = html.escape(base or "—")
-            return f"<div class='pqa-subtle'><small><strong>Query Used</strong>: {txt}</small></div>"
+                return q or ""
         except Exception:
-            return "<div class='pqa-subtle'><small><strong>Query Used</strong>: —</small></div>"
+            return q or ""
 
-    # Enter in Question or clicking ↻ Rewrite triggers LLM rewrite immediately and updates all panels
+    # Update progress steps based on completion status
+    def _update_progress_steps(step_completed: str = "") -> str:
+        # Define step progression logic for consolidated tabs
+        steps_order = ["", "retrieval", "evidence", "intelligence", "summary"]
+        current_index = (
+            steps_order.index(step_completed) if step_completed in steps_order else 0
+        )
+
+        steps = [
+            (
+                "Plan & Retrieval",
+                "done"
+                if current_index >= 2
+                else ("active" if current_index >= 1 else "done"),
+            ),  # Combined step
+            (
+                "Evidence",
+                "done"
+                if current_index >= 3
+                else ("active" if current_index >= 2 else ""),
+            ),
+            (
+                "Research Intel",
+                "done"
+                if current_index >= 4
+                else ("active" if current_index >= 3 else ""),
+            ),
+            (
+                "Answer",
+                "done"
+                if current_index >= 4
+                else ("active" if current_index >= 4 else ""),
+            ),
+        ]
+
+        step_html = []
+        for name, status in steps:
+            if status == "done":
+                step_html.append(f"<span class='pqa-step done'>{name}</span>")
+            elif status == "active":
+                step_html.append(f"<span class='pqa-step active'>{name}</span>")
+            else:
+                step_html.append(f"<span class='pqa-step'>{name}</span>")
+
+        return f"<div class='pqa-steps'>{''.join(step_html)}</div>"
+
+    # Enter in Question or clicking ↻ Rewrite triggers LLM rewrite immediately
     question_input.submit(
         fn=_preview_rewrite,
         inputs=[question_input, config_dropdown],
-        outputs=[
-            rewritten_textbox,
-            rewrite_status,
-            rewrite_debug_panel,
-            query_used_strip,
-        ],
+        outputs=[rewritten_textbox, rewrite_status, query_used_strip],
     )
     rewrite_button.click(
         fn=_preview_rewrite,
         inputs=[question_input, config_dropdown],
-        outputs=[
-            rewritten_textbox,
-            rewrite_status,
-            rewrite_debug_panel,
-            query_used_strip,
-        ],
+        outputs=[rewritten_textbox, rewrite_status, query_used_strip],
     )
 
     # Always use quote extraction in refinement; toggle removed
@@ -3517,15 +3876,53 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
 
     # Intentionally no automatic submit on typing/enter; use Run button only
 
-    # Plan Run button triggers same retrieval
+    # Simplified wrapper function for run button
+    def run_with_feedback(
+        *args: Any,
+    ) -> Generator[
+        Tuple[str, str, str, str, str, str, Any, Any, str, str, str, str, str],
+        None,
+        None,
+    ]:
+        """Simplified wrapper that runs ask_with_progress directly."""
+        # Update status to show processing started
+        yield (
+            "",  # inline_analysis
+            "",  # answer_display
+            "",  # sources_display
+            "",  # intelligence_display
+            "",  # error_display
+            "",  # status_display
+            gr.update(value="Processing...", interactive=False),  # ask_button
+            gr.update(),  # center_tabs - no changes needed
+            _update_progress_steps("retrieval"),  # progress_steps
+            "",  # evidence_summary_display
+            "",  # conflicts_display
+            "",  # evidence_meta_summary
+            "<div style='text-align:center;margin-top:8px;'><small style='color:#3b82f6;'>🔄 Processing your question...</small></div>",  # run_status
+        )
+
+        # Then run the actual ask_with_progress function
+        for result in ask_with_progress(*args):
+            # Add the run_status as the last element with actual completion message
+            yield result + (
+                "<div style='text-align:center;margin-top:8px;'><small style='color:#10b981;'>Check status below for progress...</small></div>",
+            )
+
+    # Plan Run button triggers same retrieval using the user-editable query
     run_button.click(
-        fn=ask_with_progress,
+        fn=run_with_feedback,
         inputs=[
-            question_input,
+            query_used_strip,  # Use the editable query instead of original question
             config_dropdown,
             critique_toggle,
-            # rewrite always on via LLM
-            bias_retrieval_toggle,
+            gr.State(
+                False
+            ),  # rewrite_query_toggle: False since user already provided final query
+            gr.State(
+                False
+            ),  # use_llm_rewrite: False since user already provided final query
+            gr.State(True),  # bias_retrieval: Always enabled
             score_cutoff_slider,
             per_doc_cap_number,
             max_sources_number,
@@ -3534,13 +3931,18 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
         ],
         outputs=[
             inline_analysis,  # Retrieval tab
-            answer_display,  # Synthesis tab
+            answer_display,  # Answer tab
             sources_display,  # Evidence tab
-            metadata_display,  # Right rail
-            intelligence_display,  # Right rail
+            intelligence_display,  # Research Intel tab
             error_display,  # Retrieval tab
             status_display,  # Retrieval tab (hidden)
             ask_button,  # Retrieval tab
+            center_tabs,  # Tab switching
+            progress_steps,  # Progress chevrons
+            evidence_summary_display,  # Evidence tab
+            conflicts_display,  # Conflicts tab
+            evidence_meta_summary,  # Evidence tab summary
+            run_status,  # Status indicator for user guidance
         ],
     )
 
@@ -3551,10 +3953,11 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
             inline_analysis,  # Retrieval tab
             answer_display,  # Synthesis tab
             sources_display,  # Evidence tab
-            metadata_display,  # Right rail
             intelligence_display,  # Right rail
             error_display,  # Retrieval tab
             status_display,  # Retrieval tab
+            evidence_summary_display,  # Evidence tab
+            conflicts_display,  # Conflicts tab
         ],
     )
 
