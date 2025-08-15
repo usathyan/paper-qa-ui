@@ -370,6 +370,7 @@ async def process_uploaded_files_async(files: List[Any]) -> Tuple[str, str]:
             )
             status_msg += "\n".join([f"  • {f}" for f in processed_files])
             status_msg += "\n\n📚 You can now ask questions about these documents!"
+            # No auto-run; Plan tab rewrite does not depend on retrieval
         else:
             status_msg = "❌ No documents were successfully processed."
 
@@ -664,10 +665,7 @@ async def process_question_async(
                             "messages": messages,
                             "timeout": 45,
                         }
-                        _or_key = os.getenv("OPENROUTER_API_KEY", "").strip()
-                        if _or_key and str(settings.llm).startswith("openrouter/"):
-                            litellm.api_base = "https://openrouter.ai/api/v1"
-                            litellm.api_key = _or_key
+                        # Respect configured LiteLLM router via environment; do not hardcode here
                         resp = await litellm.acompletion(**_kwargs)
                         content = getattr(resp, "content", None)
                         if not isinstance(content, str):
@@ -1176,6 +1174,39 @@ def _run_pre_evidence_in_thread(
                 },
                 timeout=0.1,
             )
+        except Exception:
+            pass
+        # Persist contexts for downstream rewrite (without requiring full QA synthesis)
+        try:
+            contexts = getattr(session, "contexts", []) or []
+            export_contexts = []
+            for c in contexts:
+                txt_obj = getattr(c, "text", None)
+                doc = getattr(txt_obj, "doc", None) if txt_obj is not None else None
+                title = None
+                citation = None
+                if doc is not None:
+                    citation = getattr(doc, "formatted_citation", None)
+                    title = getattr(doc, "title", None) or getattr(doc, "docname", None)
+                export_contexts.append(
+                    {
+                        "doc": citation or title or "Unknown",
+                        "page": getattr(c, "page", None),
+                        "score": getattr(c, "score", None),
+                        "text": getattr(txt_obj, "text", None)
+                        if txt_obj is not None
+                        else None,
+                    }
+                )
+            sess = app_state.get("session_data") or {}
+            sess.update(
+                {
+                    "question": question,
+                    "contexts": export_contexts,
+                    "documents_searched": len(app_state.get("uploaded_docs", [])),
+                }
+            )
+            app_state["session_data"] = sess
         except Exception:
             pass
         # Selection stats for transparency
@@ -2640,6 +2671,26 @@ async def llm_decompose_query(question: str, settings: Settings) -> Dict[str, An
             {"role": "system", "content": system},
             {"role": "user", "content": user},
         ]
+        # Log prompt details (truncate to keep logs readable)
+        try:
+            logger.info(
+                "LLM rewrite prompt: model=%s system_len=%d user_len=%d user=\n%s",
+                model_name,
+                len(system),
+                len(user),
+                (user[:2000] + ("…" if len(user) > 2000 else "")),
+            )
+            logger.info(
+                "LLM rewrite prompt (system excerpt):\n%s",
+                (system[:1000] + ("…" if len(system) > 1000 else "")),
+            )
+            logger.info(
+                "LLM rewrite call details: messages=%d timeout=%d",
+                len(messages),
+                20,
+            )
+        except Exception:
+            pass
 
         async def _go() -> Any:
             kwargs: Dict[str, Any] = {
@@ -2650,11 +2701,52 @@ async def llm_decompose_query(question: str, settings: Settings) -> Dict[str, An
             api_key = os.getenv("OPENROUTER_API_KEY", "").strip()
             if api_key and model_name.startswith("openrouter/"):
                 kwargs["api_key"] = api_key
+            try:
+                logger.info(
+                    "LiteLLM acompletion start: model=%s timeout=%s has_api_key=%s",
+                    kwargs.get("model"),
+                    kwargs.get("timeout"),
+                    bool(api_key),
+                )
+            except Exception:
+                pass
             return await litellm.acompletion(**kwargs)
 
         _ensure_query_loop()
+        _t_call = time.time()
         fut = asyncio.run_coroutine_threadsafe(_go(), app_state["query_loop"])
         resp = fut.result(timeout=45)
+        try:
+            elapsed = time.time() - _t_call
+            # choices length if present
+            choices = getattr(resp, "choices", None)
+            clen = len(choices) if isinstance(choices, list) else -1
+            logger.info("LiteLLM acompletion done in %.2fs; choices=%s", elapsed, clen)
+            usage = getattr(resp, "usage", None)
+            if isinstance(usage, dict):
+                pt = usage.get("prompt_tokens")
+                ct = usage.get("completion_tokens")
+                tt = usage.get("total_tokens")
+                logger.info(
+                    "LLM usage: prompt_tokens=%s completion_tokens=%s total_tokens=%s",
+                    pt,
+                    ct,
+                    tt,
+                )
+            else:
+                # Some providers attach usage as attributes
+                pt = getattr(usage, "prompt_tokens", None)
+                ct = getattr(usage, "completion_tokens", None)
+                tt = getattr(usage, "total_tokens", None)
+                if any(x is not None for x in (pt, ct, tt)):
+                    logger.info(
+                        "LLM usage: prompt_tokens=%s completion_tokens=%s total_tokens=%s",
+                        pt,
+                        ct,
+                        tt,
+                    )
+        except Exception:
+            pass
 
         def _extract(resp_obj: Any) -> str:
             try:
@@ -2677,24 +2769,41 @@ async def llm_decompose_query(question: str, settings: Settings) -> Dict[str, An
 
         content_res = _extract(resp)
         content = content_res if isinstance(content_res, str) else ""
+        try:
+            logger.info(
+                "LLM rewrite raw response: len=%d\n%s",
+                len(content),
+                (content[:2000] + ("…" if len(content) > 2000 else "")),
+            )
+        except Exception:
+            pass
 
         # Try to parse JSON from the content (strip code fences if present)
         txt = content.strip()
-        if txt.startswith("```"):
-            # remove leading/trailing fences
+        fenced = txt.startswith("```")
+        if fenced:
             try:
                 txt = re.sub(r"^```[a-zA-Z0-9]*\n?|```$", "", txt).strip()
-            except Exception:
-                pass
+                logger.info("LLM rewrite: stripped code fences from response")
+            except Exception as fence_err:
+                logger.info("LLM rewrite: fence strip failed: %s", fence_err)
         data: Dict[str, Any]
         try:
             data = json.loads(txt)
+            try:
+                logger.info("LLM rewrite: JSON parsed successfully")
+            except Exception:
+                pass
         except Exception:
             # attempt to find JSON substring
             try:
                 m = re.search(r"\{[\s\S]*\}$", txt)
                 if m:
                     data = json.loads(m.group(0))
+                    try:
+                        logger.info("LLM rewrite: parsed JSON from substring match")
+                    except Exception:
+                        pass
                 else:
                     data = {}
             except Exception:
@@ -2723,6 +2832,16 @@ async def llm_decompose_query(question: str, settings: Settings) -> Dict[str, An
                 ]
             else:
                 norm[key] = []
+        try:
+            logger.info(
+                "LLM rewrite parsed: rewritten_len=%d years=%s venues=%d fields=%d",
+                len(rewritten or ""),
+                (norm.get("years") if isinstance(norm.get("years"), list) else None),
+                len(norm.get("venues", [])),
+                len(norm.get("fields", [])),
+            )
+        except Exception:
+            pass
         return {"rewritten": rewritten, "filters": norm}
     except Exception:
         return {"rewritten": question, "filters": {}}
@@ -2784,6 +2903,7 @@ def clear_all() -> Tuple[str, str, str, str, str, str, str]:
     """Clear all uploaded documents and reset the interface."""
     app_state["uploaded_docs"] = []
     app_state["processing_status"] = ""
+    app_state["auto_ran_retrieval"] = False
 
     if "status_tracker" in app_state:
         app_state["status_tracker"].clear()
@@ -2928,6 +3048,11 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
                     value=False,
                     info="Append extracted filters to the rewritten query",
                 )
+                litellm_debug_toggle = gr.Checkbox(
+                    label="LiteLLM debug logs",
+                    value=False,
+                    info="Enable verbose LiteLLM router/provider logs in console",
+                )
                 gr.HTML(
                     "<div class='pqa-subtle'><small><strong>Query Used</strong> will be shown above Analysis Progress.</small></div>"
                 )
@@ -3031,7 +3156,7 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
                         "<div class='pqa-subtle'><small><strong>Query Used</strong>: (placeholder; the exact string sent downstream)</small></div>"
                     )
                     with gr.Row():
-                        run_button = gr.Button("▶ Run retrieval", variant="primary")
+                        run_button = gr.Button("🤖 Ask Question", variant="primary")
 
                 with gr.TabItem("Retrieval"):
                     # Status display (hidden for now)
@@ -3133,6 +3258,8 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
 
     # Event handlers - automatically process documents on upload
     def _pre_upload_disable() -> Any:
+        # Reset auto-run flag at the start of a new upload
+        app_state["auto_ran_retrieval"] = False
         return gr.update(value="⏳ Wait…", interactive=False)
 
     def _post_upload_enable() -> Any:
@@ -3168,6 +3295,8 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
     upload_status.change(fn=_status_to_session_log, outputs=[session_log_display])
     # Also refresh on analysis updates by tying to inline_analysis panel value
     inline_analysis.change(fn=_status_to_session_log, outputs=[session_log_display])
+
+    # No auto-run retrieval on upload status change
 
     # Export helpers
     def _ensure_exports_dir() -> Path:
@@ -3258,193 +3387,79 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
         ],
     )
 
-    # Preview rewrite on Enter without starting retrieval (LLM first, fallback heuristic)
+    # Preview rewrite: always use LLM rewrite on the raw question (no retrieval required)
     def _preview_rewrite(q: str, cfg: str) -> Tuple[str, str]:
         try:
             settings = app_state.get("settings") or initialize_settings(cfg)
             app_state["settings"] = settings
-            rewritten: str = q
-            banner: str = ""
+            # Prefer LLM decomposition on a fresh event loop to avoid conflicts
+            logger.info("Preview rewrite: attempting LLM rewrite (question-only)")
+            # Log the exact prompt we will send (outer level, before inner call)
             try:
-                # Prefer LLM decomposition on a fresh event loop to avoid conflicts
-                logger.info("Preview rewrite: attempting LLM rewrite")
-                _t0 = time.time()
-                _loop = asyncio.new_event_loop()
-                try:
-                    asyncio.set_event_loop(_loop)
-                    decomp = _loop.run_until_complete(
-                        asyncio.wait_for(llm_decompose_query(q, settings), timeout=30)
-                    )
-                finally:
-                    try:
-                        _loop.close()
-                    except Exception:
-                        pass
-                    try:
-                        asyncio.set_event_loop(None)
-                    except Exception:
-                        pass
-                rewritten = str(decomp.get("rewritten") or q)
-                app_state["rewrite_info"] = {
-                    "original": q,
-                    "rewritten": rewritten,
-                    "filters": decomp.get("filters") or {},
-                    "bias_applied": False,
-                }
-                _model_str = html.escape(str(getattr(settings, "llm", "")))
-                banner = (
-                    "<small class='pqa-muted'>LLM rewrite used"
-                    f" (model: {_model_str})</small>"
-                )
+                from .prompts import REWRITE_SYSTEM_PROMPT, REWRITE_USER_TEMPLATE
+
+                _system_dbg = REWRITE_SYSTEM_PROMPT
+                _user_dbg = REWRITE_USER_TEMPLATE.format(question=q)
                 logger.info(
-                    "Preview rewrite: LLM rewrite succeeded in %.2fs; rewritten='%s'",
-                    (time.time() - _t0),
-                    str(rewritten)[:200],
+                    "Preview rewrite prompt (outer): model=%s system_len=%d user_len=%d\n%s",
+                    str(getattr(settings, "llm", "")),
+                    len(_system_dbg),
+                    len(_user_dbg),
+                    _user_dbg[:2000] + ("…" if len(_user_dbg) > 2000 else ""),
                 )
-                # If we have prior contexts from session data, perform quote extraction + refinement
+            except Exception:
+                pass
+            _t0 = time.time()
+            _loop = asyncio.new_event_loop()
+            try:
+                asyncio.set_event_loop(_loop)
+                decomp = _loop.run_until_complete(
+                    asyncio.wait_for(llm_decompose_query(q, settings), timeout=30)
+                )
+            finally:
                 try:
-                    sess = app_state.get("session_data") or {}
-                    ctx = sess.get("contexts") or []
-                    if isinstance(ctx, list) and ctx:
-                        from .prompts import (
-                            QUOTE_EXTRACTION_SYSTEM_PROMPT,
-                            QUOTE_EXTRACTION_USER_TEMPLATE,
-                            REWRITE_FROM_QUOTES_SYSTEM_PROMPT,
-                            REWRITE_FROM_QUOTES_USER_TEMPLATE,
-                        )
-                        import litellm
-
-                        # Build passages block
-                        parts: List[str] = []
-                        for i, c in enumerate(ctx[:10000], 1):
-                            pdoc = c.get("doc") if isinstance(c, dict) else None
-                            ppage = c.get("page") if isinstance(c, dict) else None
-                            ptxt = c.get("text") if isinstance(c, dict) else None
-                            parts.append(
-                                f"id: P{i:04d} | title: {pdoc or '-'} | page: {ppage if ppage is not None else '-'}\ntext: {ptxt or ''}"
-                            )
-                        passages_block = "\n\n".join(parts)
-                        # Extract quotes
-                        msg = [
-                            {
-                                "role": "system",
-                                "content": QUOTE_EXTRACTION_SYSTEM_PROMPT,
-                            },
-                            {
-                                "role": "user",
-                                "content": QUOTE_EXTRACTION_USER_TEMPLATE.format(
-                                    question=q, passages_block=passages_block
-                                ),
-                            },
-                        ]
-                        _kwargs_qe: Dict[str, Any] = {
-                            "model": str(settings.llm),
-                            "messages": msg,
-                            "timeout": 30,
-                        }
-                        _or_key = os.getenv("OPENROUTER_API_KEY", "").strip()
-                        if _or_key and str(settings.llm).startswith("openrouter/"):
-                            litellm.api_base = "https://openrouter.ai/api/v1"
-                            litellm.api_key = _or_key
-                        # Run quote extraction synchronously to avoid await in sync context
-                        qe = await asyncio.to_thread(litellm.completion, **_kwargs_qe)
-                        qcontent = getattr(qe, "content", None)
-                        if not isinstance(qcontent, str):
-                            ch = getattr(qe, "choices", None)
-                            if isinstance(ch, list) and ch:
-                                m = getattr(ch[0], "message", None)
-                                if isinstance(m, dict):
-                                    qcontent = m.get("content")
-                                else:
-                                    qcontent = getattr(m, "content", None)
-                        quotes_block = ""
-                        try:
-                            import json as _json
-
-                            data = (
-                                _json.loads(qcontent)
-                                if isinstance(qcontent, str)
-                                else {}
-                            )
-                            quotes = data.get("quotes") or []
-                            if quotes:
-                                quotes_block = "\n".join(
-                                    [
-                                        f"- {str(it.get('quote') or '').strip()}"
-                                        for it in quotes[:10]
-                                    ]
-                                )
-                        except Exception:
-                            quotes_block = ""
-
-                        if quotes_block:
-                            # Refine the question using quotes
-                            msg2 = [
-                                {
-                                    "role": "system",
-                                    "content": REWRITE_FROM_QUOTES_SYSTEM_PROMPT,
-                                },
-                                {
-                                    "role": "user",
-                                    "content": REWRITE_FROM_QUOTES_USER_TEMPLATE.format(
-                                        question=q, quotes_block=quotes_block
-                                    ),
-                                },
-                            ]
-                            _kwargs_rq: Dict[str, Any] = {
-                                "model": str(settings.llm),
-                                "messages": msg2,
-                                "timeout": 30,
-                            }
-                            if _or_key and str(settings.llm).startswith("openrouter/"):
-                                litellm.api_base = "https://openrouter.ai/api/v1"
-                                litellm.api_key = _or_key
-                            rq = await asyncio.to_thread(
-                                litellm.completion, **_kwargs_rq
-                            )
-                            rcontent = getattr(rq, "content", None)
-                            if not isinstance(rcontent, str):
-                                ch2 = getattr(rq, "choices", None)
-                                if isinstance(ch2, list) and ch2:
-                                    m2 = getattr(ch2[0], "message", None)
-                                    if isinstance(m2, dict):
-                                        rcontent = m2.get("content")
-                                    else:
-                                        rcontent = getattr(m2, "content", None)
-                            if isinstance(rcontent, str) and rcontent.strip():
-                                refined_line = rcontent.strip().splitlines()[0]
-                                logger.info(
-                                    "Refined-from-quotes: '%s'", refined_line[:200]
-                                )
-                                rewritten = refined_line
+                    _loop.close()
                 except Exception:
                     pass
-            except Exception as e:
-                # Fallback to heuristic
-                rewritten = rewrite_query(q, settings)
-                app_state["rewrite_info"] = {
-                    "original": q,
-                    "rewritten": rewritten,
-                    "filters": {},
-                    "bias_applied": False,
-                }
-                reason = html.escape(str(e))[:120]
-                logger.warning(
-                    "Preview rewrite: LLM failed, heuristic used: %s", reason
+                try:
+                    asyncio.set_event_loop(None)
+                except Exception:
+                    pass
+            rewritten = str(decomp.get("rewritten") or q)
+            try:
+                logger.info(
+                    "Preview rewrite result (outer): rewritten_len=%d filters_keys=%s",
+                    len(rewritten or ""),
+                    list((decomp.get("filters") or {}).keys()),
                 )
-                if not banner:
-                    banner = f"<small class='pqa-muted'>Heuristic fallback used (reason: {reason})</small>"
+            except Exception:
+                pass
+            app_state["rewrite_info"] = {
+                "original": q,
+                "rewritten": rewritten,
+                "filters": decomp.get("filters") or {},
+                "bias_applied": False,
+            }
+            _model_str = html.escape(str(getattr(settings, "llm", "")))
+            banner = (
+                "<small class='pqa-muted'>LLM rewrite used"
+                f" (model: {_model_str})</small>"
+            )
+            logger.info(
+                "Preview rewrite: LLM rewrite succeeded in %.2fs; rewritten='%s'",
+                (time.time() - _t0),
+                str(rewritten)[:200],
+            )
             return rewritten, banner
         except Exception:
             return q, "<small class='pqa-muted'>Heuristic fallback used</small>"
 
+    # Enter in Question or clicking ↻ Rewrite triggers LLM rewrite immediately
     question_input.submit(
         fn=_preview_rewrite,
         inputs=[question_input, config_dropdown],
         outputs=[rewritten_textbox, rewrite_status],
     )
-
-    # Dedicated Rewrite button (LLM first, fallback heuristic)
     rewrite_button.click(
         fn=_preview_rewrite,
         inputs=[question_input, config_dropdown],
@@ -3453,6 +3468,25 @@ with gr.Blocks(title="Paper-QA UI", theme=gr.themes.Soft()) as demo:
 
     # Always use quote extraction in refinement; toggle removed
     app_state["use_quote_extraction"] = True
+
+    # Toggle LiteLLM debug logging at runtime
+    def _set_litellm_debug(on: bool) -> str:
+        try:
+            if on:
+                os.environ["LITELLM_LOG"] = "DEBUG"
+                logging.getLogger("litellm").setLevel(logging.DEBUG)
+                logging.getLogger("LiteLLM").setLevel(logging.DEBUG)
+            else:
+                os.environ.pop("LITELLM_LOG", None)
+                logging.getLogger("litellm").setLevel(logging.INFO)
+                logging.getLogger("LiteLLM").setLevel(logging.INFO)
+        except Exception:
+            pass
+        return ""
+
+    litellm_debug_toggle.change(
+        fn=_set_litellm_debug, inputs=[litellm_debug_toggle], outputs=[cfg_status]
+    )
 
     # Intentionally no automatic submit on typing/enter; use Run button only
 
