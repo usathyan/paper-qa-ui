@@ -26,41 +26,45 @@ Paper-QA UI is a sophisticated web interface that transforms the [Paper-QA](http
 ### High-Level System Architecture
 
 ```mermaid
-graph LR
-    subgraph "UI Layer"
-        UPLOAD[📁 Upload]
-        QUERY[❓ Question]
-        DISPLAY[📊 Results]
+graph TB
+    subgraph "🎯 User Interface"
+        UPLOAD[📁 Document Upload]
+        QUERY[❓ Question Input]
+        DISPLAY[📊 Results Display]
     end
     
-    subgraph "Processing"
-        INDEX[📚 Index]
-        SEARCH[🔍 Search]
-        ANSWER[💡 Answer]
-        INTELL[🧠 Intelligence]
+    subgraph "⚙️ Core Processing"
+        INDEX[📚 Document Indexing]
+        SEARCH[🔍 Evidence Retrieval]
+        ANSWER[💡 Answer Generation]
+        INTELL[🧠 Intelligence Analysis]
     end
     
-    subgraph "Data"
-        CORPUS[📖 Corpus]
-        VECTORS[🔢 Vectors]
+    subgraph "💾 Data Storage"
+        CORPUS[📖 Document Corpus]
+        VECTORS[🔢 Embedding Vectors]
+        METADATA[📋 Document Metadata]
     end
     
-    subgraph "Services"
-        LLM[🤖 LLM]
-        EMB[🔤 Embeddings]
+    subgraph "🌐 External Services"
+        LLM[🤖 LLM Services]
+        EMB[🔤 Embedding Services]
     end
     
     UPLOAD --> INDEX
     QUERY --> SEARCH
-    INDEX --> CORPUS
-    SEARCH --> VECTORS
-    SEARCH --> ANSWER
-    ANSWER --> INTELL
-    INTELL --> DISPLAY
     
+    INDEX --> CORPUS
     INDEX --> LLM
+    
+    SEARCH --> VECTORS
     SEARCH --> EMB
+    SEARCH --> ANSWER
+    
+    ANSWER --> INTELL
     ANSWER --> LLM
+    
+    INTELL --> DISPLAY
 ```
 
 ### End-to-End Data Flow
