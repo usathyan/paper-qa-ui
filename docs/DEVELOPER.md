@@ -19,44 +19,6 @@
 ## System Overview
 
 Paper-QA UI is a sophisticated web interface that transforms the [Paper-QA](https://github.com/Future-House/paper-qa) library into an intuitive, research-focused application. It provides high-accuracy Retrieval Augmented Generation (RAG) capabilities for scientific document analysis with real-time transparency and comprehensive evidence curation.
-
-### Key Design Principles
-
-- **Research-First**: Optimized for scientific literature analysis workflows
-- **Transparency**: Real-time progress tracking and evidence traceability
-- **Usability**: Streamlined interface with opinionated defaults
-- **Performance**: Local-first architecture with cloud fallbacks
-- **Extensibility**: Modular design for future enhancements
-
-### Technology Stack
-
-```mermaid
-graph TB
-    subgraph "Frontend Layer"
-        G[Gradio 5.x] --> UI[Modern Web UI]
-        UI --> RT[Real-time Updates]
-        UI --> RP[Responsive Design]
-    end
-    
-    subgraph "Backend Layer"
-        PQ[Paper-QA v5.27.0+] --> RAG[RAG Pipeline]
-        PQ --> PDF[PDF Parsing]
-        PQ --> EMB[Embeddings]
-        PQ --> LLM[LLM Integration]
-    end
-    
-    subgraph "Infrastructure"
-        OLL[Ollama] --> LOCAL[Local Models]
-        OR[OpenRouter] --> CLOUD[Cloud LLMs]
-        ASYNC[AsyncIO] --> THREAD[Background Threading]
-    end
-    
-    G --> PQ
-    PQ --> OLL
-    PQ --> OR
-    PQ --> ASYNC
-```
-
 ---
 
 ## Architecture & Data Flow
@@ -64,48 +26,41 @@ graph TB
 ### High-Level System Architecture
 
 ```mermaid
-graph TB
-    subgraph "User Interface Layer"
-        UPLOAD[Document Upload]
-        QUERY[Question Input]
-        REWRITE[Query Rewrite]
-        DISPLAY[Results Display]
+graph LR
+    subgraph "UI Layer"
+        UPLOAD[📁 Upload]
+        QUERY[❓ Question]
+        DISPLAY[📊 Results]
     end
     
-    subgraph "Processing Layer"
-        INDEX[Document Indexing]
-        SEARCH[Evidence Retrieval]
-        ANSWER[Answer Generation]
-        INTELL[Intelligence Analysis]
+    subgraph "Processing"
+        INDEX[📚 Index]
+        SEARCH[🔍 Search]
+        ANSWER[💡 Answer]
+        INTELL[🧠 Intelligence]
     end
     
-    subgraph "Data Layer"
-        CORPUS[In-Memory Docs Corpus]
-        VECTORS[Embedding Vectors]
-        METADATA[Document Metadata]
-        SESSION[Session State]
+    subgraph "Data"
+        CORPUS[📖 Corpus]
+        VECTORS[🔢 Vectors]
     end
     
-    subgraph "External Services"
-        LLM_SVC[LLM Services]
-        EMB_SVC[Embedding Services]
-        STORAGE[File Storage]
+    subgraph "Services"
+        LLM[🤖 LLM]
+        EMB[🔤 Embeddings]
     end
     
     UPLOAD --> INDEX
+    QUERY --> SEARCH
     INDEX --> CORPUS
-    QUERY --> REWRITE
-    REWRITE --> SEARCH
-    SEARCH --> CORPUS
     SEARCH --> VECTORS
     SEARCH --> ANSWER
     ANSWER --> INTELL
     INTELL --> DISPLAY
     
-    INDEX --> LLM_SVC
-    SEARCH --> EMB_SVC
-    ANSWER --> LLM_SVC
-    UPLOAD --> STORAGE
+    INDEX --> LLM
+    SEARCH --> EMB
+    ANSWER --> LLM
 ```
 
 ### End-to-End Data Flow
@@ -144,41 +99,6 @@ sequenceDiagram
     UI-->>U: Display results
 ```
 
-### Threading and Execution Model
-
-```mermaid
-graph LR
-    subgraph "Main Thread"
-        UI[Gradio UI]
-        STATE[State Management]
-    end
-    
-    subgraph "Background Thread"
-        LOOP[AsyncIO Event Loop]
-        PQ_CALLS[Paper-QA Calls]
-        LLM_IO[LLM I/O]
-        EMB_IO[Embedding I/O]
-    end
-    
-    subgraph "Thread Communication"
-        QUEUE[Task Queue]
-        CALLBACK[Progress Callbacks]
-        RESULT[Result Updates]
-    end
-    
-    UI --> QUEUE
-    QUEUE --> LOOP
-    LOOP --> PQ_CALLS
-    PQ_CALLS --> LLM_IO
-    PQ_CALLS --> EMB_IO
-    LOOP --> CALLBACK
-    CALLBACK --> UI
-    LOOP --> RESULT
-    RESULT --> STATE
-```
-
----
-
 ## User Requirements Traceability
 
 This section maps user requirements from the README to functional and system requirements, down to specific function calls.
@@ -203,143 +123,6 @@ This section maps user requirements from the README to functional and system req
 | **Section 5: Operational Constraints** | Single query lock | Concurrency control | `src/ui/paperqa2_ui.py` | `_query_lock` |
 | | Local-first processing | Resource management | `src/ui/paperqa2_ui.py` | `initialize_settings()` |
 
-### Detailed Traceability Flow
-
-```mermaid
-graph TB
-    subgraph "User Requirements (README)"
-        UR1[Document Intake]
-        UR2[Configuration]
-        UR3[Tab Structure]
-        UR4[Default Behaviors]
-        UR5[Operational Constraints]
-    end
-    
-    subgraph "Functional Requirements"
-        FR1[File Upload & Indexing]
-        FR2[Query Processing]
-        FR3[Evidence Retrieval]
-        FR4[Answer Generation]
-        FR5[Intelligence Analysis]
-        FR6[UI State Management]
-    end
-    
-    subgraph "System Requirements"
-        SR1[Async Processing]
-        SR2[Thread Safety]
-        SR3[Error Handling]
-        SR4[Performance Optimization]
-        SR5[Configuration Management]
-        SR6[State Persistence]
-    end
-    
-    subgraph "Implementation"
-        IMP1[process_uploaded_files_async]
-        IMP2[process_question_async]
-        IMP3[ask_with_progress]
-        IMP4[build_evidence_meta_summary_html]
-        IMP5[build_intelligence_html]
-        IMP6[format_answer_html]
-    end
-    
-    UR1 --> FR1
-    UR2 --> FR2
-    UR3 --> FR3
-    UR4 --> FR4
-    UR5 --> FR5
-    
-    FR1 --> SR1
-    FR2 --> SR2
-    FR3 --> SR3
-    FR4 --> SR4
-    FR5 --> SR5
-    FR6 --> SR6
-    
-    SR1 --> IMP1
-    SR2 --> IMP2
-    SR3 --> IMP3
-    SR4 --> IMP4
-    SR5 --> IMP5
-    SR6 --> IMP6
-```
-
----
-
-## Core Implementation
-
-### File Structure and Organization
-
-```mermaid
-graph TB
-    subgraph "Source Code Structure"
-        subgraph "UI Layer"
-            UI_MAIN[paperqa2_ui.py]
-            UI_PROMPTS[prompts.py]
-            UI_CONFIG[config_ui.py]
-        end
-        
-        subgraph "Core Layer"
-            CORE_CONFIG[config_manager.py]
-            CORE_UTILS[utils.py]
-            CORE_CLI[cli/]
-        end
-        
-        subgraph "Configuration"
-            CONFIG_JSON[configs/*.json]
-            CONFIG_ENV[.env]
-        end
-        
-        subgraph "Data"
-            DATA_PAPERS[papers/]
-            DATA_LOGS[logs/]
-            DATA_EXPORTS[exports/]
-        end
-    end
-    
-    UI_MAIN --> CORE_CONFIG
-    UI_MAIN --> CORE_UTILS
-    UI_PROMPTS --> UI_MAIN
-    CORE_CONFIG --> CONFIG_JSON
-    CORE_CONFIG --> CONFIG_ENV
-    UI_MAIN --> DATA_PAPERS
-    UI_MAIN --> DATA_LOGS
-    UI_MAIN --> DATA_EXPORTS
-```
-
-### State Management Architecture
-
-```mermaid
-graph LR
-    subgraph "Application State"
-        STATE_DOCS[Documents Corpus]
-        STATE_SETTINGS[Settings]
-        STATE_SESSION[Session Data]
-        STATE_UI[UI State]
-        STATE_PROGRESS[Progress Tracking]
-    end
-    
-    subgraph "State Operations"
-        OP_INIT[Initialize]
-        OP_UPDATE[Update]
-        OP_CLEAR[Clear]
-        OP_PERSIST[Persist]
-    end
-    
-    subgraph "State Consumers"
-        UI_COMPONENTS[UI Components]
-        PROCESSING[Processing Pipeline]
-        EXPORT[Export Functions]
-    end
-    
-    STATE_DOCS --> OP_INIT
-    STATE_SETTINGS --> OP_UPDATE
-    STATE_SESSION --> OP_CLEAR
-    STATE_UI --> OP_PERSIST
-    
-    OP_INIT --> UI_COMPONENTS
-    OP_UPDATE --> PROCESSING
-    OP_CLEAR --> EXPORT
-```
 
 ### Key Implementation Patterns
 
