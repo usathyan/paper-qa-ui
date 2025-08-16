@@ -193,36 +193,36 @@ def initialize_settings(config_name: str = "optimized_ollama") -> Settings:
 ### Configuration Architecture
 
 ```mermaid
-graph TB
-    subgraph "Configuration Sources"
-        JSON_CONFIG[configs/*.json]
-        ENV_VARS[Environment Variables]
-        DEFAULTS[System Defaults]
+graph LR
+    subgraph "Sources"
+        JSON[📄 JSON Config]
+        ENV[🔧 Env Vars]
+        DEF[⚙️ Defaults]
     end
     
-    subgraph "Configuration Processing"
-        LOAD[load_config]
-        VALIDATE[validate_config]
-        CONVERT[config_to_settings]
-        MERGE[merge_defaults]
+    subgraph "Processing"
+        LOAD[📥 Load]
+        VAL[✅ Validate]
+        CONV[🔄 Convert]
+        MERGE[🔗 Merge]
     end
     
-    subgraph "Configuration Output"
-        SETTINGS[Paper-QA Settings]
-        UI_CONFIG[UI Configuration]
-        RUNTIME_CONFIG[Runtime Settings]
+    subgraph "Output"
+        SETTINGS[⚙️ Settings]
+        UI[🖥️ UI Config]
+        RUNTIME[🚀 Runtime]
     end
     
-    JSON_CONFIG --> LOAD
-    ENV_VARS --> LOAD
-    DEFAULTS --> MERGE
+    JSON --> LOAD
+    ENV --> LOAD
+    DEF --> MERGE
     
-    LOAD --> VALIDATE
-    VALIDATE --> CONVERT
-    CONVERT --> MERGE
+    LOAD --> VAL
+    VAL --> CONV
+    CONV --> MERGE
     MERGE --> SETTINGS
-    MERGE --> UI_CONFIG
-    MERGE --> RUNTIME_CONFIG
+    MERGE --> UI
+    MERGE --> RUNTIME
 ```
 
 ### Configuration Profiles
