@@ -83,13 +83,14 @@ flowchart TD
 
 ```mermaid
 sequenceDiagram
-    participant U as User
-    participant UI as Gradio UI
-    participant AS as AsyncIO Loop
-    participant PQ as Paper-QA
-    participant LLM as LLM Service
-    participant EMB as Embedding Service
+    participant U as 👤 User
+    participant UI as 🖥️ Gradio UI
+    participant AS as ⚡ AsyncIO Loop
+    participant PQ as 🧠 Paper-QA
+    participant LLM as 🤖 LLM Service
+    participant EMB as 🔤 Embedding Service
     
+    Note over U,EMB: 📄 Document Upload Phase
     U->>UI: Upload PDFs
     UI->>AS: process_uploaded_files_async()
     AS->>PQ: Docs.aadd()
@@ -98,17 +99,22 @@ sequenceDiagram
     PQ-->>AS: Indexed documents
     AS-->>UI: Upload complete
     
+    Note over U,EMB: ❓ Question Processing Phase
     U->>UI: Enter question
     U->>UI: Click "Ask Question"
     UI->>AS: process_question_async()
     AS->>PQ: llm_decompose_query()
     PQ->>LLM: Query rewrite request
     LLM-->>PQ: Rewritten query + filters
+    
+    Note over U,EMB: 🔍 Evidence Retrieval Phase
     AS->>PQ: Docs.aquery()
     PQ->>EMB: Retrieve relevant chunks
     EMB-->>PQ: Evidence contexts
     PQ->>LLM: Generate answer
     LLM-->>PQ: Formatted answer
+    
+    Note over U,EMB: 🧠 Intelligence Analysis Phase
     AS->>PQ: Build intelligence analysis
     PQ-->>AS: Complete response
     AS-->>UI: Update UI components
@@ -209,36 +215,44 @@ def initialize_settings(config_name: str = "optimized_ollama") -> Settings:
 ### Configuration Architecture
 
 ```mermaid
-graph LR
-    subgraph "Sources"
-        JSON[📄 JSON Config]
-        ENV[🔧 Env Vars]
-        DEF[⚙️ Defaults]
-    end
+flowchart LR
+    %% Sources
+    JSON[📄 JSON Config]
+    ENV[🔧 Env Vars]
+    DEF[⚙️ Defaults]
     
-    subgraph "Processing"
-        LOAD[📥 Load]
-        VAL[✅ Validate]
-        CONV[🔄 Convert]
-        MERGE[🔗 Merge]
-    end
+    %% Processing Pipeline
+    LOAD[📥 Load]
+    VAL[✅ Validate]
+    CONV[🔄 Convert]
+    MERGE[🔗 Merge]
     
-    subgraph "Output"
-        SETTINGS[⚙️ Settings]
-        UI[🖥️ UI Config]
-        RUNTIME[🚀 Runtime]
-    end
+    %% Output
+    SETTINGS[⚙️ Settings]
+    UI[🖥️ UI Config]
+    RUNTIME[🚀 Runtime]
     
-    JSON --> LOAD
-    ENV --> LOAD
-    DEF --> MERGE
+    %% Flow
+    JSON ==> LOAD
+    ENV ==> LOAD
+    DEF ==> MERGE
     
-    LOAD --> VAL
-    VAL --> CONV
-    CONV --> MERGE
-    MERGE --> SETTINGS
-    MERGE --> UI
-    MERGE --> RUNTIME
+    LOAD ==> VAL
+    VAL ==> CONV
+    CONV ==> MERGE
+    
+    MERGE ==> SETTINGS
+    MERGE ==> UI
+    MERGE ==> RUNTIME
+    
+    %% Styling
+    classDef sourceStyle fill:#166534,stroke:#4ade80,stroke-width:2px,color:#ffffff
+    classDef processStyle fill:#581c87,stroke:#a855f7,stroke-width:2px,color:#ffffff
+    classDef outputStyle fill:#1e3a8a,stroke:#60a5fa,stroke-width:2px,color:#ffffff
+    
+    class JSON,ENV,DEF sourceStyle
+    class LOAD,VAL,CONV,MERGE processStyle
+    class SETTINGS,UI,RUNTIME outputStyle
 ```
 
 ### Configuration Profiles
@@ -277,26 +291,37 @@ graph LR
 ### Configuration Validation
 
 ```mermaid
-graph LR
-    subgraph "Validation Steps"
-        V1[Schema Validation]
-        V2[Required Fields]
-        V3[Value Ranges]
-        V4[Dependencies]
-    end
+flowchart LR
+    %% Validation Pipeline
+    V1[📋 Schema Validation]
+    V2[✅ Required Fields]
+    V3[📊 Value Ranges]
+    V4[🔗 Dependencies]
     
-    subgraph "Validation Results"
-        SUCCESS[Valid Config]
-        ERROR[Validation Error]
-        WARNING[Warning]
-    end
+    %% Results
+    SUCCESS[✅ Valid Config]
+    ERROR[❌ Validation Error]
+    WARNING[⚠️ Warning]
     
-    V1 --> V2
-    V2 --> V3
-    V3 --> V4
-    V4 --> SUCCESS
-    V4 --> ERROR
-    V4 --> WARNING
+    %% Flow
+    V1 ==> V2
+    V2 ==> V3
+    V3 ==> V4
+    
+    V4 ==> SUCCESS
+    V4 ==> ERROR
+    V4 ==> WARNING
+    
+    %% Styling
+    classDef validationStyle fill:#581c87,stroke:#a855f7,stroke-width:2px,color:#ffffff
+    classDef successStyle fill:#166534,stroke:#4ade80,stroke-width:2px,color:#ffffff
+    classDef errorStyle fill:#dc2626,stroke:#f87171,stroke-width:2px,color:#ffffff
+    classDef warningStyle fill:#ea580c,stroke:#fb923c,stroke-width:2px,color:#ffffff
+    
+    class V1,V2,V3,V4 validationStyle
+    class SUCCESS successStyle
+    class ERROR errorStyle
+    class WARNING warningStyle
 ```
 
 ---
