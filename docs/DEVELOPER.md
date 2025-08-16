@@ -331,119 +331,153 @@ flowchart LR
 ### UI Component Hierarchy
 
 ```mermaid
-graph TB
-    subgraph "Main Interface"
-        MAIN[Gradio Interface]
-        
-        subgraph "Left Panel"
-            UPLOAD[Document Upload]
-            CONFIG[Configuration]
-            CONTROLS[Query Controls]
-            EXPORT[Export Options]
-        end
-        
-        subgraph "Center Panel"
-            TABS[Tab Container]
-            
-            subgraph "Tab 1: Plan & Retrieval"
-                QUESTION[Question Input]
-                REWRITE[Rewrite Button]
-                PROGRESS[Analysis Progress]
-            end
-            
-            subgraph "Tab 2: Evidence"
-                SUMMARY[Evidence Summary]
-                FACETS[Facets Panel]
-                SOURCES[Evidence Sources]
-                TOP_EVIDENCE[Top Evidence]
-            end
-            
-            subgraph "Tab 3: Conflicts"
-                QUALITY[Quality Issues]
-                CONFLICTS[Relevance Conflicts]
-                INSIGHTS[Key Insights]
-            end
-            
-            subgraph "Tab 4: Research Intel"
-                CONTRADICTIONS[Potential Contradictions]
-                FLAGS[Quality Flags]
-                DIVERSITY[Diversity & Recency]
-                CRITIQUE[Critique]
-            end
-            
-            subgraph "Tab 5: Answer"
-                ANSWER_DISPLAY[Answer Display]
-            end
-        end
-        
-        subgraph "Right Panel"
-            LIVE_PROGRESS[Live Analysis Progress]
-        end
-    end
+flowchart TD
+    %% Main Interface
+    MAIN[🖥️ Gradio Interface]
     
-    MAIN --> UPLOAD
-    MAIN --> CONFIG
-    MAIN --> TABS
-    MAIN --> LIVE_PROGRESS
+    %% Left Panel Components
+    UPLOAD[📁 Document Upload]
+    CONFIG[⚙️ Configuration]
+    CONTROLS[🎛️ Query Controls]
+    EXPORT[💾 Export Options]
     
-    TABS --> QUESTION
-    TABS --> SUMMARY
-    TABS --> QUALITY
-    TABS --> CONTRADICTIONS
-    TABS --> ANSWER_DISPLAY
+    %% Center Panel - Tab Container
+    TABS[📋 Tab Container]
+    
+    %% Tab 1: Plan & Retrieval
+    QUESTION[❓ Question Input]
+    REWRITE[✏️ Rewrite Button]
+    PROGRESS[📊 Analysis Progress]
+    
+    %% Tab 2: Evidence
+    SUMMARY[📈 Evidence Summary]
+    FACETS[🏷️ Facets Panel]
+    SOURCES[📄 Evidence Sources]
+    TOP_EVIDENCE[⭐ Top Evidence]
+    
+    %% Tab 3: Conflicts
+    QUALITY[🔍 Quality Issues]
+    CONFLICTS[⚠️ Relevance Conflicts]
+    INSIGHTS[💡 Key Insights]
+    
+    %% Tab 4: Research Intel
+    CONTRADICTIONS[🔀 Potential Contradictions]
+    FLAGS[🚩 Quality Flags]
+    DIVERSITY[📊 Diversity & Recency]
+    CRITIQUE[📝 Critique]
+    
+    %% Tab 5: Answer
+    ANSWER_DISPLAY[📋 Answer Display]
+    
+    %% Right Panel
+    LIVE_PROGRESS[⚡ Live Analysis Progress]
+    
+    %% Main Structure
+    MAIN ==> UPLOAD
+    MAIN ==> CONFIG
+    MAIN ==> CONTROLS
+    MAIN ==> EXPORT
+    MAIN ==> TABS
+    MAIN ==> LIVE_PROGRESS
+    
+    %% Tab Content
+    TABS ==> QUESTION
+    TABS ==> REWRITE
+    TABS ==> PROGRESS
+    
+    TABS ==> SUMMARY
+    TABS ==> FACETS
+    TABS ==> SOURCES
+    TABS ==> TOP_EVIDENCE
+    
+    TABS ==> QUALITY
+    TABS ==> CONFLICTS
+    TABS ==> INSIGHTS
+    
+    TABS ==> CONTRADICTIONS
+    TABS ==> FLAGS
+    TABS ==> DIVERSITY
+    TABS ==> CRITIQUE
+    
+    TABS ==> ANSWER_DISPLAY
+    
+    %% Styling
+    classDef mainStyle fill:#1e3a8a,stroke:#60a5fa,stroke-width:3px,color:#ffffff
+    classDef leftPanelStyle fill:#166534,stroke:#4ade80,stroke-width:2px,color:#ffffff
+    classDef tabStyle fill:#581c87,stroke:#a855f7,stroke-width:2px,color:#ffffff
+    classDef contentStyle fill:#ea580c,stroke:#fb923c,stroke-width:2px,color:#ffffff
+    classDef rightPanelStyle fill:#dc2626,stroke:#f87171,stroke-width:2px,color:#ffffff
+    
+    class MAIN mainStyle
+    class UPLOAD,CONFIG,CONTROLS,EXPORT leftPanelStyle
+    class TABS tabStyle
+    class QUESTION,REWRITE,PROGRESS,SUMMARY,FACETS,SOURCES,TOP_EVIDENCE,QUALITY,CONFLICTS,INSIGHTS,CONTRADICTIONS,FLAGS,DIVERSITY,CRITIQUE,ANSWER_DISPLAY contentStyle
+    class LIVE_PROGRESS rightPanelStyle
 ```
 
 ### UI State Management
 
 ```mermaid
-graph LR
-    subgraph "UI State"
-        STATE_QUESTION[Question State]
-        STATE_PROGRESS[Progress State]
-        STATE_RESULTS[Results State]
-        STATE_CONFIG[Config State]
-    end
+flowchart LR
+    %% State Storage
+    STATE_QUESTION[❓ Question State]
+    STATE_PROGRESS[📊 Progress State]
+    STATE_RESULTS[📋 Results State]
+    STATE_CONFIG[⚙️ Config State]
     
-    subgraph "State Updates"
-        UPDATE_QUESTION[Question Change]
-        UPDATE_PROGRESS[Progress Update]
-        UPDATE_RESULTS[Results Ready]
-        UPDATE_CONFIG[Config Change]
-    end
+    %% State Updates
+    UPDATE_QUESTION[🔄 Question Change]
+    UPDATE_PROGRESS[⚡ Progress Update]
+    UPDATE_RESULTS[✅ Results Ready]
+    UPDATE_CONFIG[🔧 Config Change]
     
-    subgraph "UI Components"
-        COMP_QUESTION[Question Input]
-        COMP_PROGRESS[Progress Display]
-        COMP_RESULTS[Results Display]
-        COMP_CONFIG[Config Panel]
-    end
+    %% UI Components
+    COMP_QUESTION[💬 Question Input]
+    COMP_PROGRESS[📈 Progress Display]
+    COMP_RESULTS[📊 Results Display]
+    COMP_CONFIG[🎛️ Config Panel]
     
-    STATE_QUESTION --> UPDATE_QUESTION
-    STATE_PROGRESS --> UPDATE_PROGRESS
-    STATE_RESULTS --> UPDATE_RESULTS
-    STATE_CONFIG --> UPDATE_CONFIG
+    %% Flow
+    STATE_QUESTION ==> UPDATE_QUESTION
+    STATE_PROGRESS ==> UPDATE_PROGRESS
+    STATE_RESULTS ==> UPDATE_RESULTS
+    STATE_CONFIG ==> UPDATE_CONFIG
     
-    UPDATE_QUESTION --> COMP_QUESTION
-    UPDATE_PROGRESS --> COMP_PROGRESS
-    UPDATE_RESULTS --> COMP_RESULTS
-    UPDATE_CONFIG --> COMP_CONFIG
+    UPDATE_QUESTION ==> COMP_QUESTION
+    UPDATE_PROGRESS ==> COMP_PROGRESS
+    UPDATE_RESULTS ==> COMP_RESULTS
+    UPDATE_CONFIG ==> COMP_CONFIG
+    
+    %% Styling
+    classDef stateStyle fill:#1e3a8a,stroke:#60a5fa,stroke-width:2px,color:#ffffff
+    classDef updateStyle fill:#581c87,stroke:#a855f7,stroke-width:2px,color:#ffffff
+    classDef componentStyle fill:#166534,stroke:#4ade80,stroke-width:2px,color:#ffffff
+    
+    class STATE_QUESTION,STATE_PROGRESS,STATE_RESULTS,STATE_CONFIG stateStyle
+    class UPDATE_QUESTION,UPDATE_PROGRESS,UPDATE_RESULTS,UPDATE_CONFIG updateStyle
+    class COMP_QUESTION,COMP_PROGRESS,COMP_RESULTS,COMP_CONFIG componentStyle
 ```
 
 ### Event Flow Architecture
 
 ```mermaid
 sequenceDiagram
-    participant U as User
-    participant UI as UI Components
-    participant EH as Event Handlers
-    participant AS as AsyncIO Loop
-    participant PQ as Paper-QA
+    participant U as 👤 User
+    participant UI as 🖥️ UI Components
+    participant EH as ⚡ Event Handlers
+    participant AS as 🔄 AsyncIO Loop
+    participant PQ as 🧠 Paper-QA
     
+    Note over U,PQ: 🎯 User Interaction Flow
     U->>UI: Interact with component
     UI->>EH: Trigger event
+    
+    Note over U,PQ: ⚡ Async Processing
     EH->>AS: Schedule async task
     AS->>PQ: Execute operation
     PQ-->>AS: Return result
+    
+    Note over U,PQ: 🔄 UI Update Cycle
     AS->>EH: Update callback
     EH->>UI: Update component
     UI-->>U: Display result
@@ -456,57 +490,66 @@ sequenceDiagram
 ### Query Processing Flow
 
 ```mermaid
-graph TB
-    subgraph "Input Processing"
-        QUESTION[User Question]
-        CONFIG[Configuration]
-        CONTEXT[Session Context]
-    end
+flowchart TD
+    %% Input Processing
+    QUESTION[❓ User Question]
+    CONFIG[⚙️ Configuration]
+    CONTEXT_IN[📋 Session Context]
     
-    subgraph "Query Rewriting"
-        REWRITE[LLM Rewrite]
-        FILTERS[Filter Extraction]
-        ENHANCE[Query Enhancement]
-    end
+    %% Query Rewriting
+    REWRITE[🤖 LLM Rewrite]
+    FILTERS[🏷️ Filter Extraction]
+    ENHANCE[✨ Query Enhancement]
     
-    subgraph "Document Retrieval"
-        SEARCH[Vector Search]
-        MMR[MMR Selection]
-        RANK[Relevance Ranking]
-    end
+    %% Document Retrieval
+    SEARCH[🔍 Vector Search]
+    MMR[🎯 MMR Selection]
+    RANK[📊 Relevance Ranking]
     
-    subgraph "Answer Generation"
-        CONTEXT[Context Assembly]
-        LLM_CALL[LLM Generation]
-        FORMAT[Response Formatting]
-    end
+    %% Answer Generation
+    CONTEXT_ASM[🔧 Context Assembly]
+    LLM_CALL[🧠 LLM Generation]
+    FORMAT[📝 Response Formatting]
     
-    subgraph "Intelligence Analysis"
-        CONTRADICTIONS[Contradiction Detection]
-        QUALITY[Quality Assessment]
-        DIVERSITY[Diversity Analysis]
-        CRITIQUE[Critique Generation]
-    end
+    %% Intelligence Analysis
+    CONTRADICTIONS[🔀 Contradiction Detection]
+    QUALITY[🔍 Quality Assessment]
+    DIVERSITY[📊 Diversity Analysis]
+    CRITIQUE[📝 Critique Generation]
     
-    QUESTION --> REWRITE
-    CONFIG --> REWRITE
-    CONTEXT --> REWRITE
+    %% Flow
+    QUESTION ==> REWRITE
+    CONFIG ==> REWRITE
+    CONTEXT_IN ==> REWRITE
     
-    REWRITE --> FILTERS
-    FILTERS --> ENHANCE
-    ENHANCE --> SEARCH
+    REWRITE ==> FILTERS
+    FILTERS ==> ENHANCE
+    ENHANCE ==> SEARCH
     
-    SEARCH --> MMR
-    MMR --> RANK
-    RANK --> CONTEXT
+    SEARCH ==> MMR
+    MMR ==> RANK
+    RANK ==> CONTEXT_ASM
     
-    CONTEXT --> LLM_CALL
-    LLM_CALL --> FORMAT
-    FORMAT --> CONTRADICTIONS
+    CONTEXT_ASM ==> LLM_CALL
+    LLM_CALL ==> FORMAT
+    FORMAT ==> CONTRADICTIONS
     
-    CONTRADICTIONS --> QUALITY
-    QUALITY --> DIVERSITY
-    DIVERSITY --> CRITIQUE
+    CONTRADICTIONS ==> QUALITY
+    QUALITY ==> DIVERSITY
+    DIVERSITY ==> CRITIQUE
+    
+    %% Styling
+    classDef inputStyle fill:#1e3a8a,stroke:#60a5fa,stroke-width:2px,color:#ffffff
+    classDef rewriteStyle fill:#581c87,stroke:#a855f7,stroke-width:2px,color:#ffffff
+    classDef retrievalStyle fill:#166534,stroke:#4ade80,stroke-width:2px,color:#ffffff
+    classDef answerStyle fill:#ea580c,stroke:#fb923c,stroke-width:2px,color:#ffffff
+    classDef intelligenceStyle fill:#dc2626,stroke:#f87171,stroke-width:2px,color:#ffffff
+    
+    class QUESTION,CONFIG,CONTEXT_IN inputStyle
+    class REWRITE,FILTERS,ENHANCE rewriteStyle
+    class SEARCH,MMR,RANK retrievalStyle
+    class CONTEXT_ASM,LLM_CALL,FORMAT answerStyle
+    class CONTRADICTIONS,QUALITY,DIVERSITY,CRITIQUE intelligenceStyle
 ```
 
 ### Query Rewriting System
