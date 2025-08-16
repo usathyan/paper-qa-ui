@@ -1,19 +1,3 @@
-# UX (Next.js + FastAPI) targets (skeleton)
-.PHONY: ux-setup ux-backend-venv ux-frontend-install ux-test ux-build ux-export
-
-ux-setup: ## Setup UX project environments (backend + frontend)
-	python3 -m venv .venv_ux_backend && . .venv_ux_backend/bin/activate && pip install -U pip && pip install -r requirements_ux.txt || true
-	@[ -d src/ux/frontend ] || echo "NOTE: Create src/ux/frontend and run npm install there"
-
-ux-test: ## Run backend type checks/tests (placeholder)
-	@[ -d src/ux/backend ] || echo "NOTE: Backend not scaffolded yet"
-	@echo "✅ UX test placeholder (add pytest/mypy for backend; eslint/tsc for frontend)"
-
-ux-build: ## Build frontend/backend (placeholder)
-	@echo "✅ UX build placeholder (next build + backend packaging)"
-
-ux-export: ## Call backend export endpoints (placeholder)
-	@echo "✅ UX export placeholder"
 
 # PaperQA2 Makefile
 # Clean, focused targets for the current system
@@ -94,16 +78,22 @@ setup:
 	@echo "🔍 Checking Ollama setup..."
 	@if command -v ollama >/dev/null 2>&1; then \
 		echo "✅ Ollama found"; \
-		if ! ollama list | grep -q "nomic-embed-text"; then \
-			echo "📥 Downloading nomic-embed-text model..."; \
-			ollama pull nomic-embed-text; \
-		fi; \
-		if ! ollama list | grep -q "llama3.2"; then \
-			echo "📥 Downloading llama3.2 model..."; \
-			ollama pull llama3.2; \
+		if ! ollama list >/dev/null 2>&1; then \
+			echo "⚠️  Ollama not running. Please start with: ollama serve"; \
+			echo "   Then run 'make setup' again to download models"; \
+		else \
+			if ! ollama list | grep -q "nomic-embed-text"; then \
+				echo "📥 Downloading nomic-embed-text model..."; \
+				ollama pull nomic-embed-text; \
+			fi; \
+			if ! ollama list | grep -q "llama3.2"; then \
+				echo "📥 Downloading llama3.2 model..."; \
+				ollama pull llama3.2; \
+			fi; \
 		fi; \
 	else \
 		echo "⚠️  Ollama not found. Please install from https://ollama.com/"; \
+		echo "   After installation, run: ollama serve"; \
 	fi
 	@echo "✅ Setup complete!"
 	@echo ""
@@ -120,7 +110,7 @@ ui: check-env
 	@echo "🌐 Starting PaperQA2 Gradio UI..."
 	@echo "📱 Open your browser to: http://localhost:7860"
 	@echo "🛑 Press Ctrl+C to stop"
-	@$(PYTHON) -m src.ui.paperqa2_ui
+	@$(UV) run $(PYTHON) -m src.ui.paperqa2_ui
 
 # Kill hanging server processes
 kill-server:
