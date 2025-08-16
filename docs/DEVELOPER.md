@@ -1,192 +1,448 @@
 # Paper-QA UI: Developer Documentation
 
-This document provides comprehensive technical documentation for maintainers and developers working on Paper-QA UI.
+## Table of Contents
 
-## System Architecture
+1. [System Overview](#system-overview)
+2. [Architecture & Data Flow](#architecture--data-flow)
+3. [User Requirements Traceability](#user-requirements-traceability)
+4. [Core Implementation](#core-implementation)
+5. [Configuration System](#configuration-system)
+6. [UI Architecture](#ui-architecture)
+7. [Query Processing Pipeline](#query-processing-pipeline)
+8. [Evidence & Intelligence System](#evidence--intelligence-system)
+9. [Performance & Optimization](#performance--optimization)
+10. [Development Workflow](#development-workflow)
+11. [Roadmap & Future Development](#roadmap--future-development)
 
-### Overview
+---
 
-Paper-QA UI is a modern web interface built on top of the [Paper-QA](https://github.com/Future-House/paper-qa) library, providing high-accuracy Retrieval Augmented Generation (RAG) capabilities for scientific documents.
+## System Overview
 
-### Core Components
+Paper-QA UI is a sophisticated web interface that transforms the [Paper-QA](https://github.com/Future-House/paper-qa) library into an intuitive, research-focused application. It provides high-accuracy Retrieval Augmented Generation (RAG) capabilities for scientific document analysis with real-time transparency and comprehensive evidence curation.
 
-- **Frontend**: Gradio 5.x with modern web UI and real-time updates
-- **Backend**: Paper-QA v5.27.0+ with PDF parsing and RAG pipeline
-- **Configuration**: Centralized JSON-based configuration management
-- **Execution Model**: Dedicated asyncio event loop for all LLM/embedding I/O
+### Key Design Principles
 
-### Data Flow
+- **Research-First**: Optimized for scientific literature analysis workflows
+- **Transparency**: Real-time progress tracking and evidence traceability
+- **Usability**: Streamlined interface with opinionated defaults
+- **Performance**: Local-first architecture with cloud fallbacks
+- **Extensibility**: Modular design for future enhancements
 
-1. **Document Upload**: PDF files uploaded via Gradio interface
-2. **Document Processing**: Files copied to `papers/` directory and indexed into in-memory `Docs` corpus
-3. **Question Processing**: User questions processed by querying the in-memory corpus (`Docs.aquery`)
-4. **Evidence Retrieval**: Relevant document sections retrieved using embeddings
-5. **Answer Generation**: LLM generates answers with citations
-6. **Response Display**: Formatted results shown in web interface
+### Technology Stack
 
-## Setup and Launch
-
-### Prerequisites
-
-- Python 3.11+
-- Ollama running for local models (default setup)
-- Optional: Cloud LLM API keys for external providers
-
-### Installation
-
-```bash
-# Setup environment and dependencies
-make setup
-
-# Start the UI
-make ui
-
-# Access at http://localhost:7860
+```mermaid
+graph TB
+    subgraph "Frontend Layer"
+        G[Gradio 5.x] --> UI[Modern Web UI]
+        UI --> RT[Real-time Updates]
+        UI --> RP[Responsive Design]
+    end
+    
+    subgraph "Backend Layer"
+        PQ[Paper-QA v5.27.0+] --> RAG[RAG Pipeline]
+        PQ --> PDF[PDF Parsing]
+        PQ --> EMB[Embeddings]
+        PQ --> LLM[LLM Integration]
+    end
+    
+    subgraph "Infrastructure"
+        OLL[Ollama] --> LOCAL[Local Models]
+        OR[OpenRouter] --> CLOUD[Cloud LLMs]
+        ASYNC[AsyncIO] --> THREAD[Background Threading]
+    end
+    
+    G --> PQ
+    PQ --> OLL
+    PQ --> OR
+    PQ --> ASYNC
 ```
 
-### Environment Configuration
+---
 
-- Default configuration uses optimized Ollama setup
-- External providers configured via `configs/*.json` and `.env` file
-- API keys managed through environment variables
+## Architecture & Data Flow
 
-## Core Implementation
+### High-Level System Architecture
 
-### File Structure
-
+```mermaid
+graph TB
+    subgraph "User Interface Layer"
+        UPLOAD[Document Upload]
+        QUERY[Question Input]
+        REWRITE[Query Rewrite]
+        DISPLAY[Results Display]
+    end
+    
+    subgraph "Processing Layer"
+        INDEX[Document Indexing]
+        SEARCH[Evidence Retrieval]
+        ANSWER[Answer Generation]
+        INTELL[Intelligence Analysis]
+    end
+    
+    subgraph "Data Layer"
+        CORPUS[In-Memory Docs Corpus]
+        VECTORS[Embedding Vectors]
+        METADATA[Document Metadata]
+        SESSION[Session State]
+    end
+    
+    subgraph "External Services"
+        LLM_SVC[LLM Services]
+        EMB_SVC[Embedding Services]
+        STORAGE[File Storage]
+    end
+    
+    UPLOAD --> INDEX
+    INDEX --> CORPUS
+    QUERY --> REWRITE
+    REWRITE --> SEARCH
+    SEARCH --> CORPUS
+    SEARCH --> VECTORS
+    SEARCH --> ANSWER
+    ANSWER --> INTELL
+    INTELL --> DISPLAY
+    
+    INDEX --> LLM_SVC
+    SEARCH --> EMB_SVC
+    ANSWER --> LLM_SVC
+    UPLOAD --> STORAGE
 ```
-src/
-├── ui/
-│   ├── paperqa2_ui.py          # Main UI implementation
-│   ├── prompts.py              # LLM prompts for query rewriting
-│   └── config_ui.py            # Configuration UI components
-├── config_manager.py           # JSON config loading and Settings conversion
-├── cli/                        # Command-line interfaces
-└── utils.py                    # Utility functions
+
+### End-to-End Data Flow
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant UI as Gradio UI
+    participant AS as AsyncIO Loop
+    participant PQ as Paper-QA
+    participant LLM as LLM Service
+    participant EMB as Embedding Service
+    
+    U->>UI: Upload PDFs
+    UI->>AS: process_uploaded_files_async()
+    AS->>PQ: Docs.aadd()
+    PQ->>EMB: Generate embeddings
+    EMB-->>PQ: Vector representations
+    PQ-->>AS: Indexed documents
+    AS-->>UI: Upload complete
+    
+    U->>UI: Enter question
+    U->>UI: Click "Ask Question"
+    UI->>AS: process_question_async()
+    AS->>PQ: llm_decompose_query()
+    PQ->>LLM: Query rewrite request
+    LLM-->>PQ: Rewritten query + filters
+    AS->>PQ: Docs.aquery()
+    PQ->>EMB: Retrieve relevant chunks
+    EMB-->>PQ: Evidence contexts
+    PQ->>LLM: Generate answer
+    LLM-->>PQ: Formatted answer
+    AS->>PQ: Build intelligence analysis
+    PQ-->>AS: Complete response
+    AS-->>UI: Update UI components
+    UI-->>U: Display results
 ```
 
 ### Threading and Execution Model
 
-- **Dedicated asyncio event loop**: Runs in background thread for all LLM/embedding I/O
-- **Thread-safe execution**: All Paper-QA async calls scheduled via `asyncio.run_coroutine_threadsafe`
-- **Single-query lock**: Prevents client contention and ensures stability
-
-### State Management
-
-```python
-app_state = {
-    "docs": None,                    # In-memory Docs corpus
-    "settings": None,                # Current Paper-QA Settings
-    "uploaded_docs": [],             # List of processed documents
-    "status_tracker": None,          # Real-time status updates
-    "rewrite_info": None,            # Query rewrite information
-    "rewrite_debug": None,           # Debug info for rewrite process
-    "session_data": None,            # Current session data
-    "ui_toggles": {},                # UI display toggles
-    "curation": {},                  # Evidence curation settings
-}
-```
-
-## Query Processing Pipeline
-
-### Document Intake
-
-```python
-async def process_uploaded_files_async(files: List[str]) -> Tuple[str, str]:
-    """
-    1. Handle Gradio file objects (different types across versions)
-    2. Copy files to papers/ directory with duplicate detection
-    3. Index documents using Docs.aadd()
-    4. Update status tracker with progress
-    """
-```
-
-### Question Processing
-
-```python
-async def process_question_async(question: str, config_name: str) -> Tuple[str, str, str, str]:
-    """
-    1. Initialize settings with research-oriented defaults
-    2. Apply query rewriting if enabled
-    3. Execute Docs.aquery() against in-memory corpus
-    4. Generate formatted response with evidence and metadata
-    """
-```
-
-### Query Rewriting System
-
-The system supports both heuristic and LLM-based query rewriting:
-
-#### LLM-Based Rewriting
-
-```python
-async def llm_decompose_query(question: str, settings: Settings) -> Dict[str, Any]:
-    """
-    Uses configured LLM to rewrite query and extract filters.
+```mermaid
+graph LR
+    subgraph "Main Thread"
+        UI[Gradio UI]
+        STATE[State Management]
+    end
     
-    Returns:
-    {
-        "rewritten": str,
-        "filters": {
-            "years": [int, int] | null,
-            "venues": string[],
-            "fields": string[],
-            "species": string[],
-            "study_types": string[],
-            "outcomes": string[]
-        }
-    }
-    """
+    subgraph "Background Thread"
+        LOOP[AsyncIO Event Loop]
+        PQ_CALLS[Paper-QA Calls]
+        LLM_IO[LLM I/O]
+        EMB_IO[Embedding I/O]
+    end
+    
+    subgraph "Thread Communication"
+        QUEUE[Task Queue]
+        CALLBACK[Progress Callbacks]
+        RESULT[Result Updates]
+    end
+    
+    UI --> QUEUE
+    QUEUE --> LOOP
+    LOOP --> PQ_CALLS
+    PQ_CALLS --> LLM_IO
+    PQ_CALLS --> EMB_IO
+    LOOP --> CALLBACK
+    CALLBACK --> UI
+    LOOP --> RESULT
+    RESULT --> STATE
 ```
 
-#### Prompts System
+---
 
-External prompts in `src/ui/prompts.py`:
+## User Requirements Traceability
 
-- `REWRITE_SYSTEM_PROMPT`: Instructs LLM on rewriting approach
-- `REWRITE_USER_TEMPLATE`: Template for user query with JSON schema
-- `QUOTE_EXTRACTION_SYSTEM_PROMPT`: For evidence quote extraction
-- `QUOTE_EXTRACTION_USER_TEMPLATE`: Template for quote extraction
+This section maps user requirements from the README to functional and system requirements, down to specific function calls.
 
-#### Heuristic Fallback
+### Traceability Matrix
+
+| User Requirement (README Section) | Functional Requirement | System Requirement | Implementation Location | Key Functions |
+|-----------------------------------|------------------------|-------------------|-------------------------|---------------|
+| **Section 1: Document Intake** | Upload and index PDFs | File processing pipeline | `src/ui/paperqa2_ui.py` | `process_uploaded_files_async()` |
+| | | Duplicate detection | `src/ui/paperqa2_ui.py` | `_copy_file_with_hash()` |
+| | | Status tracking | `src/ui/paperqa2_ui.py` | `_update_upload_status()` |
+| **Section 2: Configuration** | LLM/embedding config | JSON-based config system | `src/config_manager.py` | `load_config()` |
+| | Query rewriting | LLM-based optimization | `src/ui/prompts.py` | `llm_decompose_query()` |
+| | Evidence curation | Score-based filtering | `src/ui/paperqa2_ui.py` | `build_evidence_meta_summary_html()` |
+| **Section 3: Tab Structure** | Plan & Retrieval | Question processing | `src/ui/paperqa2_ui.py` | `ask_with_progress()` |
+| | Evidence display | Context visualization | `src/ui/paperqa2_ui.py` | `build_top_evidence_html()` |
+| | Conflicts analysis | Quality assessment | `src/ui/paperqa2_ui.py` | `build_conflicts_html()` |
+| | Research Intel | Intelligence generation | `src/ui/paperqa2_ui.py` | `build_intelligence_html()` |
+| | Answer display | Response formatting | `src/ui/paperqa2_ui.py` | `format_answer_html()` |
+| **Section 4: Default Behaviors** | Smart filter biasing | Filter enhancement | `src/ui/paperqa2_ui.py` | `_enhance_query_with_filters()` |
+| | Quote extraction | Evidence traceability | `src/ui/paperqa2_ui.py` | `_extract_quotes()` |
+| **Section 5: Operational Constraints** | Single query lock | Concurrency control | `src/ui/paperqa2_ui.py` | `_query_lock` |
+| | Local-first processing | Resource management | `src/ui/paperqa2_ui.py` | `initialize_settings()` |
+
+### Detailed Traceability Flow
+
+```mermaid
+graph TB
+    subgraph "User Requirements (README)"
+        UR1[Document Intake]
+        UR2[Configuration]
+        UR3[Tab Structure]
+        UR4[Default Behaviors]
+        UR5[Operational Constraints]
+    end
+    
+    subgraph "Functional Requirements"
+        FR1[File Upload & Indexing]
+        FR2[Query Processing]
+        FR3[Evidence Retrieval]
+        FR4[Answer Generation]
+        FR5[Intelligence Analysis]
+        FR6[UI State Management]
+    end
+    
+    subgraph "System Requirements"
+        SR1[Async Processing]
+        SR2[Thread Safety]
+        SR3[Error Handling]
+        SR4[Performance Optimization]
+        SR5[Configuration Management]
+        SR6[State Persistence]
+    end
+    
+    subgraph "Implementation"
+        IMP1[process_uploaded_files_async]
+        IMP2[process_question_async]
+        IMP3[ask_with_progress]
+        IMP4[build_evidence_meta_summary_html]
+        IMP5[build_intelligence_html]
+        IMP6[format_answer_html]
+    end
+    
+    UR1 --> FR1
+    UR2 --> FR2
+    UR3 --> FR3
+    UR4 --> FR4
+    UR5 --> FR5
+    
+    FR1 --> SR1
+    FR2 --> SR2
+    FR3 --> SR3
+    FR4 --> SR4
+    FR5 --> SR5
+    FR6 --> SR6
+    
+    SR1 --> IMP1
+    SR2 --> IMP2
+    SR3 --> IMP3
+    SR4 --> IMP4
+    SR5 --> IMP5
+    SR6 --> IMP6
+```
+
+---
+
+## Core Implementation
+
+### File Structure and Organization
+
+```mermaid
+graph TB
+    subgraph "Source Code Structure"
+        subgraph "UI Layer"
+            UI_MAIN[paperqa2_ui.py]
+            UI_PROMPTS[prompts.py]
+            UI_CONFIG[config_ui.py]
+        end
+        
+        subgraph "Core Layer"
+            CORE_CONFIG[config_manager.py]
+            CORE_UTILS[utils.py]
+            CORE_CLI[cli/]
+        end
+        
+        subgraph "Configuration"
+            CONFIG_JSON[configs/*.json]
+            CONFIG_ENV[.env]
+        end
+        
+        subgraph "Data"
+            DATA_PAPERS[papers/]
+            DATA_LOGS[logs/]
+            DATA_EXPORTS[exports/]
+        end
+    end
+    
+    UI_MAIN --> CORE_CONFIG
+    UI_MAIN --> CORE_UTILS
+    UI_PROMPTS --> UI_MAIN
+    CORE_CONFIG --> CONFIG_JSON
+    CORE_CONFIG --> CONFIG_ENV
+    UI_MAIN --> DATA_PAPERS
+    UI_MAIN --> DATA_LOGS
+    UI_MAIN --> DATA_EXPORTS
+```
+
+### State Management Architecture
+
+```mermaid
+graph LR
+    subgraph "Application State"
+        STATE_DOCS[Documents Corpus]
+        STATE_SETTINGS[Settings]
+        STATE_SESSION[Session Data]
+        STATE_UI[UI State]
+        STATE_PROGRESS[Progress Tracking]
+    end
+    
+    subgraph "State Operations"
+        OP_INIT[Initialize]
+        OP_UPDATE[Update]
+        OP_CLEAR[Clear]
+        OP_PERSIST[Persist]
+    end
+    
+    subgraph "State Consumers"
+        UI_COMPONENTS[UI Components]
+        PROCESSING[Processing Pipeline]
+        EXPORT[Export Functions]
+    end
+    
+    STATE_DOCS --> OP_INIT
+    STATE_SETTINGS --> OP_UPDATE
+    STATE_SESSION --> OP_CLEAR
+    STATE_UI --> OP_PERSIST
+    
+    OP_INIT --> UI_COMPONENTS
+    OP_UPDATE --> PROCESSING
+    OP_CLEAR --> EXPORT
+```
+
+### Key Implementation Patterns
+
+#### 1. Async Processing Pattern
 
 ```python
-def rewrite_query(question: str, settings: Settings) -> str:
-    """
-    Lightweight local rewriting:
-    - Remove polite fillers ("please", "kindly")
-    - Convert "what is/are" to "summarize"
-    - Normalize whitespace and punctuation
-    """
+# Pattern: Background async execution with UI updates
+async def process_question_async(question: str, config_name: str) -> Tuple[...]:
+    """Main processing function with comprehensive error handling."""
+    try:
+        # Initialize settings
+        settings = initialize_settings(config_name)
+        
+        # Query rewriting
+        rewrite_result = await llm_decompose_query(question, settings)
+        
+        # Execute Paper-QA query
+        answer = await docs.aquery(rewrite_result["rewritten"], settings)
+        
+        # Build response components
+        evidence_html = build_evidence_meta_summary_html(answer.contexts)
+        intelligence_html = build_intelligence_html(answer)
+        
+        return (answer.answer, evidence_html, intelligence_html, ...)
+    except Exception as e:
+        logger.error(f"Processing failed: {e}", exc_info=True)
+        return error_response()
 ```
 
-### Evidence Curation
-
-The system provides multiple levels of evidence control:
-
-#### Curation Controls
-
-- **Score cutoff**: `answer.evidence_relevance_score_cutoff` (0.0-1.0)
-- **Max sources**: `answer.answer_max_sources` (total sources limit)
-- **Per-document cap**: Post-selection pruning per source
-
-#### Implementation
+#### 2. UI Component Pattern
 
 ```python
-# Settings mutation on initialization
-settings.answer.evidence_relevance_score_cutoff = 0
-settings.answer.evidence_k = 15  # Higher for richer evidence
-settings.answer.answer_max_sources = 10
-settings.answer.get_evidence_if_no_contexts = True
-settings.answer.group_contexts_by_question = True
-settings.answer.answer_filter_extra_background = True
+# Pattern: Reusable UI components with state management
+def create_evidence_display() -> gr.HTML:
+    """Create evidence display component with dynamic updates."""
+    return gr.HTML(
+        value="<div class='pqa-panel'>Evidence will appear here...</div>",
+        elem_classes=["pqa-evidence-panel"],
+        interactive=False
+    )
+
+def update_evidence_display(contexts: List, score_cutoff: float) -> str:
+    """Update evidence display with new data."""
+    return build_evidence_meta_summary_html(contexts, score_cutoff)
 ```
+
+#### 3. Configuration Pattern
+
+```python
+# Pattern: Centralized configuration management
+def initialize_settings(config_name: str = "optimized_ollama") -> Settings:
+    """Load and validate configuration with research defaults."""
+    config = load_config(config_name)
+    settings = config_to_settings(config)
+    
+    # Apply research-oriented defaults
+    settings.answer.evidence_k = 15
+    settings.answer.answer_max_sources = 10
+    settings.answer.get_evidence_if_no_contexts = True
+    
+    return settings
+```
+
+---
 
 ## Configuration System
 
-### Configuration Profiles
+### Configuration Architecture
 
-The system supports multiple configuration profiles in `configs/`:
+```mermaid
+graph TB
+    subgraph "Configuration Sources"
+        JSON_CONFIG[configs/*.json]
+        ENV_VARS[Environment Variables]
+        DEFAULTS[System Defaults]
+    end
+    
+    subgraph "Configuration Processing"
+        LOAD[load_config()]
+        VALIDATE[validate_config()]
+        CONVERT[config_to_settings()]
+        MERGE[merge_defaults()]
+    end
+    
+    subgraph "Configuration Output"
+        SETTINGS[Paper-QA Settings]
+        UI_CONFIG[UI Configuration]
+        RUNTIME_CONFIG[Runtime Settings]
+    end
+    
+    JSON_CONFIG --> LOAD
+    ENV_VARS --> LOAD
+    DEFAULTS --> MERGE
+    
+    LOAD --> VALIDATE
+    VALIDATE --> CONVERT
+    CONVERT --> MERGE
+    MERGE --> SETTINGS
+    MERGE --> UI_CONFIG
+    MERGE --> RUNTIME_CONFIG
+```
+
+### Configuration Profiles
 
 #### Optimized Ollama (Default)
 
@@ -219,421 +475,813 @@ The system supports multiple configuration profiles in `configs/`:
 }
 ```
 
-### Settings Initialization
+### Configuration Validation
 
-```python
-def initialize_settings(config_name: str = "optimized_ollama") -> Settings:
-    """
-    1. Load JSON configuration from configs/
-    2. Convert to Paper-QA Settings object
-    3. Apply research-oriented defaults
-    4. Validate configuration
-    """
+```mermaid
+graph LR
+    subgraph "Validation Steps"
+        V1[Schema Validation]
+        V2[Required Fields]
+        V3[Value Ranges]
+        V4[Dependencies]
+    end
+    
+    subgraph "Validation Results"
+        SUCCESS[Valid Config]
+        ERROR[Validation Error]
+        WARNING[Warning]
+    end
+    
+    V1 --> V2
+    V2 --> V3
+    V3 --> V4
+    V4 --> SUCCESS
+    V4 --> ERROR
+    V4 --> WARNING
 ```
 
-## Removed Settings and UI Simplification
+---
 
-### Overview
+## UI Architecture
 
-During development, several toggles and settings were removed from the UI to reduce complexity while maintaining functionality through opinionated defaults. This section documents these changes for developers who need to modify or restore these features.
+### UI Component Hierarchy
 
-### Always-Enabled Features (Previously Toggles)
-
-#### Smart Filter Biasing (`bias_retrieval`)
-- **Location**: `ask_with_progress()` function, line ~921
-- **Default**: `True` (always enabled)
-- **Functionality**: Appends extracted filters to rewritten queries
-- **Implementation**: 
-  ```python
-  # Hardcoded to True in gr.State calls
-  gr.State(True),  # bias_retrieval: Always enabled
-  ```
-- **Filter types**: years, venues, fields, species, study_types, outcomes
-- **Format**: `"query (years 2020-2024; fields neurodegeneration; species human)"`
-
-#### Quote Extraction (`use_quote_extraction`)
-- **Location**: `app_state["use_quote_extraction"]` initialization
-- **Default**: `True` (always enabled)
-- **Functionality**: Extracts relevant quotes from sources for answer traceability
-- **Implementation**: Set in app_state during initialization
-
-### Removed UI Components
-
-#### LiteLLM Debug Toggle
-- **Previous location**: Left panel Query Builder accordion
-- **Functionality**: Enabled/disabled LiteLLM debug logging
-- **Removal reason**: Cluttered UI, debugging better handled via logs
-- **Developer access**: Modify logging configuration directly
-
-#### File Logging Toggle
-- **Previous location**: Left panel Query Builder accordion  
-- **Functionality**: Enabled/disabled writing rewrite logs to files
-- **Removal reason**: Essential logs still captured, reduced complexity
-- **Developer access**: Modify logging handlers in code
-
-#### Separate Analysis Progress Tab
-- **Previous location**: Dedicated tab in center panel
-- **Functionality**: Showed real-time analysis progress
-- **Replacement**: Inline progress display in Plan & Retrieval tab
-- **Removal reason**: Better UX with consolidated view
-
-#### Tab Switching Automation
-- **Previous functionality**: Automatically switched to Retrieval tab when processing started
-- **Associated complexity**: Button state management, tab index tracking, user guidance messages
-- **Replacement**: Single consolidated "Plan & Retrieval" tab
-- **Removal reason**: Eliminated navigation confusion
-
-#### Status Display Panels
-- **Previous location**: Right rail session log and processing info sections
-- **Functionality**: Displayed session history and processing statistics
-- **Replacement**: Processing info integrated into dynamic evidence summary
-- **Removal reason**: Reduced UI clutter, information available in relevant tabs
-
-#### Placeholder Text
-- **Previous location**: Throughout UI (Evidence tab, Answer tab, etc.)
-- **Functionality**: Displayed placeholder messages like "Answer and Critique will render here"
-- **Replacement**: Clean interfaces with no unnecessary text
-- **Removal reason**: Improved user experience, reduced confusion
-
-## Current Tab Structure
-
-### Overview
-The UI is organized into 5 main tabs that provide different views of the analysis:
-
-### Tab 1: Plan & Retrieval
-- **Purpose**: Question input, query rewriting, and real-time progress tracking
-- **Components**:
-  - Question input textbox
-  - Rewrite button (LLM-based query optimization)
-  - Query Used (editable field for final query)
-  - Analysis Progress (real-time chevron indicators)
-- **Progress Phases**: Plan & Retrieval → Evidence → Research Intel → Answer
-
-### Tab 2: Evidence
-- **Purpose**: Comprehensive evidence analysis and filtering
-- **Components**:
-  - Dynamic Summary (real-time metrics)
-  - Facets Panel (filter controls)
-  - Evidence Summary (statistical overview)
-  - Evidence Sources (excerpts table)
-  - Top Evidence (by score) - scrollable list of top 8 pieces
-
-### Tab 3: Conflicts
-- **Purpose**: Evidence quality analysis and conflict detection
-- **Components**:
-  - Evidence Quality Issues (preprint/retraction flags)
-  - Relevance Conflicts (score variance analysis)
-  - Key Insights (evidence pattern analysis)
-
-### Tab 4: Research Intel
-- **Purpose**: Research intelligence and critique
-- **Components**:
-  - Potential Contradictions (cross-document analysis)
-  - Quality Flags (source-level indicators)
-  - Diversity & Recency (year distribution)
-  - Critique (LLM-generated assessment)
-
-### Tab 5: Answer
-- **Purpose**: Final answer display
-- **Components**:
-  - Answer Display (formatted HTML)
-  - Clean interface (no placeholders)
-
-### Implementation Details
-
-#### Dynamic Evidence Summary
-```python
-def build_evidence_meta_summary_html(contexts: List, score_cutoff: float = 0.0) -> str:
-    """Generate dynamic evidence metadata summary for the Evidence tab header."""
-    # Calculates: total evidence, above cutoff count, venues, preprint share, 
-    # year distribution, diversity score
+```mermaid
+graph TB
+    subgraph "Main Interface"
+        MAIN[Gradio Interface]
+        
+        subgraph "Left Panel"
+            UPLOAD[Document Upload]
+            CONFIG[Configuration]
+            CONTROLS[Query Controls]
+            EXPORT[Export Options]
+        end
+        
+        subgraph "Center Panel"
+            TABS[Tab Container]
+            
+            subgraph "Tab 1: Plan & Retrieval"
+                QUESTION[Question Input]
+                REWRITE[Rewrite Button]
+                PROGRESS[Analysis Progress]
+            end
+            
+            subgraph "Tab 2: Evidence"
+                SUMMARY[Evidence Summary]
+                FACETS[Facets Panel]
+                SOURCES[Evidence Sources]
+                TOP_EVIDENCE[Top Evidence]
+            end
+            
+            subgraph "Tab 3: Conflicts"
+                QUALITY[Quality Issues]
+                CONFLICTS[Relevance Conflicts]
+                INSIGHTS[Key Insights]
+            end
+            
+            subgraph "Tab 4: Research Intel"
+                CONTRADICTIONS[Potential Contradictions]
+                FLAGS[Quality Flags]
+                DIVERSITY[Diversity & Recency]
+                CRITIQUE[Critique]
+            end
+            
+            subgraph "Tab 5: Answer"
+                ANSWER_DISPLAY[Answer Display]
+            end
+        end
+        
+        subgraph "Right Panel"
+            LIVE_PROGRESS[Live Analysis Progress]
+        end
+    end
+    
+    MAIN --> UPLOAD
+    MAIN --> CONFIG
+    MAIN --> TABS
+    MAIN --> LIVE_PROGRESS
+    
+    TABS --> QUESTION
+    TABS --> SUMMARY
+    TABS --> QUALITY
+    TABS --> CONTRADICTIONS
+    TABS --> ANSWER_DISPLAY
 ```
 
-#### Top Evidence Generation
-```python
-def build_top_evidence_html(contexts: List) -> str:
-    """Generate top evidence by relevance score for the Evidence tab."""
-    # Sorts by score, displays top 8 with formatting
+### UI State Management
+
+```mermaid
+graph LR
+    subgraph "UI State"
+        STATE_QUESTION[Question State]
+        STATE_PROGRESS[Progress State]
+        STATE_RESULTS[Results State]
+        STATE_CONFIG[Config State]
+    end
+    
+    subgraph "State Updates"
+        UPDATE_QUESTION[Question Change]
+        UPDATE_PROGRESS[Progress Update]
+        UPDATE_RESULTS[Results Ready]
+        UPDATE_CONFIG[Config Change]
+    end
+    
+    subgraph "UI Components"
+        COMP_QUESTION[Question Input]
+        COMP_PROGRESS[Progress Display]
+        COMP_RESULTS[Results Display]
+        COMP_CONFIG[Config Panel]
+    end
+    
+    STATE_QUESTION --> UPDATE_QUESTION
+    STATE_PROGRESS --> UPDATE_PROGRESS
+    STATE_RESULTS --> UPDATE_RESULTS
+    STATE_CONFIG --> UPDATE_CONFIG
+    
+    UPDATE_QUESTION --> COMP_QUESTION
+    UPDATE_PROGRESS --> COMP_PROGRESS
+    UPDATE_RESULTS --> COMP_RESULTS
+    UPDATE_CONFIG --> COMP_CONFIG
 ```
 
-#### Evidence Conflicts Analysis
-```python
-def build_conflicts_html(answer: str, contexts: List) -> str:
-    """Generate evidence conflicts and key insights for the Evidence tab."""
-    # Analyzes quality issues, relevance conflicts, and evidence patterns
+### Event Flow Architecture
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant UI as UI Components
+    participant EH as Event Handlers
+    participant AS as AsyncIO Loop
+    participant PQ as Paper-QA
+    
+    U->>UI: Interact with component
+    UI->>EH: Trigger event
+    EH->>AS: Schedule async task
+    AS->>PQ: Execute operation
+    PQ-->>AS: Return result
+    AS->>EH: Update callback
+    EH->>UI: Update component
+    UI-->>U: Display result
 ```
 
-### Modifiable Parameters for Developers
+---
 
-If you need to restore or modify these features:
+## Query Processing Pipeline
 
-#### Bias Retrieval
-```python
-# In ask_with_progress() function calls, change:
-gr.State(True),  # bias_retrieval: Always enabled
-# To:
-bias_retrieval_toggle,  # Restore UI toggle
+### Query Processing Flow
 
-# Add back UI component in left panel:
-bias_retrieval_toggle = gr.Checkbox(
-    label="Enhance search with smart filters",
-    value=True,
-    info="Uses AI-extracted context (years, fields, etc.) to improve search precision"
-)
+```mermaid
+graph TB
+    subgraph "Input Processing"
+        QUESTION[User Question]
+        CONFIG[Configuration]
+        CONTEXT[Session Context]
+    end
+    
+    subgraph "Query Rewriting"
+        REWRITE[LLM Rewrite]
+        FILTERS[Filter Extraction]
+        ENHANCE[Query Enhancement]
+    end
+    
+    subgraph "Document Retrieval"
+        SEARCH[Vector Search]
+        MMR[MMR Selection]
+        RANK[Relevance Ranking]
+    end
+    
+    subgraph "Answer Generation"
+        CONTEXT[Context Assembly]
+        LLM_CALL[LLM Generation]
+        FORMAT[Response Formatting]
+    end
+    
+    subgraph "Intelligence Analysis"
+        CONTRADICTIONS[Contradiction Detection]
+        QUALITY[Quality Assessment]
+        DIVERSITY[Diversity Analysis]
+        CRITIQUE[Critique Generation]
+    end
+    
+    QUESTION --> REWRITE
+    CONFIG --> REWRITE
+    CONTEXT --> REWRITE
+    
+    REWRITE --> FILTERS
+    FILTERS --> ENHANCE
+    ENHANCE --> SEARCH
+    
+    SEARCH --> MMR
+    MMR --> RANK
+    RANK --> CONTEXT
+    
+    CONTEXT --> LLM_CALL
+    LLM_CALL --> FORMAT
+    FORMAT --> CONTRADICTIONS
+    
+    CONTRADICTIONS --> QUALITY
+    QUALITY --> DIVERSITY
+    DIVERSITY --> CRITIQUE
 ```
 
-#### Quote Extraction
-```python
-# In initialization, change:
-app_state["use_quote_extraction"] = True
-# To conditional based on toggle:
-app_state["use_quote_extraction"] = quote_extraction_toggle.value
+### Query Rewriting System
+
+```mermaid
+graph LR
+    subgraph "Input"
+        USER_Q[User Question]
+        SETTINGS[LLM Settings]
+    end
+    
+    subgraph "Processing"
+        PROMPT[Prompt Assembly]
+        LLM_CALL[LLM Call]
+        PARSE[Response Parsing]
+        VALIDATE[Validation]
+    end
+    
+    subgraph "Output"
+        REWRITTEN[Rewritten Query]
+        FILTERS[Extracted Filters]
+        ENHANCED[Enhanced Query]
+    end
+    
+    USER_Q --> PROMPT
+    SETTINGS --> PROMPT
+    PROMPT --> LLM_CALL
+    LLM_CALL --> PARSE
+    PARSE --> VALIDATE
+    VALIDATE --> REWRITTEN
+    VALIDATE --> FILTERS
+    REWRITTEN --> ENHANCED
+    FILTERS --> ENHANCED
 ```
 
-#### Debug Logging
-```python
-# Restore LiteLLM debug toggle:
-litellm_debug_toggle = gr.Checkbox(
-    label="Enable LiteLLM debug logs",
-    value=False,
-    info="Shows detailed LLM API call information"
-)
+### Evidence Retrieval System
 
-# Add event handler:
-def _set_litellm_debug(enabled: bool) -> str:
-    import litellm
-    litellm.set_verbose = enabled
-    return f"LiteLLM debug {'enabled' if enabled else 'disabled'}"
+```mermaid
+graph TB
+    subgraph "Query"
+        ENHANCED_Q[Enhanced Query]
+        CORPUS[Document Corpus]
+    end
+    
+    subgraph "Retrieval"
+        EMBED[Query Embedding]
+        SIMILARITY[Similarity Search]
+        CANDIDATES[Candidate Selection]
+    end
+    
+    subgraph "Selection"
+        MMR[MMR Algorithm]
+        DIVERSITY[Diversity Scoring]
+        RELEVANCE[Relevance Filtering]
+    end
+    
+    subgraph "Output"
+        EVIDENCE[Selected Evidence]
+        METADATA[Evidence Metadata]
+        SCORES[Relevance Scores]
+    end
+    
+    ENHANCED_Q --> EMBED
+    CORPUS --> EMBED
+    EMBED --> SIMILARITY
+    SIMILARITY --> CANDIDATES
+    CANDIDATES --> MMR
+    MMR --> DIVERSITY
+    DIVERSITY --> RELEVANCE
+    RELEVANCE --> EVIDENCE
+    RELEVANCE --> METADATA
+    RELEVANCE --> SCORES
 ```
 
-### Parameter Limits and Validation
+---
 
-#### Score Cutoff
-- **Range**: 0.0 to 1.0 (float)
-- **Default**: 0.0 (no filtering)
-- **Validation**: Gradio slider enforces bounds
+## Evidence & Intelligence System
 
-#### Per-Document Cap
-- **Range**: 0 to unlimited (integer)
-- **Default**: 0 (unlimited)
-- **Validation**: Non-negative integers only
+### Evidence Processing Pipeline
 
-#### Max Sources
-- **Range**: 0 to unlimited (integer)  
-- **Default**: 0 (use Paper-QA defaults)
-- **Validation**: Non-negative integers only
-
-#### Years Range (Evidence Tab)
-- **Range**: 1990 to 2025 (integers)
-- **Default**: 2020-2024
-- **Validation**: Start year ≤ End year
-
-### Configuration Override Examples
-
-For advanced users needing to override defaults programmatically:
-
-```python
-# Override bias_retrieval in configuration
-def custom_ask_with_progress(*args):
-    # Force bias_retrieval = False for specific use case
-    modified_args = list(args)
-    modified_args[5] = False  # bias_retrieval parameter position
-    return original_ask_with_progress(*modified_args)
-
-# Restore removed UI toggle
-def add_bias_retrieval_toggle():
-    with gr.Accordion("Advanced Options", open=False):
-        bias_toggle = gr.Checkbox(
-            label="Smart filter biasing",
-            value=True,
-            info="Append extracted filters to queries"
-        )
-    return bias_toggle
+```mermaid
+graph TB
+    subgraph "Evidence Input"
+        CONTEXTS[Retrieved Contexts]
+        METADATA[Document Metadata]
+        SCORES[Relevance Scores]
+    end
+    
+    subgraph "Evidence Processing"
+        FILTER[Score Filtering]
+        GROUP[Source Grouping]
+        RANK[Relevance Ranking]
+        DIVERSIFY[Diversity Analysis]
+    end
+    
+    subgraph "Evidence Output"
+        SUMMARY[Evidence Summary]
+        TOP_EVIDENCE[Top Evidence]
+        FACETS[Evidence Facets]
+        CONFLICTS[Evidence Conflicts]
+    end
+    
+    CONTEXTS --> FILTER
+    METADATA --> GROUP
+    SCORES --> RANK
+    
+    FILTER --> GROUP
+    GROUP --> RANK
+    RANK --> DIVERSIFY
+    
+    DIVERSIFY --> SUMMARY
+    DIVERSIFY --> TOP_EVIDENCE
+    DIVERSIFY --> FACETS
+    DIVERSIFY --> CONFLICTS
 ```
 
-## UI Components and Flow
+### Intelligence Analysis System
 
-### Main Interface Structure
+```mermaid
+graph LR
+    subgraph "Input Data"
+        ANSWER[Generated Answer]
+        EVIDENCE[Evidence Contexts]
+        METADATA[Document Metadata]
+    end
+    
+    subgraph "Analysis Components"
+        CONTRADICTIONS[Contradiction Detection]
+        QUALITY[Quality Assessment]
+        DIVERSITY[Diversity Analysis]
+        CRITIQUE[Critique Generation]
+    end
+    
+    subgraph "Output Intelligence"
+        CONTRADICTIONS_OUT[Potential Contradictions]
+        QUALITY_FLAGS[Quality Flags]
+        DIVERSITY_METRICS[Diversity Metrics]
+        CRITIQUE_TEXT[Critique Text]
+    end
+    
+    ANSWER --> CONTRADICTIONS
+    EVIDENCE --> CONTRADICTIONS
+    METADATA --> QUALITY
+    
+    ANSWER --> QUALITY
+    EVIDENCE --> DIVERSITY
+    METADATA --> DIVERSITY
+    
+    ANSWER --> CRITIQUE
+    EVIDENCE --> CRITIQUE
+    
+    CONTRADICTIONS --> CONTRADICTIONS_OUT
+    QUALITY --> QUALITY_FLAGS
+    DIVERSITY --> DIVERSITY_METRICS
+    CRITIQUE --> CRITIQUE_TEXT
+```
 
-The UI follows a three-panel layout:
+### Contradiction Detection Algorithm
 
-- **Left Panel**: Configuration, upload, and controls
-- **Center Panel**: Question input, rewrite interface, and run controls
-- **Right Panel**: Results display (answer, sources, intelligence, metadata)
+```mermaid
+graph TB
+    subgraph "Input Processing"
+        DOCUMENTS[Document Collection]
+        ENTITIES[Entity Extraction]
+        POLARITY[Polarity Analysis]
+    end
+    
+    subgraph "Contradiction Detection"
+        ANTONYM[Antonym Detection]
+        CLUSTERING[Entity Clustering]
+        CONFLICT[Conflict Identification]
+    end
+    
+    subgraph "Output Generation"
+        CONTRADICTIONS[Contradiction Groups]
+        SOURCES[Source Mapping]
+        CONFIDENCE[Confidence Scores]
+    end
+    
+    DOCUMENTS --> ENTITIES
+    ENTITIES --> POLARITY
+    POLARITY --> ANTONYM
+    
+    ANTONYM --> CLUSTERING
+    CLUSTERING --> CONFLICT
+    CONFLICT --> CONTRADICTIONS
+    
+    CONTRADICTIONS --> SOURCES
+    CONTRADICTIONS --> CONFIDENCE
+```
 
-### Research Intelligence Features
+---
 
-#### Contradiction Detection
+## Performance & Optimization
 
-- **Heuristic antonym detection**: Cross-document analysis
-- **Polarity clustering**: Verb→polarity mapping with entity grouping
-- **Conflict visualization**: Entity-based grouping with source counts
+### Performance Architecture
 
-#### Quality Indicators
+```mermaid
+graph TB
+    subgraph "Performance Layers"
+        subgraph "Application Layer"
+            ASYNC[Async Processing]
+            CACHING[Response Caching]
+            BATCHING[Batch Operations]
+        end
+        
+        subgraph "System Layer"
+            MEMORY[Memory Management]
+            THREADING[Thread Pool]
+            RESOURCE[Resource Limits]
+        end
+        
+        subgraph "External Layer"
+            LLM_OPT[LLM Optimization]
+            EMB_OPT[Embedding Optimization]
+            NETWORK[Network Optimization]
+        end
+    end
+    
+    ASYNC --> MEMORY
+    CACHING --> THREADING
+    BATCHING --> RESOURCE
+    
+    MEMORY --> LLM_OPT
+    THREADING --> EMB_OPT
+    RESOURCE --> NETWORK
+```
 
-- **Source flags**: Preprint detection (arXiv, bioRxiv, medRxiv)
-- **Retraction detection**: Title-based heuristics
-- **Venue information**: Journal/conference display when available
+### Optimization Strategies
 
-#### MMR Visualization
+#### 1. Local Processing Optimizations
 
-- **Selected diversity**: Score histograms and diversity metrics
-- **Candidate overlay**: Comparison of candidates vs selected evidence
-- **Transparency metrics**: Detailed retrieval and selection statistics
+- **Ollama Integration**: Optimized for single-user local workloads
+- **Concurrent Request Limiting**: `max_concurrent_requests = 2` for stability
+- **Memory Management**: Efficient in-memory document indexing
+- **Resource Cleanup**: Proper cleanup of temporary resources
 
-## Performance and Optimization
+#### 2. Evidence Retrieval Optimizations
 
-### Local Processing Optimizations
-
-- **Ollama integration**: Optimized for single-user local workloads
-- **Concurrent request limiting**: `max_concurrent_requests = 1` for stability
-- **Memory management**: Efficient in-memory document indexing
-- **Resource cleanup**: Proper cleanup of temporary resources
-
-### Evidence Retrieval Optimizations
-
-- **MMR search**: Maximum Marginal Relevance for diverse evidence selection
-- **Relevance scoring**: Multi-stage evidence ranking
-- **Source tracking**: Complete citation and provenance information
+- **MMR Search**: Maximum Marginal Relevance for diverse evidence selection
+- **Relevance Scoring**: Multi-stage evidence ranking
+- **Source Tracking**: Complete citation and provenance information
 - **Caching**: Efficient vector storage and retrieval
 
-## Error Handling
+#### 3. UI Performance Optimizations
 
-### Robust File Processing
+- **Lazy Loading**: Components load only when needed
+- **Incremental Updates**: UI updates without full re-renders
+- **Background Processing**: Non-blocking operations
+- **State Management**: Efficient state updates and propagation
 
-- **Gradio compatibility**: Handles different file object types across versions
-- **Duplicate detection**: SHA-256 based deduplication
-- **Error recovery**: Graceful handling of processing failures
-- **Progress tracking**: Real-time status updates with error reporting
+### Performance Monitoring
 
-### Network Resilience
-
-- **Connection retry**: Automatic retry with exponential backoff
-- **Timeout handling**: Configurable timeouts for long operations
-- **Fallback options**: Multiple provider configurations for reliability
-- **Loop management**: Proper asyncio loop handling to prevent conflicts
-
-## Testing and Development
-
-### Test Suite
-
-```bash
-# Run all tests
-make test
-
-# Code quality
-make format                # Code formatting
-make lint                  # Linting and style checks
-make type-check            # Static type checking
+```mermaid
+graph LR
+    subgraph "Metrics Collection"
+        TIMING[Timing Metrics]
+        MEMORY[Memory Usage]
+        THROUGHPUT[Throughput]
+        ERRORS[Error Rates]
+    end
+    
+    subgraph "Performance Analysis"
+        PROFILING[Code Profiling]
+        BOTTLENECKS[Bottleneck Detection]
+        OPTIMIZATION[Optimization Opportunities]
+    end
+    
+    subgraph "Performance Output"
+        REPORTS[Performance Reports]
+        ALERTS[Performance Alerts]
+        RECOMMENDATIONS[Optimization Recommendations]
+    end
+    
+    TIMING --> PROFILING
+    MEMORY --> BOTTLENECKS
+    THROUGHPUT --> OPTIMIZATION
+    ERRORS --> PROFILING
+    
+    PROFILING --> REPORTS
+    BOTTLENECKS --> ALERTS
+    OPTIMIZATION --> RECOMMENDATIONS
 ```
 
-### Development Workflow
+---
 
-1. **Setup**: `make setup` for environment initialization
-2. **Development**: `make ui` for live development
-3. **Testing**: `make test` before commits
-4. **Debugging**: Enable debug logging for troubleshooting
+## Development Workflow
 
-## Troubleshooting
+### Development Environment Setup
 
-### Common Issues and Solutions
-
-#### Ollama Connection Issues
-
-**Problem**: `Connection refused` or model not found errors
-
-**Solutions**:
-1. Verify Ollama is running: `ollama serve`
-2. Check model availability: `ollama list`
-3. Download required models: `ollama pull llama3.2`
-
-#### Performance Issues
-
-**Problem**: Slow response times or timeouts
-
-**Solutions**:
-1. Reduce `evidence_k` to 10-12 (default is 15+)
-2. Set `max_concurrent_requests: 1`
-3. Lower `answer_max_sources` to 5-7
-4. Increase timeout values in configuration
-
-#### Memory Issues
-
-**Problem**: Out of memory during processing
-
-**Solutions**:
-1. Reduce `chunk_size` in parsing settings
-2. Lower `num_ctx` for models with limited VRAM
-3. Use smaller models for resource-constrained environments
-4. Monitor system resources during processing
-
-#### Configuration Issues
-
-**Problem**: Settings not applied or JSON parsing errors
-
-**Solutions**:
-1. Validate JSON syntax in configuration files
-2. Restart application after configuration changes
-3. Check file paths and permissions
-4. Review logs for specific error messages
-
-### Debug Tools and Utilities
-
-```bash
-# Environment status check
-make check-env
-
-# Clean data for fresh start
-make clean-data        # Preserves papers/
-make clean-all-data    # Complete reset
-
-# Kill hanging processes
-make kill-server
+```mermaid
+graph TB
+    subgraph "Environment Setup"
+        CLONE[Clone Repository]
+        SETUP[make setup]
+        VENV[Virtual Environment]
+        DEPS[Dependencies]
+    end
+    
+    subgraph "Development Tools"
+        LINT[Code Linting]
+        TEST[Testing]
+        TYPE_CHECK[Type Checking]
+        FORMAT[Code Formatting]
+    end
+    
+    subgraph "Development Process"
+        DEV[Development]
+        TEST_LOCAL[Local Testing]
+        COMMIT[Commit Changes]
+        PUSH[Push to Repository]
+    end
+    
+    CLONE --> SETUP
+    SETUP --> VENV
+    VENV --> DEPS
+    
+    DEPS --> LINT
+    DEPS --> TEST
+    DEPS --> TYPE_CHECK
+    DEPS --> FORMAT
+    
+    LINT --> DEV
+    TEST --> DEV
+    TYPE_CHECK --> DEV
+    FORMAT --> DEV
+    
+    DEV --> TEST_LOCAL
+    TEST_LOCAL --> COMMIT
+    COMMIT --> PUSH
 ```
+
+### Testing Strategy
+
+```mermaid
+graph LR
+    subgraph "Test Types"
+        UNIT[Unit Tests]
+        INTEGRATION[Integration Tests]
+        UI[UI Tests]
+        PERFORMANCE[Performance Tests]
+    end
+    
+    subgraph "Test Execution"
+        AUTOMATED[Automated Testing]
+        MANUAL[Manual Testing]
+        CONTINUOUS[Continuous Integration]
+    end
+    
+    subgraph "Test Results"
+        PASS[Pass]
+        FAIL[Fail]
+        COVERAGE[Coverage Report]
+    end
+    
+    UNIT --> AUTOMATED
+    INTEGRATION --> AUTOMATED
+    UI --> MANUAL
+    PERFORMANCE --> CONTINUOUS
+    
+    AUTOMATED --> PASS
+    AUTOMATED --> FAIL
+    MANUAL --> PASS
+    MANUAL --> FAIL
+    CONTINUOUS --> COVERAGE
+```
+
+### Code Quality Pipeline
+
+```mermaid
+graph TB
+    subgraph "Code Quality Tools"
+        RUFF[Ruff Linter]
+        MYPY[MyPy Type Checker]
+        BLACK[Black Formatter]
+        ISORT[Import Sorter]
+    end
+    
+    subgraph "Quality Checks"
+        SYNTAX[Syntax Validation]
+        STYLE[Style Compliance]
+        TYPES[Type Safety]
+        IMPORTS[Import Organization]
+    end
+    
+    subgraph "Quality Output"
+        REPORTS[Quality Reports]
+        FIXES[Auto-fixes]
+        ERRORS[Error Reports]
+        WARNINGS[Warning Reports]
+    end
+    
+    RUFF --> SYNTAX
+    RUFF --> STYLE
+    MYPY --> TYPES
+    ISORT --> IMPORTS
+    
+    SYNTAX --> REPORTS
+    STYLE --> FIXES
+    TYPES --> ERRORS
+    IMPORTS --> WARNINGS
+```
+
+---
 
 ## Roadmap and Future Development
 
 ### Completed Features
 
-- ✅ Analysis Progress with live updates and transparency metrics
-- ✅ MMR visualization with candidate/selected comparison
-- ✅ Research Intelligence: contradictions, insights, evidence summary
-- ✅ Source quality flags and reputation indicators
-- ✅ LLM-based query rewriting with filter extraction
-- ✅ Evidence curation controls and preview
-- ✅ Export functionality (JSON/CSV/JSONL/ZIP)
-- ✅ Comprehensive error handling and recovery
+- ✅ **Analysis Progress with live updates and transparency metrics**
+  - Real-time progress tracking with chevron indicators
+  - Comprehensive transparency metrics for evidence selection
+  - Live updates during processing with user feedback
+
+- ✅ **MMR visualization with candidate/selected comparison**
+  - Maximum Marginal Relevance algorithm visualization
+  - Candidate vs selected evidence comparison
+  - Diversity metrics and selection transparency
+
+- ✅ **Research Intelligence: contradictions, insights, evidence summary**
+  - Cross-document contradiction detection
+  - Evidence pattern analysis and insights
+  - Comprehensive evidence summary with metadata
+
+- ✅ **Source quality flags and reputation indicators**
+  - Preprint detection and flagging
+  - Retraction detection heuristics
+  - Venue quality indicators
+
+- ✅ **LLM-based query rewriting with filter extraction**
+  - Intelligent query optimization
+  - Filter extraction (years, venues, fields, species, study types, outcomes)
+  - Smart filter biasing for enhanced retrieval
+
+- ✅ **Evidence curation controls and preview**
+  - Score-based evidence filtering
+  - Real-time evidence preview
+  - Curation controls with immediate feedback
+
+- ✅ **Export functionality (JSON/CSV/JSONL/ZIP)**
+  - Comprehensive session export
+  - Multiple export formats
+  - Trace data export for analysis
+
+- ✅ **Comprehensive error handling and recovery**
+  - Robust error handling throughout pipeline
+  - Graceful degradation and recovery
+  - User-friendly error messages
 
 ### High Priority Next Steps
 
 #### Evidence Curation Enhancements
 
 - **Real-time preview refinements**: Apply cutoff adjustments to histograms
+  - Dynamic histogram updates based on score cutoff changes
+  - Real-time evidence count updates
+  - Interactive filtering with immediate visual feedback
+
 - **Venue quality indicators**: Enhanced reputation scoring when metadata available
+  - Journal impact factor integration
+  - Conference ranking indicators
+  - Source credibility scoring
+
 - **Conflicts drill-down**: Expandable polarity-grouped excerpts
+  - Detailed contradiction analysis
+  - Source-specific conflict resolution
+  - Evidence strength assessment
 
 #### MMR Visualization Improvements
 
 - **Hook-based candidate capture**: Replace log parsing with deterministic hooks
+  - Direct integration with Paper-QA MMR algorithm
+  - Real-time candidate selection tracking
+  - Improved accuracy and performance
+
 - **Enhanced diversity metrics**: More sophisticated diversity measurements
+  - Semantic diversity scoring
+  - Temporal diversity analysis
+  - Source diversity optimization
+
 - **Export integration**: Include candidate/selected sets in exports
+  - MMR candidate data in exports
+  - Selection rationale documentation
+  - Comparison analysis tools
 
 #### Live Analytics
 
 - **Tool calls monitoring**: Real-time operation tracking
+  - LLM call monitoring and optimization
+  - Embedding operation tracking
+  - Performance bottleneck identification
+
 - **Performance dashboard**: Comprehensive metrics display
+  - Real-time performance metrics
+  - Resource utilization monitoring
+  - Optimization recommendations
+
 - **Pause/resume functionality**: Control over long-running operations
+  - User-controlled processing interruption
+  - State preservation during pauses
+  - Graceful resumption capabilities
 
 ### Technical Debt and Improvements
 
+#### Code Quality Enhancements
+
 - **Async/await consistency**: Full migration to async patterns
+  - Complete async/await implementation
+  - Improved concurrency handling
+  - Better error propagation
+
 - **Type safety**: Enhanced type annotations throughout
+  - Comprehensive type hints
+  - Static type checking improvements
+  - Better IDE support and error detection
+
 - **Test coverage**: Comprehensive test suite expansion
-- **Documentation**: API documentation generation
+  - Unit test coverage for all components
+  - Integration test scenarios
+  - Performance regression testing
+
+#### Documentation and Maintenance
+
+- **API documentation generation**: Automated API documentation
+  - Function signature documentation
+  - Parameter validation documentation
+  - Usage examples and best practices
+
 - **Performance profiling**: Systematic optimization opportunities
+  - Performance bottleneck identification
+  - Optimization strategy development
+  - Resource utilization analysis
+
+#### Architecture Improvements
+
+- **Modular component design**: Enhanced component modularity
+  - Reusable UI components
+  - Plugin architecture for extensions
+  - Configuration-driven customization
+
+- **Scalability improvements**: Enhanced system scalability
+  - Multi-user support considerations
+  - Distributed processing capabilities
+  - Resource scaling strategies
+
+### Future Vision
+
+#### Advanced Features
+
+- **Collaborative analysis**: Multi-user research collaboration
+  - Shared session management
+  - Collaborative annotation
+  - Team-based analysis workflows
+
+- **Advanced analytics**: Enhanced research analytics
+  - Trend analysis across documents
+  - Citation network analysis
+  - Research gap identification
+
+- **Integration capabilities**: External system integration
+  - Reference manager integration
+  - Academic database connections
+  - Publication workflow integration
+
+#### Research Workflow Enhancements
+
+- **Automated literature reviews**: Streamlined review processes
+  - Systematic review automation
+  - Meta-analysis support
+  - Evidence synthesis tools
+
+- **Research planning**: Enhanced research planning capabilities
+  - Research question formulation
+  - Methodology planning
+  - Resource allocation optimization
+
+---
 
 ## Conclusion
 
-Paper-QA UI provides a robust, user-friendly interface for scientific document analysis with a focus on transparency, accuracy, and reproducibility. The architecture balances performance with usability while maintaining extensibility for future enhancements.
+Paper-QA UI represents a sophisticated integration of modern web technologies with advanced natural language processing capabilities, specifically designed for scientific literature analysis. The architecture balances performance, usability, and extensibility while maintaining the rigor required for research applications.
 
-For additional support or contributions, please refer to the project repository and community resources.
+### Key Achievements
+
+1. **User-Centric Design**: Streamlined interface that reduces cognitive load while maintaining powerful functionality
+2. **Research-First Approach**: Optimized for scientific workflows with comprehensive evidence analysis
+3. **Transparency and Traceability**: Complete visibility into the analysis process with detailed evidence tracking
+4. **Performance Optimization**: Efficient local-first architecture with cloud fallbacks
+5. **Extensibility**: Modular design that supports future enhancements and customizations
+
+### Technical Excellence
+
+- **Robust Architecture**: Comprehensive error handling and recovery mechanisms
+- **Performance Optimization**: Efficient processing pipeline with real-time updates
+- **Code Quality**: High standards for maintainability and extensibility
+- **Documentation**: Comprehensive technical documentation with traceability mapping
+
+### Future Directions
+
+The system is positioned for continued evolution with a clear roadmap for advanced features, performance improvements, and research workflow enhancements. The modular architecture ensures that new capabilities can be integrated seamlessly while maintaining the core principles of transparency, accuracy, and usability.
+
+For additional support, contributions, or collaboration opportunities, please refer to the project repository and community resources. The development team welcomes feedback, suggestions, and contributions from the research community to further enhance the system's capabilities and impact.
