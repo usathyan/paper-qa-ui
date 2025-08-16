@@ -555,73 +555,88 @@ flowchart TD
 ### Query Rewriting System
 
 ```mermaid
-graph LR
-    subgraph "Input"
-        USER_Q[User Question]
-        SETTINGS[LLM Settings]
-    end
+flowchart LR
+    %% Input
+    USER_Q[❓ User Question]
+    SETTINGS[⚙️ LLM Settings]
     
-    subgraph "Processing"
-        PROMPT[Prompt Assembly]
-        LLM_CALL[LLM Call]
-        PARSE[Response Parsing]
-        VALIDATE[Validation]
-    end
+    %% Processing Pipeline
+    PROMPT[📝 Prompt Assembly]
+    LLM_CALL[🤖 LLM Call]
+    PARSE[🔍 Response Parsing]
+    VALIDATE[✅ Validation]
     
-    subgraph "Output"
-        REWRITTEN[Rewritten Query]
-        FILTERS[Extracted Filters]
-        ENHANCED[Enhanced Query]
-    end
+    %% Output
+    REWRITTEN[✏️ Rewritten Query]
+    FILTERS[🏷️ Extracted Filters]
+    ENHANCED[✨ Enhanced Query]
     
-    USER_Q --> PROMPT
-    SETTINGS --> PROMPT
-    PROMPT --> LLM_CALL
-    LLM_CALL --> PARSE
-    PARSE --> VALIDATE
-    VALIDATE --> REWRITTEN
-    VALIDATE --> FILTERS
-    REWRITTEN --> ENHANCED
-    FILTERS --> ENHANCED
+    %% Flow
+    USER_Q ==> PROMPT
+    SETTINGS ==> PROMPT
+    PROMPT ==> LLM_CALL
+    LLM_CALL ==> PARSE
+    PARSE ==> VALIDATE
+    VALIDATE ==> REWRITTEN
+    VALIDATE ==> FILTERS
+    REWRITTEN ==> ENHANCED
+    FILTERS ==> ENHANCED
+    
+    %% Styling
+    classDef inputStyle fill:#1e3a8a,stroke:#60a5fa,stroke-width:2px,color:#ffffff
+    classDef processStyle fill:#581c87,stroke:#a855f7,stroke-width:2px,color:#ffffff
+    classDef outputStyle fill:#166534,stroke:#4ade80,stroke-width:2px,color:#ffffff
+    
+    class USER_Q,SETTINGS inputStyle
+    class PROMPT,LLM_CALL,PARSE,VALIDATE processStyle
+    class REWRITTEN,FILTERS,ENHANCED outputStyle
 ```
 
 ### Evidence Retrieval System
 
 ```mermaid
-graph TB
-    subgraph "Query"
-        ENHANCED_Q[Enhanced Query]
-        CORPUS[Document Corpus]
-    end
+flowchart TD
+    %% Input Query
+    ENHANCED_Q[✨ Enhanced Query]
+    CORPUS[📖 Document Corpus]
     
-    subgraph "Retrieval"
-        EMBED[Query Embedding]
-        SIMILARITY[Similarity Search]
-        CANDIDATES[Candidate Selection]
-    end
+    %% Retrieval Pipeline
+    EMBED[🔢 Query Embedding]
+    SIMILARITY[🔍 Similarity Search]
+    CANDIDATES[📝 Candidate Selection]
     
-    subgraph "Selection"
-        MMR[MMR Algorithm]
-        DIVERSITY[Diversity Scoring]
-        RELEVANCE[Relevance Filtering]
-    end
+    %% Selection Algorithm
+    MMR[🎯 MMR Algorithm]
+    DIVERSITY[📊 Diversity Scoring]
+    RELEVANCE[✅ Relevance Filtering]
     
-    subgraph "Output"
-        EVIDENCE[Selected Evidence]
-        METADATA[Evidence Metadata]
-        SCORES[Relevance Scores]
-    end
+    %% Output Results
+    EVIDENCE[📄 Selected Evidence]
+    METADATA[📋 Evidence Metadata]
+    SCORES[📈 Relevance Scores]
     
-    ENHANCED_Q --> EMBED
-    CORPUS --> EMBED
-    EMBED --> SIMILARITY
-    SIMILARITY --> CANDIDATES
-    CANDIDATES --> MMR
-    MMR --> DIVERSITY
-    DIVERSITY --> RELEVANCE
-    RELEVANCE --> EVIDENCE
-    RELEVANCE --> METADATA
-    RELEVANCE --> SCORES
+    %% Flow
+    ENHANCED_Q ==> EMBED
+    CORPUS ==> EMBED
+    EMBED ==> SIMILARITY
+    SIMILARITY ==> CANDIDATES
+    CANDIDATES ==> MMR
+    MMR ==> DIVERSITY
+    DIVERSITY ==> RELEVANCE
+    RELEVANCE ==> EVIDENCE
+    RELEVANCE ==> METADATA
+    RELEVANCE ==> SCORES
+    
+    %% Styling
+    classDef queryStyle fill:#1e3a8a,stroke:#60a5fa,stroke-width:2px,color:#ffffff
+    classDef retrievalStyle fill:#581c87,stroke:#a855f7,stroke-width:2px,color:#ffffff
+    classDef selectionStyle fill:#166534,stroke:#4ade80,stroke-width:2px,color:#ffffff
+    classDef outputStyle fill:#ea580c,stroke:#fb923c,stroke-width:2px,color:#ffffff
+    
+    class ENHANCED_Q,CORPUS queryStyle
+    class EMBED,SIMILARITY,CANDIDATES retrievalStyle
+    class MMR,DIVERSITY,RELEVANCE selectionStyle
+    class EVIDENCE,METADATA,SCORES outputStyle
 ```
 
 ---
@@ -631,114 +646,135 @@ graph TB
 ### Evidence Processing Pipeline
 
 ```mermaid
-graph TB
-    subgraph "Evidence Input"
-        CONTEXTS[Retrieved Contexts]
-        METADATA[Document Metadata]
-        SCORES[Relevance Scores]
-    end
+flowchart TD
+    %% Evidence Input
+    CONTEXTS[📄 Retrieved Contexts]
+    METADATA[📋 Document Metadata]
+    SCORES[📈 Relevance Scores]
     
-    subgraph "Evidence Processing"
-        FILTER[Score Filtering]
-        GROUP[Source Grouping]
-        RANK[Relevance Ranking]
-        DIVERSIFY[Diversity Analysis]
-    end
+    %% Processing Pipeline
+    FILTER[🔍 Score Filtering]
+    GROUP[📊 Source Grouping]
+    RANK[📈 Relevance Ranking]
+    DIVERSIFY[🎯 Diversity Analysis]
     
-    subgraph "Evidence Output"
-        SUMMARY[Evidence Summary]
-        TOP_EVIDENCE[Top Evidence]
-        FACETS[Evidence Facets]
-        CONFLICTS[Evidence Conflicts]
-    end
+    %% Evidence Output
+    SUMMARY[📊 Evidence Summary]
+    TOP_EVIDENCE[⭐ Top Evidence]
+    FACETS[🏷️ Evidence Facets]
+    CONFLICTS[⚠️ Evidence Conflicts]
     
-    CONTEXTS --> FILTER
-    METADATA --> GROUP
-    SCORES --> RANK
+    %% Flow
+    CONTEXTS ==> FILTER
+    METADATA ==> GROUP
+    SCORES ==> RANK
     
-    FILTER --> GROUP
-    GROUP --> RANK
-    RANK --> DIVERSIFY
+    FILTER ==> GROUP
+    GROUP ==> RANK
+    RANK ==> DIVERSIFY
     
-    DIVERSIFY --> SUMMARY
-    DIVERSIFY --> TOP_EVIDENCE
-    DIVERSIFY --> FACETS
-    DIVERSIFY --> CONFLICTS
+    DIVERSIFY ==> SUMMARY
+    DIVERSIFY ==> TOP_EVIDENCE
+    DIVERSIFY ==> FACETS
+    DIVERSIFY ==> CONFLICTS
+    
+    %% Styling
+    classDef inputStyle fill:#1e3a8a,stroke:#60a5fa,stroke-width:2px,color:#ffffff
+    classDef processStyle fill:#581c87,stroke:#a855f7,stroke-width:2px,color:#ffffff
+    classDef outputStyle fill:#166534,stroke:#4ade80,stroke-width:2px,color:#ffffff
+    
+    class CONTEXTS,METADATA,SCORES inputStyle
+    class FILTER,GROUP,RANK,DIVERSIFY processStyle
+    class SUMMARY,TOP_EVIDENCE,FACETS,CONFLICTS outputStyle
 ```
 
 ### Intelligence Analysis System
 
 ```mermaid
-graph LR
-    subgraph "Input Data"
-        ANSWER[Generated Answer]
-        EVIDENCE[Evidence Contexts]
-        METADATA[Document Metadata]
-    end
+flowchart LR
+    %% Input Data
+    ANSWER[💡 Generated Answer]
+    EVIDENCE[📄 Evidence Contexts]
+    METADATA[📋 Document Metadata]
     
-    subgraph "Analysis Components"
-        CONTRADICTIONS[Contradiction Detection]
-        QUALITY[Quality Assessment]
-        DIVERSITY[Diversity Analysis]
-        CRITIQUE[Critique Generation]
-    end
+    %% Analysis Components
+    CONTRADICTIONS[🔀 Contradiction Detection]
+    QUALITY[🔍 Quality Assessment]
+    DIVERSITY[📊 Diversity Analysis]
+    CRITIQUE[📝 Critique Generation]
     
-    subgraph "Output Intelligence"
-        CONTRADICTIONS_OUT[Potential Contradictions]
-        QUALITY_FLAGS[Quality Flags]
-        DIVERSITY_METRICS[Diversity Metrics]
-        CRITIQUE_TEXT[Critique Text]
-    end
+    %% Output Intelligence
+    CONTRADICTIONS_OUT[⚠️ Potential Contradictions]
+    QUALITY_FLAGS[🚩 Quality Flags]
+    DIVERSITY_METRICS[📈 Diversity Metrics]
+    CRITIQUE_TEXT[📝 Critique Text]
     
-    ANSWER --> CONTRADICTIONS
-    EVIDENCE --> CONTRADICTIONS
-    METADATA --> QUALITY
+    %% Flow
+    ANSWER ==> CONTRADICTIONS
+    EVIDENCE ==> CONTRADICTIONS
+    METADATA ==> QUALITY
     
-    ANSWER --> QUALITY
-    EVIDENCE --> DIVERSITY
-    METADATA --> DIVERSITY
+    ANSWER ==> QUALITY
+    EVIDENCE ==> DIVERSITY
+    METADATA ==> DIVERSITY
     
-    ANSWER --> CRITIQUE
-    EVIDENCE --> CRITIQUE
+    ANSWER ==> CRITIQUE
+    EVIDENCE ==> CRITIQUE
     
-    CONTRADICTIONS --> CONTRADICTIONS_OUT
-    QUALITY --> QUALITY_FLAGS
-    DIVERSITY --> DIVERSITY_METRICS
-    CRITIQUE --> CRITIQUE_TEXT
+    CONTRADICTIONS ==> CONTRADICTIONS_OUT
+    QUALITY ==> QUALITY_FLAGS
+    DIVERSITY ==> DIVERSITY_METRICS
+    CRITIQUE ==> CRITIQUE_TEXT
+    
+    %% Styling
+    classDef inputStyle fill:#1e3a8a,stroke:#60a5fa,stroke-width:2px,color:#ffffff
+    classDef analysisStyle fill:#581c87,stroke:#a855f7,stroke-width:2px,color:#ffffff
+    classDef outputStyle fill:#166534,stroke:#4ade80,stroke-width:2px,color:#ffffff
+    
+    class ANSWER,EVIDENCE,METADATA inputStyle
+    class CONTRADICTIONS,QUALITY,DIVERSITY,CRITIQUE analysisStyle
+    class CONTRADICTIONS_OUT,QUALITY_FLAGS,DIVERSITY_METRICS,CRITIQUE_TEXT outputStyle
 ```
 
 ### Contradiction Detection Algorithm
 
 ```mermaid
-graph TB
-    subgraph "Input Processing"
-        DOCUMENTS[Document Collection]
-        ENTITIES[Entity Extraction]
-        POLARITY[Polarity Analysis]
-    end
+flowchart TD
+    %% Input Processing
+    DOCUMENTS[📚 Document Collection]
+    ENTITIES[🏷️ Entity Extraction]
+    POLARITY[🎯 Polarity Analysis]
     
-    subgraph "Contradiction Detection"
-        ANTONYM[Antonym Detection]
-        CLUSTERING[Entity Clustering]
-        CONFLICT[Conflict Identification]
-    end
+    %% Detection Pipeline
+    ANTONYM[🔀 Antonym Detection]
+    CLUSTERING[📊 Entity Clustering]
+    CONFLICT[⚠️ Conflict Identification]
     
-    subgraph "Output Generation"
-        CONTRADICTIONS[Contradiction Groups]
-        SOURCES[Source Mapping]
-        CONFIDENCE[Confidence Scores]
-    end
+    %% Output Generation
+    CONTRADICTIONS[🔀 Contradiction Groups]
+    SOURCES[📄 Source Mapping]
+    CONFIDENCE[📈 Confidence Scores]
     
-    DOCUMENTS --> ENTITIES
-    ENTITIES --> POLARITY
-    POLARITY --> ANTONYM
+    %% Flow
+    DOCUMENTS ==> ENTITIES
+    ENTITIES ==> POLARITY
+    POLARITY ==> ANTONYM
     
-    ANTONYM --> CLUSTERING
-    CLUSTERING --> CONFLICT
-    CONFLICT --> CONTRADICTIONS
+    ANTONYM ==> CLUSTERING
+    CLUSTERING ==> CONFLICT
+    CONFLICT ==> CONTRADICTIONS
     
-    CONTRADICTIONS --> SOURCES
-    CONTRADICTIONS --> CONFIDENCE
+    CONTRADICTIONS ==> SOURCES
+    CONTRADICTIONS ==> CONFIDENCE
+    
+    %% Styling
+    classDef inputStyle fill:#1e3a8a,stroke:#60a5fa,stroke-width:2px,color:#ffffff
+    classDef detectionStyle fill:#581c87,stroke:#a855f7,stroke-width:2px,color:#ffffff
+    classDef outputStyle fill:#166534,stroke:#4ade80,stroke-width:2px,color:#ffffff
+    
+    class DOCUMENTS,ENTITIES,POLARITY inputStyle
+    class ANTONYM,CLUSTERING,CONFLICT detectionStyle
+    class CONTRADICTIONS,SOURCES,CONFIDENCE outputStyle
 ```
 
 ---
