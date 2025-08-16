@@ -1,11 +1,18 @@
-# Paper-QA UI: User Guide (Data Scientists)
+# Paper-QA UI: User Guide 
 
-This document describes exactly how to operate the UI, what each control does, how outputs are computed, and what to expect. It assumes familiarity with literature review workflows and scientific evaluation.
+This repo is a UI built on top of open source tools to help scientists with their literature synthesis. It assumes you have [sourced](https://github.com/Future-House/paper-qa/tree/main?tab=readme-ov-file#where-do-i-get-papers), and downloaded the journals and articles needed to conduct your analysis. It assumes familiarity with literature review workflows and scientific evaluation.
+This repo only provides a visual interface that exposes the many features available with [Paper QA](https://github.com/Future-House/paper-qa) project, and adds a few more features not part of it.
 
-## 1. Launch
+***PaperQA has a lot more features than what is exposed via this user interface. I have made significant assumptions in making this as practical and usable as possible based on my limited knowledge and experinece in understanding the research workflow.***
+
+
+## Getting Started
+- Clone this repo
+- Build: `make setup`
 - Start: `make ui`
 - Access: http://localhost:7860
-- Requirements: Python 3.11+, Ollama running for local models (default). Optional cloud LLMs via OpenRouter/others if configured.
+- Requirements: Python 3.11+, [Ollama](https://ollama.com/) running for local models (default). Optional cloud LLMs via OpenRouter/others if configured.
+
 
 ## Screenshot of what the UI looks like
 
@@ -23,42 +30,25 @@ Watch the UI in action! This screen recording demonstrates the complete workflow
   <strong>🎥 Click the image above to watch the demo video on YouTube</strong>
 </p>
 
-## 2. Document intake
-- Upload PDFs via the left panel.
+# User Guide
+## 1. Document intake
+- Upload PDFs via the left panel (Project/Corpus) section.
 - The app copies files to `./papers/` and indexes them into an in-memory `Docs` corpus.
-- Indexing runs immediately after upload; status appears in the left panel. No separate build step is required.
+- Indexing runs immediately after upload; status appears in the left panel. 
+- Contact me if you need the ability to add other sources, and indexes
 
-## 3. Query path
-- The UI queries the in-memory `Docs` corpus using `Docs.aquery(question, settings)`. This is the same retrieval/answer path used by the CLI.
-- All LLM/embedding calls run on a dedicated asyncio loop (background thread) to avoid event loop conflicts.
 
-## 4. Configuration (left panel)
+## 2. Configuration
 
-### 4.1 Configuration dropdown
-- Selects a configuration profile for LLM and embeddings. Defaults to a local Ollama setup.
-- Changes reinitialize settings.
+### 2.1 Query Builder: Select configuration
+- Selection of a configuration profile for LLM, embeddings and more. Defaults to a local Ollama setup.
+- You can find more details about configuration aspects in the [developer notes](./docs/DEVELOPER.md)
 
-### 4.2 Run Critique (checkbox)
+### 2.2 Run Critique (checkbox)
 - Adds a post-answer critique block.
-- Implementation: heuristic + optional LLM-based critique; non-blocking.
 - Output: short list of potential issues (unsupported claims, strong language). Does not alter the answer.
 
-### 4.3 Query Options
-- Rewrite query:
-  - Rewrites the question prior to retrieval.
-  - When enabled, "Rewritten query" and "Rewritten from" (original) appear above the Analysis Progress.
-- Use LLM rewrite:
-  - Invokes an LLM to return `{ rewritten, filters: { years, venues, fields } }`.
-  - Filters are displayed inline (e.g., `years 2018-2024; venues Nature, PNAS; fields neurodegeneration`).
-- Bias retrieval using filters:
-  - Appends filter hints to the rewritten text. This biases retrieval without changing internal ranking logic.
-
-Clarification: identical rewritten text
-- If "Use LLM rewrite" is OFF, the local heuristic rewriter only removes polite prefixes, converts leading "what is/are …" to "summarize …", and normalizes punctuation. Queries that do not match those patterns will remain unchanged.
-- If "Use LLM rewrite" is ON but a local-only config is selected (e.g., `optimized_ollama`) or the provider is not reachable, the system falls back to the heuristic, which may result in no change.
-- If an API-backed config is active (e.g., OpenRouter) and the model returns the same string (considering it already optimal), the rewritten text may legitimately equal the original.
-
-### 4.4 Evidence Curation
+### 2.3 Curaton Controls
 - Relevance score cutoff (slider):
   - Sets `answer.evidence_relevance_score_cutoff`.
   - Values below cutoff are discarded during evidence selection.
@@ -68,32 +58,37 @@ Clarification: identical rewritten text
 - Max sources included (number):
   - Sets `answer.answer_max_sources` when > 0.
 
-### 4.5 Display Toggles
+### 2.4 Display Toggles
 - Show source flags (Preprint/Retracted?):
   - When enabled, source badges are shown for excerpts with heuristic flags (preprint servers; likely retraction markers in titles).
 - Show evidence conflicts:
   - When enabled, a clustered conflicts list appears under Research Intelligence.
 
-### 4.6 Export
+### 2.5 Saved Queries
+- This section is a placeholder for future feature. This is not implemented yet.
+- Contact me if you need this feature
+
+### 2.6 Export
 - Export JSON: dumps session data `{question, answer, contexts, metrics, rewrite?, curation?}`.
 - Export CSV: contexts (doc/page/score/text).
 - Export Trace (JSONL): event stream when available.
 - Export Bundle (ZIP): all of the above together.
 
-## 5. Tab Structure and Content
+
+## 3. Tab Structure and Content
 
 The UI is organized into 5 main tabs that provide different views of the analysis:
 
-### 5.1 Plan & Retrieval Tab
+### 3.1 Plan & Retrieval Tab
 - **Question Input**: Enter your research question
-- **Rewrite Button**: Uses LLM to rewrite and extract filters
+- **Rewrite Button**: Uses LLM to rewrite your query. It uses an LLM with predefined prompts to help clarify the question
 - **Query Used**: Editable field showing the final query used for retrieval
 - **Analysis Progress**: Real-time progress with chevron indicators
   - Shows elapsed time and spinner while running
   - Chevron phases: Plan & Retrieval → Evidence → Research Intel → Answer
   - Progress updates as each phase completes
 
-### 5.2 Evidence Tab
+### 3.2 Evidence Tab
 - **Dynamic Summary**: Shows real-time metrics including:
   - Total evidence pieces selected
   - Evidence above relevance cutoff
@@ -106,7 +101,7 @@ The UI is organized into 5 main tabs that provide different views of the analysi
 - **Evidence Sources**: Table of excerpts with citation, page, score, and snippet
 - **Top Evidence (by score)**: Scrollable list of top 8 most relevant evidence pieces
 
-### 5.3 Conflicts Tab
+### 3.3 Conflicts Tab
 - **Evidence Quality Issues**: Flags for preprints, retractions, and other quality concerns
 - **Relevance Conflicts**: Shows evidence pieces with high score variance from same source
 - **Key Insights**: Analysis of evidence patterns including:
@@ -115,24 +110,23 @@ The UI is organized into 5 main tabs that provide different views of the analysi
   - Coverage breadth
   - Source diversity metrics
 
-### 5.4 Research Intel Tab
+### 3.4 Research Intel Tab
 - **Potential Contradictions**: Cross-document antonym detection and polarity clustering
 - **Quality Flags**: Source-level quality indicators
 - **Diversity & Recency**: Year distribution histogram and source diversity metrics
 - **Critique**: LLM-generated assessment of answer quality and support
 
-### 5.5 Answer Tab
-- **Answer Display**: Formatted answer with consistent HTML styling
-- **Clean Interface**: No placeholder text or unnecessary elements
+### 3.5 Answer Tab
+- **Answer Display**: Formatted final answer to your question
 
-## 6. Default behaviors and assumptions
+## 4. Default behaviors and assumptions
 
 The UI has been streamlined by removing several toggles and making opinionated defaults. These decisions optimize for the most common research workflows:
 
-### 6.1 Always-enabled features
+### 4.1 Assumptions and Features 
 
-#### Smart Filter Biasing
-This feature takes the filters extracted by the LLM during rewrite (like years, venues, fields, species, study types, outcomes) and appends them as text hints to the final query used for retrieval.
+#### Rewrite prompt
+This feature adds additional filters extracted by the LLM during rewrite (like years, venues, fields, species, study types, outcomes) and appends them as text hints to the final query used for retrieval.
 
 **Example:**
 - Original question: `"What is the role of PICALM in Alzheimer's?"`
@@ -140,36 +134,18 @@ This feature takes the filters extracted by the LLM during rewrite (like years, 
 - Extracted filters: `{years: [2020, 2024], fields: ["neurodegeneration"], species: ["human"]}`
 - **Final enhanced query**: `"PICALM role Alzheimer's disease (years 2020-2024; fields neurodegeneration; species human)"`
 
-This enhancement improves retrieval precision by providing contextual hints to the search system, helping it find more relevant and targeted papers. This was previously the "Bias retrieval using filters" toggle.
-
-#### Quote Extraction
-- **Quote extraction**: All answers include extracted quotes from sources for better traceability. This was previously a toggle.
-
-### 6.2 Removed UI complexity
-- **LiteLLM debug logs**: No longer exposed in UI (reduces clutter)
-- **File logging toggle**: Simplified to essential logging only
-- **Tab switching automation**: Plan and Retrieval consolidated into single tab
-- **Separate Analysis Progress tab**: Progress now streams inline for better UX
-- **Status display panels**: Removed redundant session log and processing info sections
-- **Placeholder text**: Cleaned up unnecessary placeholder messages throughout UI
-
-These assumptions work well for 95% of research queries. For advanced customization, see the Developer documentation.
-
-## 7. Notes on behavior
+#### General Behavior
+- Answers include extracted quotes from sources for better traceability.
 - Rewriting and biasing affect retrieval text; they do not prune documents by themselves; they steer the selection.
 - Score cutoff and max sources are applied in `Settings` before selection.
 - Per-document cap is applied after selection to control over-representation.
 - Flags and conflicts are heuristic, not metadata-backed unless you provide metadata in your sources.
-
-## 8. Session export contents
 - JSON contains: `question`, `answer`, `contexts`, `processing_time`, `documents_searched`, `metrics`, and optionally `rewrite`, `curation`, and `trace`.
 
-## 9. Operational constraints
+## 5. Operational constraints
 - One active query at a time (single-query lock).
 - Local-first by default; external services only if configured.
 - No background streaming of source documents; all processing is local unless otherwise set in configuration.
-
-## 10. Troubleshooting
 - If Ollama is not running, local configs will fail; start with `ollama serve`.
 - If a port is occupied, run `make kill-server` then `make ui`.
 - If API keys are missing for cloud LLMs, use the default local config or set keys in `.env`.

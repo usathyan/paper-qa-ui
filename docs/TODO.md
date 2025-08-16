@@ -30,31 +30,6 @@
   - Add best practices section
 - **Status**: Pending
 
-## Recently Completed Items
-
-### ✅ Answer Formatting Fix
-- **Issue**: Answer content was displayed in raw Markdown format instead of rendered HTML
-- **Solution**: Implemented Markdown to HTML conversion using the `markdown` library
-- **Implementation**: Updated `format_answer_html()` function in `paperqa2_ui.py`
-- **Status**: Completed
-
-### ✅ Major UI Reorganization
-- Consolidated Plan and Retrieval tabs into single "Plan & Retrieval" tab
-- Renamed "Response Summary" to "Answer" tab
-- Added dynamic evidence meta summary with real-time metrics
-- Created dedicated Conflicts tab with evidence quality analysis
-- Streamlined Research Intelligence tab to focus on core intelligence features
-- Removed redundant UI elements and placeholder text
-- **Status**: Completed
-
-### ✅ Documentation Cleanup
-- Updated README.md with current tab structure and user workflow
-- Completely rewrote DEVELOPER.md with comprehensive technical documentation
-- Added embedded YouTube demo video to README
-- Documented removed features and default behaviors
-- Added mermaid diagrams and traceability mapping
-- **Status**: Completed
-
 ## Future Enhancements
 
 ### Performance Optimizations
