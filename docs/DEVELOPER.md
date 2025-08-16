@@ -201,10 +201,10 @@ graph TB
     end
     
     subgraph "Configuration Processing"
-        LOAD[load_config()]
-        VALIDATE[validate_config()]
-        CONVERT[config_to_settings()]
-        MERGE[merge_defaults()]
+        LOAD[load_config]
+        VALIDATE[validate_config]
+        CONVERT[config_to_settings]
+        MERGE[merge_defaults]
     end
     
     subgraph "Configuration Output"
