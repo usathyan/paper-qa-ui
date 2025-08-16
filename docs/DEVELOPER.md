@@ -74,10 +74,10 @@ flowchart TD
     ANSWER -.-> LLM
     
     %% Styling
-    classDef uiStyle fill:#e1f5fe,stroke:#01579b,stroke-width:2px
-    classDef procStyle fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
-    classDef dataStyle fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
-    classDef extStyle fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef uiStyle fill:#1e3a8a,stroke:#60a5fa,stroke-width:2px,color:#ffffff
+    classDef procStyle fill:#581c87,stroke:#a855f7,stroke-width:2px,color:#ffffff
+    classDef dataStyle fill:#166534,stroke:#4ade80,stroke-width:2px,color:#ffffff
+    classDef extStyle fill:#ea580c,stroke:#fb923c,stroke-width:2px,color:#ffffff
     
     class UPLOAD,QUERY,DISPLAY uiStyle
     class INDEX,SEARCH,ANSWER,INTELL procStyle
