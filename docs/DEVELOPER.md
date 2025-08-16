@@ -784,34 +784,39 @@ flowchart TD
 ### Performance Architecture
 
 ```mermaid
-graph TB
-    subgraph "Performance Layers"
-        subgraph "Application Layer"
-            ASYNC[Async Processing]
-            CACHING[Response Caching]
-            BATCHING[Batch Operations]
-        end
-        
-        subgraph "System Layer"
-            MEMORY[Memory Management]
-            THREADING[Thread Pool]
-            RESOURCE[Resource Limits]
-        end
-        
-        subgraph "External Layer"
-            LLM_OPT[LLM Optimization]
-            EMB_OPT[Embedding Optimization]
-            NETWORK[Network Optimization]
-        end
-    end
+flowchart TD
+    %% Application Layer
+    ASYNC[⚡ Async Processing]
+    CACHING[💾 Response Caching]
+    BATCHING[📦 Batch Operations]
     
-    ASYNC --> MEMORY
-    CACHING --> THREADING
-    BATCHING --> RESOURCE
+    %% System Layer
+    MEMORY[🧠 Memory Management]
+    THREADING[🧵 Thread Pool]
+    RESOURCE[⚙️ Resource Limits]
     
-    MEMORY --> LLM_OPT
-    THREADING --> EMB_OPT
-    RESOURCE --> NETWORK
+    %% External Layer
+    LLM_OPT[🤖 LLM Optimization]
+    EMB_OPT[🔢 Embedding Optimization]
+    NETWORK[🌐 Network Optimization]
+    
+    %% Flow
+    ASYNC ==> MEMORY
+    CACHING ==> THREADING
+    BATCHING ==> RESOURCE
+    
+    MEMORY ==> LLM_OPT
+    THREADING ==> EMB_OPT
+    RESOURCE ==> NETWORK
+    
+    %% Styling
+    classDef appStyle fill:#1e3a8a,stroke:#60a5fa,stroke-width:2px,color:#ffffff
+    classDef systemStyle fill:#581c87,stroke:#a855f7,stroke-width:2px,color:#ffffff
+    classDef externalStyle fill:#166534,stroke:#4ade80,stroke-width:2px,color:#ffffff
+    
+    class ASYNC,CACHING,BATCHING appStyle
+    class MEMORY,THREADING,RESOURCE systemStyle
+    class LLM_OPT,EMB_OPT,NETWORK externalStyle
 ```
 
 ### Optimization Strategies
@@ -840,34 +845,41 @@ graph TB
 ### Performance Monitoring
 
 ```mermaid
-graph LR
-    subgraph "Metrics Collection"
-        TIMING[Timing Metrics]
-        MEMORY[Memory Usage]
-        THROUGHPUT[Throughput]
-        ERRORS[Error Rates]
-    end
+flowchart LR
+    %% Metrics Collection
+    TIMING[⏱️ Timing Metrics]
+    MEMORY[🧠 Memory Usage]
+    THROUGHPUT[📊 Throughput]
+    ERRORS[❌ Error Rates]
     
-    subgraph "Performance Analysis"
-        PROFILING[Code Profiling]
-        BOTTLENECKS[Bottleneck Detection]
-        OPTIMIZATION[Optimization Opportunities]
-    end
+    %% Performance Analysis
+    PROFILING[🔍 Code Profiling]
+    BOTTLENECKS[🚨 Bottleneck Detection]
+    OPTIMIZATION[⚡ Optimization Opportunities]
     
-    subgraph "Performance Output"
-        REPORTS[Performance Reports]
-        ALERTS[Performance Alerts]
-        RECOMMENDATIONS[Optimization Recommendations]
-    end
+    %% Performance Output
+    REPORTS[📋 Performance Reports]
+    ALERTS[🚨 Performance Alerts]
+    RECOMMENDATIONS[💡 Optimization Recommendations]
     
-    TIMING --> PROFILING
-    MEMORY --> BOTTLENECKS
-    THROUGHPUT --> OPTIMIZATION
-    ERRORS --> PROFILING
+    %% Flow
+    TIMING ==> PROFILING
+    MEMORY ==> BOTTLENECKS
+    THROUGHPUT ==> OPTIMIZATION
+    ERRORS ==> PROFILING
     
-    PROFILING --> REPORTS
-    BOTTLENECKS --> ALERTS
-    OPTIMIZATION --> RECOMMENDATIONS
+    PROFILING ==> REPORTS
+    BOTTLENECKS ==> ALERTS
+    OPTIMIZATION ==> RECOMMENDATIONS
+    
+    %% Styling
+    classDef metricsStyle fill:#1e3a8a,stroke:#60a5fa,stroke-width:2px,color:#ffffff
+    classDef analysisStyle fill:#581c87,stroke:#a855f7,stroke-width:2px,color:#ffffff
+    classDef outputStyle fill:#166534,stroke:#4ade80,stroke-width:2px,color:#ffffff
+    
+    class TIMING,MEMORY,THROUGHPUT,ERRORS metricsStyle
+    class PROFILING,BOTTLENECKS,OPTIMIZATION analysisStyle
+    class REPORTS,ALERTS,RECOMMENDATIONS outputStyle
 ```
 
 ---
@@ -877,116 +889,137 @@ graph LR
 ### Development Environment Setup
 
 ```mermaid
-graph TB
-    subgraph "Environment Setup"
-        CLONE[Clone Repository]
-        SETUP[make setup]
-        VENV[Virtual Environment]
-        DEPS[Dependencies]
-    end
+flowchart TD
+    %% Environment Setup
+    CLONE[📥 Clone Repository]
+    SETUP[⚙️ make setup]
+    VENV[🐍 Virtual Environment]
+    DEPS[📦 Dependencies]
     
-    subgraph "Development Tools"
-        LINT[Code Linting]
-        TEST[Testing]
-        TYPE_CHECK[Type Checking]
-        FORMAT[Code Formatting]
-    end
+    %% Development Tools
+    LINT[🔍 Code Linting]
+    TEST[🧪 Testing]
+    TYPE_CHECK[📝 Type Checking]
+    FORMAT[✨ Code Formatting]
     
-    subgraph "Development Process"
-        DEV[Development]
-        TEST_LOCAL[Local Testing]
-        COMMIT[Commit Changes]
-        PUSH[Push to Repository]
-    end
+    %% Development Process
+    DEV[💻 Development]
+    TEST_LOCAL[🧪 Local Testing]
+    COMMIT[📝 Commit Changes]
+    PUSH[🚀 Push to Repository]
     
-    CLONE --> SETUP
-    SETUP --> VENV
-    VENV --> DEPS
+    %% Flow
+    CLONE ==> SETUP
+    SETUP ==> VENV
+    VENV ==> DEPS
     
-    DEPS --> LINT
-    DEPS --> TEST
-    DEPS --> TYPE_CHECK
-    DEPS --> FORMAT
+    DEPS ==> LINT
+    DEPS ==> TEST
+    DEPS ==> TYPE_CHECK
+    DEPS ==> FORMAT
     
-    LINT --> DEV
-    TEST --> DEV
-    TYPE_CHECK --> DEV
-    FORMAT --> DEV
+    LINT ==> DEV
+    TEST ==> DEV
+    TYPE_CHECK ==> DEV
+    FORMAT ==> DEV
     
-    DEV --> TEST_LOCAL
-    TEST_LOCAL --> COMMIT
-    COMMIT --> PUSH
+    DEV ==> TEST_LOCAL
+    TEST_LOCAL ==> COMMIT
+    COMMIT ==> PUSH
+    
+    %% Styling
+    classDef setupStyle fill:#1e3a8a,stroke:#60a5fa,stroke-width:2px,color:#ffffff
+    classDef toolsStyle fill:#581c87,stroke:#a855f7,stroke-width:2px,color:#ffffff
+    classDef processStyle fill:#166534,stroke:#4ade80,stroke-width:2px,color:#ffffff
+    
+    class CLONE,SETUP,VENV,DEPS setupStyle
+    class LINT,TEST,TYPE_CHECK,FORMAT toolsStyle
+    class DEV,TEST_LOCAL,COMMIT,PUSH processStyle
 ```
 
 ### Testing Strategy
 
 ```mermaid
-graph LR
-    subgraph "Test Types"
-        UNIT[Unit Tests]
-        INTEGRATION[Integration Tests]
-        UI[UI Tests]
-        PERFORMANCE[Performance Tests]
-    end
+flowchart LR
+    %% Test Types
+    UNIT[🧪 Unit Tests]
+    INTEGRATION[🔗 Integration Tests]
+    UI[🖥️ UI Tests]
+    PERFORMANCE[⚡ Performance Tests]
     
-    subgraph "Test Execution"
-        AUTOMATED[Automated Testing]
-        MANUAL[Manual Testing]
-        CONTINUOUS[Continuous Integration]
-    end
+    %% Test Execution
+    AUTOMATED[🤖 Automated Testing]
+    MANUAL[👤 Manual Testing]
+    CONTINUOUS[🔄 Continuous Integration]
     
-    subgraph "Test Results"
-        PASS[Pass]
-        FAIL[Fail]
-        COVERAGE[Coverage Report]
-    end
+    %% Test Results
+    PASS[✅ Pass]
+    FAIL[❌ Fail]
+    COVERAGE[📊 Coverage Report]
     
-    UNIT --> AUTOMATED
-    INTEGRATION --> AUTOMATED
-    UI --> MANUAL
-    PERFORMANCE --> CONTINUOUS
+    %% Flow
+    UNIT ==> AUTOMATED
+    INTEGRATION ==> AUTOMATED
+    UI ==> MANUAL
+    PERFORMANCE ==> CONTINUOUS
     
-    AUTOMATED --> PASS
-    AUTOMATED --> FAIL
-    MANUAL --> PASS
-    MANUAL --> FAIL
-    CONTINUOUS --> COVERAGE
+    AUTOMATED ==> PASS
+    AUTOMATED ==> FAIL
+    MANUAL ==> PASS
+    MANUAL ==> FAIL
+    CONTINUOUS ==> COVERAGE
+    
+    %% Styling
+    classDef testStyle fill:#1e3a8a,stroke:#60a5fa,stroke-width:2px,color:#ffffff
+    classDef executionStyle fill:#581c87,stroke:#a855f7,stroke-width:2px,color:#ffffff
+    classDef resultStyle fill:#166534,stroke:#4ade80,stroke-width:2px,color:#ffffff
+    
+    class UNIT,INTEGRATION,UI,PERFORMANCE testStyle
+    class AUTOMATED,MANUAL,CONTINUOUS executionStyle
+    class PASS,FAIL,COVERAGE resultStyle
 ```
 
 ### Code Quality Pipeline
 
 ```mermaid
-graph TB
-    subgraph "Code Quality Tools"
-        RUFF[Ruff Linter]
-        MYPY[MyPy Type Checker]
-        BLACK[Black Formatter]
-        ISORT[Import Sorter]
-    end
+flowchart TD
+    %% Code Quality Tools
+    RUFF[🔍 Ruff Linter]
+    MYPY[📝 MyPy Type Checker]
+    BLACK[✨ Black Formatter]
+    ISORT[📋 Import Sorter]
     
-    subgraph "Quality Checks"
-        SYNTAX[Syntax Validation]
-        STYLE[Style Compliance]
-        TYPES[Type Safety]
-        IMPORTS[Import Organization]
-    end
+    %% Quality Checks
+    SYNTAX[✅ Syntax Validation]
+    STYLE[🎨 Style Compliance]
+    TYPES[🔒 Type Safety]
+    IMPORTS[📦 Import Organization]
     
-    subgraph "Quality Output"
-        REPORTS[Quality Reports]
-        FIXES[Auto-fixes]
-        ERRORS[Error Reports]
-        WARNINGS[Warning Reports]
-    end
+    %% Quality Output
+    REPORTS[📊 Quality Reports]
+    FIXES[🔧 Auto-fixes]
+    ERRORS[❌ Error Reports]
+    WARNINGS[⚠️ Warning Reports]
     
-    RUFF --> SYNTAX
-    RUFF --> STYLE
-    MYPY --> TYPES
-    ISORT --> IMPORTS
+    %% Flow
+    RUFF ==> SYNTAX
+    RUFF ==> STYLE
+    MYPY ==> TYPES
+    ISORT ==> IMPORTS
     
-    SYNTAX --> REPORTS
-    STYLE --> FIXES
-    TYPES --> ERRORS
-    IMPORTS --> WARNINGS
+    SYNTAX ==> REPORTS
+    STYLE ==> FIXES
+    TYPES ==> ERRORS
+    IMPORTS ==> WARNINGS
+    
+    %% Styling
+    classDef toolsStyle fill:#1e3a8a,stroke:#60a5fa,stroke-width:2px,color:#ffffff
+    classDef checksStyle fill:#581c87,stroke:#a855f7,stroke-width:2px,color:#ffffff
+    classDef outputStyle fill:#166534,stroke:#4ade80,stroke-width:2px,color:#ffffff
+    
+    class RUFF,MYPY,BLACK,ISORT toolsStyle
+    class SYNTAX,STYLE,TYPES,IMPORTS checksStyle
+    class REPORTS,FIXES,ERRORS,WARNINGS outputStyle
 ```
 
 ---
