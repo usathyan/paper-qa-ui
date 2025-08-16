@@ -18,10 +18,11 @@ This document describes exactly how to operate the UI, what each control does, h
 Watch the UI in action! This screen recording demonstrates the complete workflow from document upload to answer generation.
 
 <p align="center">
-  <video width="1000" controls>
-    <source src="./docs/screen-recording.mp4" type="video/mp4">
-    Your browser does not support the video tag.
-  </video>
+  <a href="https://youtu.be/GX6vTlS29ps" target="_blank">
+    <img src="https://img.youtube.com/vi/GX6vTlS29ps/maxresdefault.jpg" alt="Paper-QA UI Demo Video" width="1000" style="border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+  </a>
+  <br>
+  <small>📺 <a href="https://youtu.be/GX6vTlS29ps" target="_blank">Watch on YouTube</a></small>
 </p>
 
 ## 2. Document intake
