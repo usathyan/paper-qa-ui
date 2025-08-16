@@ -26,45 +26,63 @@ Paper-QA UI is a sophisticated web interface that transforms the [Paper-QA](http
 ### High-Level System Architecture
 
 ```mermaid
-graph TB
-    subgraph "🎯 User Interface"
-        UPLOAD[📁 Document Upload]
-        QUERY[❓ Question Input]
-        DISPLAY[📊 Results Display]
+flowchart TD
+    subgraph UI ["🎯 User Interface"]
+        direction LR
+        UPLOAD[📁 Upload PDFs]
+        QUERY[❓ Ask Question]
+        DISPLAY[📊 View Results]
     end
     
-    subgraph "⚙️ Core Processing"
-        INDEX[📚 Document Indexing]
-        SEARCH[🔍 Evidence Retrieval]
-        ANSWER[💡 Answer Generation]
-        INTELL[🧠 Intelligence Analysis]
+    subgraph PROC ["⚙️ Processing Pipeline"]
+        direction LR
+        INDEX[📚 Index Docs]
+        SEARCH[🔍 Retrieve Evidence]
+        ANSWER[💡 Generate Answer]
+        INTELL[🧠 Analyze Intelligence]
     end
     
-    subgraph "💾 Data Storage"
-        CORPUS[📖 Document Corpus]
-        VECTORS[🔢 Embedding Vectors]
-        METADATA[📋 Document Metadata]
+    subgraph DATA ["💾 Data Layer"]
+        direction TB
+        CORPUS[📖 Document<br/>Corpus]
+        VECTORS[🔢 Vector<br/>Embeddings]
+        METADATA[📋 Document<br/>Metadata]
     end
     
-    subgraph "🌐 External Services"
-        LLM[🤖 LLM Services]
-        EMB[🔤 Embedding Services]
+    subgraph EXT ["🌐 External Services"]
+        direction TB
+        LLM[🤖 Large Language<br/>Models]
+        EMB[🔤 Embedding<br/>Services]
     end
     
-    UPLOAD --> INDEX
-    QUERY --> SEARCH
+    %% Primary Flow
+    UPLOAD ==> INDEX
+    QUERY ==> SEARCH
+    INDEX ==> SEARCH
+    SEARCH ==> ANSWER
+    ANSWER ==> INTELL
+    INTELL ==> DISPLAY
     
-    INDEX --> CORPUS
-    INDEX --> LLM
+    %% Data Connections
+    INDEX -.-> CORPUS
+    INDEX -.-> METADATA
+    SEARCH -.-> VECTORS
     
-    SEARCH --> VECTORS
-    SEARCH --> EMB
-    SEARCH --> ANSWER
+    %% Service Connections
+    INDEX -.-> LLM
+    SEARCH -.-> EMB
+    ANSWER -.-> LLM
     
-    ANSWER --> INTELL
-    ANSWER --> LLM
+    %% Styling
+    classDef uiStyle fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef procStyle fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef dataStyle fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
+    classDef extStyle fill:#fff3e0,stroke:#e65100,stroke-width:2px
     
-    INTELL --> DISPLAY
+    class UPLOAD,QUERY,DISPLAY uiStyle
+    class INDEX,SEARCH,ANSWER,INTELL procStyle
+    class CORPUS,VECTORS,METADATA dataStyle
+    class LLM,EMB extStyle
 ```
 
 ### End-to-End Data Flow
