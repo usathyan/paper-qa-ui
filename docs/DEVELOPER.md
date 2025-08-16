@@ -27,35 +27,29 @@ Paper-QA UI is a sophisticated web interface that transforms the [Paper-QA](http
 
 ```mermaid
 flowchart TD
-    subgraph UI ["🎯 User Interface"]
-        direction LR
-        UPLOAD[📁 Upload PDFs]
-        QUERY[❓ Ask Question]
-        DISPLAY[📊 View Results]
-    end
+    %% User Interface Layer
+    UPLOAD[📁 Upload PDFs]
+    QUERY[❓ Ask Question]
     
-    subgraph PROC ["⚙️ Processing Pipeline"]
-        direction LR
-        INDEX[📚 Index Docs]
-        SEARCH[🔍 Retrieve Evidence]
-        ANSWER[💡 Generate Answer]
-        INTELL[🧠 Analyze Intelligence]
-    end
+    %% Processing Pipeline
+    INDEX[📚 Index Documents]
+    SEARCH[🔍 Retrieve Evidence]
+    ANSWER[💡 Generate Answer]
+    INTELL[🧠 Analyze Intelligence]
     
-    subgraph DATA ["💾 Data Layer"]
-        direction TB
-        CORPUS[📖 Document<br/>Corpus]
-        VECTORS[🔢 Vector<br/>Embeddings]
-        METADATA[📋 Document<br/>Metadata]
-    end
+    %% Results Display
+    DISPLAY[📊 View Results]
     
-    subgraph EXT ["🌐 External Services"]
-        direction TB
-        LLM[🤖 Large Language<br/>Models]
-        EMB[🔤 Embedding<br/>Services]
-    end
+    %% Data Storage (Side Components)
+    CORPUS[📖 Document Corpus]
+    VECTORS[🔢 Vector Embeddings]
+    METADATA[📋 Document Metadata]
     
-    %% Primary Flow
+    %% External Services (Side Components)
+    LLM[🤖 LLM Services]
+    EMB[🔤 Embedding Services]
+    
+    %% Primary Vertical Flow
     UPLOAD ==> INDEX
     QUERY ==> SEARCH
     INDEX ==> SEARCH
@@ -63,12 +57,12 @@ flowchart TD
     ANSWER ==> INTELL
     INTELL ==> DISPLAY
     
-    %% Data Connections
+    %% Data Connections (Side arrows)
     INDEX -.-> CORPUS
     INDEX -.-> METADATA
     SEARCH -.-> VECTORS
     
-    %% Service Connections
+    %% Service Connections (Side arrows)
     INDEX -.-> LLM
     SEARCH -.-> EMB
     ANSWER -.-> LLM
